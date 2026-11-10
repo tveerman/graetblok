@@ -396,12 +396,20 @@ export class Renderer {
     this.skyU.top.value.copy(top);
     const hor = this.c1.setHex(sky.nightHor).lerp(this.c2.setHex(sky.dayHor), dayF);
     hor.lerp(this.c3.setHex(sky.duskHor), dusk * 0.6);
+    // regen en sneeuw: de lucht trekt grijs dicht; bliksem licht hem even op
+    const wet = env.wet || 0, flash = env.flash || 0;
+    if (wet > 0.01) {
+      const grey = this.c3.setRGB(0.07 + 0.36 * dayF, 0.08 + 0.39 * dayF, 0.1 + 0.42 * dayF);
+      this.skyU.top.value.lerp(grey, wet * 0.85);
+      hor.lerp(grey, wet * 0.8);
+    }
+    if (flash > 0) { this.skyU.top.value.lerp(this.c3.setRGB(0.85, 0.9, 1), flash * 0.7); hor.lerp(this.c3.setRGB(0.85, 0.9, 1), flash * 0.7); }
     this.skyU.hor.value.copy(hor);
     this.skyU.sunDir.value.copy(this.sunDir);
     this.skyU.glowAmt.value = def.cycle ? dusk * 0.9 + dayF * 0.15 : 0;
 
     // mist
-    let near = this.viewDist * 0.5, far = this.viewDist;
+    let near = this.viewDist * (0.5 - 0.32 * wet), far = this.viewDist * (1 - 0.3 * wet);
     this.fog.color.copy(hor);
     if (env.water) { this.fog.color.setHex(def.water).multiplyScalar(0.35 + 0.4 * dayF); near = 0.5; far = 20; }
     else if (env.lava) { this.fog.color.setHex(0xe05a10); near = 0.1; far = 2.5; }
@@ -414,6 +422,8 @@ export class Renderer {
     const sl = this.U.skyLight.value;
     sl.setRGB(nl * 0.62 + (1 - nl * 0.62) * dayF, nl * 0.72 + (1 - nl * 0.72) * dayF, nl + (1 - nl) * dayF);
     if (dusk > 0 && dayF > 0.05) { sl.g *= 1 - dusk * 0.12; sl.b *= 1 - dusk * 0.26; }
+    if (wet > 0.01) sl.multiplyScalar(1 - 0.3 * wet * dayF);
+    if (flash > 0) { sl.r += flash * 0.7; sl.g += flash * 0.75; sl.b += flash * 0.9; }
     if (id_vuur(this.world)) sl.setRGB(nl * 1.25, nl * 0.8, nl * 0.62);
     if (this.world === 'schaduw') sl.setRGB(nl * 0.85, nl * 0.7, nl * 1.2);
     this.U.minLight.value = def.minLight + (env.nightEyes ? 0.1 : 0);
@@ -437,6 +447,7 @@ export class Renderer {
         sc.setRGB(0.16, 0.2, 0.32).multiplyScalar(k * (env.nightEyes ? 1.5 : 1));
       }
       if (env.water) sc.multiplyScalar(0.5);
+      if (wet > 0.01) sc.multiplyScalar(1 - 0.8 * wet);
       this.UH.skyTop.value.copy(this.skyU.top.value);
     }
 
@@ -444,18 +455,18 @@ export class Renderer {
     const amb = Math.max(sl.r, sl.g, sl.b);
     this.hemi.intensity = 0.5 + amb * 2.1;
     this.hemi.color.copy(sl).lerp(this.c2.setRGB(1, 1, 1), 0.4);
-    this.sun.intensity = dayF * 1.6;
+    this.sun.intensity = dayF * 1.6 * (1 - 0.7 * wet);
     this.sun.position.copy(cam.position).addScaledVector(this.sunDir, 50);
     this.sun.target.position.copy(cam.position);
 
     // hemellichamen
     this.dome.position.copy(cam.position);
-    this.sunSprite.visible = def.cycle && el > -0.2;
+    this.sunSprite.visible = def.cycle && el > -0.2 && wet < 0.45;
     this.sunSprite.position.copy(cam.position).addScaledVector(this.sunDir, 520);
-    this.moonSprite.visible = def.cycle && el < 0.2;
+    this.moonSprite.visible = def.cycle && el < 0.2 && wet < 0.45;
     this.moonSprite.position.copy(cam.position).addScaledVector(this.sunDir, -520);
     this.stars.position.copy(cam.position);
-    this.stars.material.opacity = def.cycle ? 1 - dayF : (this.world === 'schaduw' ? 0.7 : 0.2);
+    this.stars.material.opacity = (def.cycle ? 1 - dayF : (this.world === 'schaduw' ? 0.7 : 0.2)) * (1 - wet);
     this.stars.visible = this.stars.material.opacity > 0.02;
 
     if (this.clouds.visible) {
@@ -463,8 +474,8 @@ export class Renderer {
       const cy = this.world === 'wolken' ? 168 : 152;
       this.clouds.position.set(cam.position.x, cy, cam.position.z);
       this.cloudTex.offset.set(cam.position.x / 320 + this.cloudDrift, -cam.position.z / 320);
-      this.clouds.material.color.copy(sl).lerp(this.c2.setRGB(1, 1, 1), 0.25);
-      this.clouds.material.opacity = 0.78;
+      this.clouds.material.color.copy(sl).lerp(this.c2.setRGB(1, 1, 1), 0.25).multiplyScalar(1 - 0.5 * wet);
+      this.clouds.material.opacity = 0.78 + 0.2 * wet;
     }
   }
 

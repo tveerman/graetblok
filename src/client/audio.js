@@ -105,6 +105,12 @@ export class Sound {
       const g = c.createGain(); g.gain.value = 0.0;
       src.connect(f); f.connect(g); g.connect(this.sfxGain); src.start();
       this.amb = { f, g };
+      // regen: een tweede ruis die pas klinkt als het regent
+      const rs = c.createBufferSource(); rs.buffer = this.noiseBuf; rs.loop = true;
+      const rf = c.createBiquadFilter(); rf.type = 'highpass'; rf.frequency.value = 1800;
+      const rg = c.createGain(); rg.gain.value = 0.0;
+      rs.connect(rf); rf.connect(rg); rg.connect(this.sfxGain); rs.start(0, 0.37);
+      this.rain = { f: rf, g: rg };
       // muziek: eigen volumeknop, een meter (voor de controle) en een zachte echo
       this.musicGain = c.createGain(); this.musicGain.gain.value = this.musicOn ? MUSIC_VOL : 0; this.musicGain.connect(this.master);
       this.mus.on = this.musicOn;
@@ -246,6 +252,12 @@ export class Sound {
       case 'poof': this.noise(0.22, 'lowpass', 1400, 0.2 * v, 200); break;
       case 'death': [392, 330, 262, 196].forEach((f, i) => this.tone(f, 0.35, 'triangle', 0.16 * v, 0, i * 0.18)); break;
       case 'restore': [262, 330, 392, 523, 659, 784, 1047, 1319].forEach((f, i) => this.tone(f, 0.9, 'sine', 0.13 * v, 0, i * 0.14, 0.05)); this.noise(2, 'bandpass', 800, 0.08 * v, 5000, 0, 2); break;
+      // ---- dorpen, dieren, weer en treinen ----
+      case 'donder':
+        this.noise(0.14, 'highpass', 2200, 0.3 * v);
+        this.noise(2.6, 'lowpass', 300, 0.6 * v, 50, 0.04); this.noise(1.8, 'lowpass', 140, 0.5 * v, 40, 0.5);
+        this.tone(52, 1.6, 'triangle', 0.3 * v, 30, 0.06);
+        break;
       case 'sleep': [523, 440, 349, 262].forEach((f, i) => this.tone(f, 0.6, 'sine', 0.12 * v, 0, i * 0.3, 0.1)); break;
     }
   }
@@ -270,6 +282,12 @@ export class Sound {
     const windVol = env.under ? 0.01 : (w === 'ijs' ? 0.09 : w === 'wolken' ? 0.08 : w === 'vuur' ? 0.05 : 0.035) * (0.6 + 0.4 * Math.sin(this.ctx.currentTime * 0.3));
     a.g.gain.setTargetAtTime(this.sfxOn ? windVol + (env.flying ? 0.08 : 0) : 0, this.ctx.currentTime, 0.5);
     a.f.frequency.setTargetAtTime(env.flying ? 900 : (w === 'ijs' ? 600 : 380), this.ctx.currentTime, 0.5);
+    // regen: zachter als je onder een dak staat of onder de grond zit
+    if (this.rain) {
+      const rv = (env.rain || 0) * (env.under ? 0.04 : env.roof ? 0.35 : 1) * 0.11;
+      this.rain.g.gain.setTargetAtTime(this.sfxOn ? rv : 0, this.ctx.currentTime, 0.4);
+      this.rain.f.frequency.setTargetAtTime(env.roof ? 900 : 1800, this.ctx.currentTime, 0.4);
+    }
     this.ambT -= dt;
     if (this.ambT <= 0 && this.sfxOn) {
       this.ambT = 2 + Math.random() * 5;

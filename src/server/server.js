@@ -17,6 +17,7 @@ import { hash3, mulberry32 } from '../shared/noise.js';
 import { ServerWorld } from './world.js';
 import { QUESTS, computerLines } from './quests.js';
 import { entityMethods } from './entities.js';
+import { npcMethods } from './npcs.js';
 
 const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
 const SAVE_FIELDS = ['world', 'x', 'y', 'z', 'yaw', 'hp', 'xp', 'level', 'inv', 'sel', 'flags', 'q', 'dragons', 'pets', 'spawn', 'look', 'kills'];
@@ -33,7 +34,8 @@ export class GameServer {
   }
 
   newMeta() {
-    return { v: 1, seed: (Math.random() * 2147483647) | 0, time: DAY_LENGTH * 0.05, trees: {}, bossDead: {}, portals: [], eggs: {}, nextId: 1 };
+    return { v: 1, seed: (Math.random() * 2147483647) | 0, time: DAY_LENGTH * 0.05, trees: {}, bossDead: {}, portals: [], eggs: {}, nextId: 1,
+      weather: {} };
   }
 
   async init() {
@@ -128,6 +130,7 @@ export class GameServer {
       isNew: !!p.isNew, saved: !!this.storage.persistent,
     });
     p.isNew = false;
+    this.send(p, { t: 'weather', k: this.weatherOf(p.world), now: 1 });
     this.sendInv(p); this.sendStats(p); this.sendDragons(p);
     this.spawnOwned(p);
     p.flags['visit_' + p.world] = 1;
@@ -783,6 +786,7 @@ export class GameServer {
       this.wildSpawn(p);
       this.checkGuardian(p);
     }
+    this.updateWeather(active);
     this.updateEggs();
     for (const wid of active) this.cleanup(this.worlds[wid]);
     // chunks vergeten waar niemand meer is
@@ -825,6 +829,7 @@ export class GameServer {
     else if (m.c === 'xp') this.addXp(p, m.n || 100);
     else if (m.c === 'god') p.god = !!m.v;
     else if (m.c === 'egg') { for (const k in this.meta.eggs) this.meta.eggs[k].prog = 0.95; }
+    else if (m.c === 'weather') this.setWeather(p.world, m.k || 'zon', m.dur || 120);
     else if (m.c === 'tp') { p.x = m.x; p.y = m.y; p.z = m.z; this.send(p, { t: 'tp', x: m.x, y: m.y, z: m.z }); }
     else if (m.c === 'grow') { for (const d of p.dragons) { d.growth = 100; const e = w.ents.get(d.eid); if (e) { this.applyDragon(e); this.broadcast(w.id, { t: 'entMeta', id: e.id, s: e.scale, g: 100 }); } } this.sendDragons(p); this.checkQuests(p); }
   }
@@ -848,5 +853,5 @@ export class GameServer {
   }
 }
 
-Object.assign(GameServer.prototype, entityMethods);
+Object.assign(GameServer.prototype, entityMethods, npcMethods);
 export { itemName, isNight };

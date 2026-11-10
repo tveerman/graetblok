@@ -147,6 +147,10 @@ From Jorian's design document (`spel.txt`), following development phases 1–4, 
   colours, and a spiral staircase of mushrooms around the trunk (it starts on the tall root at
   the back). Everything glows in the dark; a restored tree glows much brighter and fills the
   air with drifting lights.
+- **Weather** – sun, rain and thunderstorms in the green and shadow worlds, snow and
+  blizzards in the ice world, showers in the cloud world, and snow instead of rain high in
+  the mountains. The sky turns grey, you hear the rain (muffled under a roof), and lightning
+  strikes near you with thunder that arrives later the further away it was.
 - **Story quests** – 18 steps from "chop a tree" to "defeat the Drakenkoning", shown top-left,
   with a compass marker for the early ones.
 
@@ -251,6 +255,7 @@ game.net.send({ t: 'debug', c: 'world', w: 'wolken' })     // jump to the cloud 
 game.net.send({ t: 'debug', c: 'time', v: 0 })             // morning
 game.net.send({ t: 'debug', c: 'god', v: 1 })              // cannot be hurt
 game.net.send({ t: 'debug', c: 'grow' })                   // all your dragons become adults
+game.net.send({ t: 'debug', c: 'weather', k: 'onweer' })   // 'zon', 'regen', 'onweer', 'sneeuw', 'storm'
 ```
 
 Add `&save=test` (any short name) to play in a separate world that does not touch the real

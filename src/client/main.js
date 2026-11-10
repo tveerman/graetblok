@@ -16,6 +16,7 @@ import { Player } from './player.js';
 import { UI } from './ui.js';
 import { connect } from './net.js';
 import { setupOffline } from './offline.js';
+import { Weather } from './weather.js';
 
 const $ = (id) => document.getElementById(id);
 const DEFAULTS = { view: 5, volume: 0.8, sens: 1, music: true, sfx: true, autoJump: true, dynRes: true, hq: false };
@@ -37,6 +38,7 @@ class Game {
     this.world = new ChunkWorld(this.R.scene, this.atlas, this.R.chunkMats);
     this.particles = new Particles(this.R.scene);
     this.ents = new Entities(this.R.scene, this.particles);
+    this.sky = new Weather(this.R.scene, this.world, touch);        // regen, sneeuw en onweer
     this.sound = new Sound();
     this.inv = new Array(INV_SIZE).fill(0);
     this.sel = 0;
@@ -163,7 +165,7 @@ class Game {
     p.model.visible = false; p.held.visible = false; p.hl.visible = false; p.crack.visible = false;
     this.input.exitLock(); this.input.breakHeld = false;
     ui.showHud(false); ui.setMounted(false); ui.setBoss(null); ui.setTint(''); ui.fade(false); ui.loading(null);
-    this.world.clear(); this.ents.clear(); this.particles.clear();
+    this.world.clear(); this.ents.clear(); this.particles.clear(); this.sky.clear(); this.sky.set('zon', true);
     this.R.setWorld('groen', this.trees);
     this.sound.quiet();
     $('menu').classList.remove('hidden');
@@ -236,6 +238,7 @@ class Game {
       case 'world': {
         this.worldId = m.world;
         this.world.clear(); this.ents.clear(); this.ents.world = m.world;
+        this.sky.clear(); this.sites = [];
         this.trees = m.trees || {};
         setTreeTiles(this.trees);
         this.R.setWorld(m.world, this.trees);
@@ -282,6 +285,7 @@ class Game {
       case 'projEnd': { const pr = this.ents.endProj(m); if (pr) this.sound.play(pr.arrow ? 'hit' : 'boom', this.vol(m.x, m.y, m.z) * 0.7); break; }
       case 'fx': this.fx(m); break;
       case 'mount': p.setMount(m.id, m.s); ui.setMounted(!!m.id); if (m.id) { this.sound.play('roar', 0.6); ui.toast(this.touch ? 'Duw de stick naar voren om te vliegen. ⬆ omhoog, ⬇ omlaag.' : 'W = vliegen waar je kijkt · spatie omhoog · shift omlaag · R afstappen'); } break;
+      case 'weather': this.sky.set(m.k, m.now); break;
       case 'dragons': this.dragons = m.l; ui.refreshDragon(); break;
       case 'dragonMenu': ui.openDragon(m.uid); break;
       case 'bossDown': this.sound.play('restore', 0.7); break;
@@ -319,6 +323,14 @@ class Game {
       case 'slam': P.burst(x, y + 0.3, z, 26, [0.6, 0.5, 0.4], { speed: 5, size: 0.4, life: 0.8, grav: 6, spread: 2 }); s.play('boom', v); break;
       case 'roar': s.play('roar', Math.max(0.3, v)); break;
       case 'breath': s.play('breath', Math.max(0.4, v)); break;
+      case 'bolt': {
+        this.sky.bolt(x, y, z);
+        P.burst(x, y + 0.3, z, 30, [1, 1, 0.8], { speed: 8, size: 0.3, life: 0.5, grav: 6, up: 2 });
+        const d = Math.hypot(x - this.player.pos.x, z - this.player.pos.z);
+        // de donder komt later dan de flits, net als in het echt
+        setTimeout(() => { this.sound.play('donder', Math.max(0.35, 1 - d / 90)); if (d < 26) this.player.shake = Math.max(this.player.shake || 0, 0.35 * (1 - d / 26)); }, Math.min(1800, d * 22));
+        break;
+      }
       case 'fuse': P.burst(x, y, z, 10, [1, 0.8, 0.3], { speed: 1.6, size: 0.14, life: 0.5, grav: -1 }); s.play('fuse', Math.max(0.3, v)); break;
       case 'explode': {
         P.burst(x, y, z, 60, [1, 0.6, 0.15], { speed: 9, size: 0.6, life: 0.7, grav: 1, spread: 1.5 });
@@ -485,11 +497,12 @@ class Game {
     } else {
       p.update(dt);
       this.ents.update(dt, this.time, p);
+      this.sky.update(dt, this.R.camera, this.particles);
       this.weather(dt);
       this.motes(dt);
       this.particles.update(dt, window.innerHeight);
     }
-    this.R.update(this.gameTime, paused ? 0 : dt, { water: p.headIn === 1, lava: p.headIn === 2, nightEyes: !!this.trees.schaduw });
+    this.R.update(this.gameTime, paused ? 0 : dt, { water: p.headIn === 1, lava: p.headIn === 2, nightEyes: !!this.trees.schaduw, wet: this.sky.wet, flash: this.sky.flash });
     this.ui.setTint(p.headIn === 1 ? 'water' : p.headIn === 2 ? 'lava' : '');
     this.hudT = (this.hudT || 0) + real;
     if (this.state === 'play' && this.hudT > 0.07) {
@@ -500,7 +513,7 @@ class Game {
       this.ui.setRide(!own ? '' : (dragonStage(own.growth) >= 2 ? '🐉 Vliegen' : '🐉 ' + (own.name || 'Draak')));
       const surf = this.world.get(Math.floor(p.pos.x) >> 4, Math.floor(p.pos.z) >> 4);
       const under = surf ? p.pos.y < surf.hm[(Math.floor(p.pos.x) & 15) * 16 + (Math.floor(p.pos.z) & 15)] - 6 : false;
-      this.sound.ambience(hd, { world: this.worldId, under, day: this.R.dayF, flying: !!p.mount && p.speedNow > 4 });
+      this.sound.ambience(hd, { world: this.worldId, under, day: this.R.dayF, flying: !!p.mount && p.mountKind !== 'trein' && p.speedNow > 4, rain: Math.max(this.sky.rain, this.sky.snow * 0.25), roof: this.sky.roof });
     }
     this.R.render();
 
