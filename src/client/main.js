@@ -39,6 +39,7 @@ class Game {
     this.particles = new Particles(this.R.scene);
     this.ents = new Entities(this.R.scene, this.particles);
     this.sky = new Weather(this.R.scene, this.world, touch);        // regen, sneeuw en onweer
+    this.sites = [];                                                // dorpen en kastelen in de buurt (voor het kompas)
     this.sound = new Sound();
     this.inv = new Array(INV_SIZE).fill(0);
     this.sel = 0;
@@ -292,7 +293,11 @@ class Game {
       }
       case 'fx': this.fx(m); break;
       case 'mount': p.setMount(m.id, m.s); ui.setMounted(!!m.id); if (m.id) { this.sound.play('roar', 0.6); ui.toast(this.touch ? 'Duw de stick naar voren om te vliegen. ⬆ omhoog, ⬇ omlaag.' : 'W = vliegen waar je kijkt · spatie omhoog · shift omlaag · R afstappen'); } break;
+      case 'trade': ui.openTrade(m); break;
+      case 'traded': ui.got(m.id, m.n); this.sound.play('coin'); break;
       case 'weather': this.sky.set(m.k, m.now); break;
+      case 'sites': this.sites = m.l; break;
+      case 'debugSite': this.debugSite = m.s; break;
       case 'dragons': this.dragons = m.l; ui.refreshDragon(); break;
       case 'dragonMenu': ui.openDragon(m.uid); break;
       case 'bossDown': this.sound.play('restore', 0.7); break;
@@ -526,7 +531,7 @@ class Game {
     if (this.state === 'play' && this.hudT > 0.07) {
       // het kompas en de sfeergeluiden hoeven niet elke frame
       const hd = this.hudT; this.hudT = 0;
-      this.ui.frame(p.yaw, p.pos, this.worldId);
+      this.ui.frame(p.yaw, p.pos, this.worldId, this.sites);
       const own = p.mount ? null : this.nearDragon();
       this.ui.setRide(!own ? '' : (dragonStage(own.growth) >= 2 ? '🐉 Vliegen' : '🐉 ' + (own.name || 'Draak')));
       this.animalSounds(hd);

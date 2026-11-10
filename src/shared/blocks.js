@@ -166,9 +166,24 @@ def(116, 'koperblok', 'Koperblok', { hard: 5, tool: 'pick', tier: 2, snd: 'metal
 def(117, 'zilverblok', 'Zilverblok', { hard: 5, tool: 'pick', tier: 2, snd: 'metal' });
 
 // ---- dorpen, kastelen en spoorwegen ----
+def(118, 'stro', 'Strodak', { hard: 0.6, snd: 'grass' });
+def(119, 'dakpan', 'Dakpannen', { hard: 3, tool: 'pick' });
+def(143, 'vakwerk', 'Vakwerkmuur', { hard: 2, tool: 'axe', snd: 'wood' });
+def(146, 'grind', 'Grind', { hard: 0.7, snd: 'sand' });
 def(147, 'wol', 'Wol', { hard: 0.5, snd: 'snow' });
 def(148, 'wol_rood', 'Rode wol', { hard: 0.5, snd: 'snow' });
 def(149, 'wol_blauw', 'Blauwe wol', { hard: 0.5, snd: 'snow' });
+def(150, 'hooi', 'Hooibaal', { tiles: ['hooi_top', 'hooi', 'hooi_top'], hard: 0.6, snd: 'grass' });
+def(151, 'luifel', 'Luifel', { hard: 0.5, snd: 'snow' });
+const MEUBEL = { shape: SHAPE_LOW, solid: true, opaque: false, hard: 1, tool: 'axe', snd: 'wood' };
+def(152, 'tafel', 'Tafel', { ...MEUBEL, tiles: ['tafel_top', 'tafel_side', 'planken'], height: 0.8125 });
+def(153, 'kruk', 'Kruk', { ...MEUBEL, tiles: ['planken', 'kruk_side', 'planken'], height: 0.5 });
+def(154, 'kookpot', 'Kookpot', { tiles: ['kookpot_top', 'kookpot', 'kookpot'], hard: 3, tool: 'pick', snd: 'metal', light: 6 });
+def(155, 'aambeeld', 'Aambeeld', { ...MEUBEL, tiles: ['aambeeld_top', 'aambeeld', 'aambeeld_top'], height: 0.75, tool: 'pick', hard: 4, snd: 'metal' });
+def(156, 'boekenkast', 'Boekenkast', { tiles: ['planken', 'boekenkast', 'planken'], hard: 1.6, tool: 'axe', snd: 'wood' });
+def(160, 'akker', 'Akker', { tiles: ['akker_top', 'aarde', 'aarde'], hard: 0.6, snd: 'grass', drop: [2, 1, 1] });
+def(161, 'tarwe', 'Tarwe', { ...CROSS, drop: [326, 1, 2] });
+def(162, 'pompoen', 'Pompoen', { tiles: ['pompoen_top', 'pompoen', 'pompoen_top'], hard: 1, tool: 'axe', snd: 'wood' });
 
 // ---- rond de levensbomen: alles geeft licht in het donker ----
 // Lichtranken hangen uit de kruin, lichtvruchten zitten er als lampionnen tussen. Ze horen
@@ -211,7 +226,8 @@ export const TILE_CRACK = [tile('crack0'), tile('crack1'), tile('crack2'), tile(
 // src/client/blockmodels.js. De plaatjes van die blokken zelf worden alleen nog gebruikt
 // als icoontje in de rugzak.
 export const MODEL_TILES = ['gras_spriet', 'plant_steel', 'plant_blad', 'bloemblad_rood', 'bloemblad_geel', 'bloemblad_blauw',
-  'bloemhart', 'bes', 'tak', 'stok_hout', 'vlam', 'lichtblad', 'zwamhoed_turkoois', 'zwamlamellen_turkoois'];
+  'bloemhart', 'bes', 'tak', 'stok_hout', 'vlam', 'lichtblad', 'zwamhoed_turkoois', 'zwamlamellen_turkoois',
+  'tarwe_halm', 'tarwe_aar'];
 MODEL_TILES.forEach(tile);
 
 export const NUM_BLOCKS = 256;

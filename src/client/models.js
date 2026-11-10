@@ -314,6 +314,84 @@ export function playerModel(look) {
   return root;
 }
 
+// ---------- mensen: dorpelingen, de koning en ridders ----------
+
+// Kleren per beroep: [hemd, broek, hoed, schort]. hoed: zie hieronder.
+const OUTFIT = {
+  bakker: [0xf2f0ea, 0x8a7a66, 'muts', 0xffffff],
+  kok: [0xf6f6f6, 0x3a3a44, 'koksmuts', 0],
+  smid: [0x4a4a52, 0x3a3028, 'kaal', 0x6a4426],
+  winkelier: [0x3f8a4a, 0x5a4a3a, 'haar', 0x8a5a30],
+  boer: [0x3a6ab8, 0x3a6ab8, 'strohoed', 0],
+  houthakker: [0xb8322a, 0x4a3a2a, 'pet', 0],
+  juwelier: [0x7a3aa8, 0x2a2a34, 'hoge hoed', 0],
+  mijnwerker: [0x7a7a80, 0x4a4a50, 'helm', 0],
+  marktkoopman: [0xe08a2a, 0x5a4a3a, 'pet', 0xf2f0ea],
+  drakenhandelaar: [0x4a2a6a, 0x2a1a3a, 'kap', 0],
+  stationschef: [0x24345e, 0x24345e, 'chefpet', 0],
+  koning: [0xb81e2e, 0x7a1420, 'kroon', 0],
+};
+const SHIRTS = [0x2f7fd0, 0xd0362f, 0x3fa34a, 0xe8b02a, 0x8a4ad0, 0xe86aa8, 0x40b0b0, 0xc87a3a];
+const HAIRS = [0x5a3a1c, 0x2a1c12, 0xd8b050, 0xb8502a, 0x8a8a8a, 0x1a1a1e];
+const SKINS = [0xe8b890, 0xf2cca8, 0xc68a5a, 0x8a5a3a, 0xe0a878];
+
+export function mens(job, v = 0) {
+  const root = base('biped'), g = root.userData.a.inner, a = root.userData.a;
+  const O = OUTFIT[job] || [SHIRTS[v % SHIRTS.length], [0x3a4a7a, 0x5a4a3a, 0x3a3a44][v % 3], v % 4 === 1 ? 'staart' : 'haar', 0];
+  const skinC = SKINS[(v >> 3) % SKINS.length], hairC = HAIRS[(v >> 5) % HAIRS.length];
+  const sk = mat(skinC, 'glad'), shirt = mat(O[0], 'glad'), pants = mat(O[1], 'glad'), hair = mat(hairC, 'vacht');
+  const rok = !OUTFIT[job] && v % 4 === 1 || job === 'koning' || job === 'drakenhandelaar';
+  a.legs = [limb(g, pants, 0.24, 0.75, 0.24, -0.13, 0.75, 0), limb(g, pants, 0.24, 0.75, 0.24, 0.13, 0.75, 0)];
+  part(g, shirt, 0.52, 0.7, 0.28, 0, 1.1, 0);
+  if (rok) part(g, shirt, 0.6, 0.62, 0.36, 0, 0.5, 0);                                  // een jurk of mantel tot op de grond
+  if (O[3]) part(g, mat(O[3], 'glad'), 0.4, 0.8, 0.04, 0, 0.92, 0.17);                 // schort
+  a.arms = [limb(g, shirt, 0.2, 0.56, 0.2, -0.37, 1.43, 0), limb(g, shirt, 0.2, 0.56, 0.2, 0.37, 1.43, 0)];
+  part(a.arms[0], sk, 0.17, 0.17, 0.17, 0, -0.64, 0); part(a.arms[1], sk, 0.17, 0.17, 0.17, 0, -0.64, 0);
+  const head = new THREE.Group(); head.position.set(0, 1.68, 0); g.add(head); a.head = head;
+  part(head, faceMats(skinC, 'glad', '#201810', false, true), 0.44, 0.44, 0.44, 0, 0, 0);
+  const hat = O[2];
+  const haar = () => { part(head, hair, 0.48, 0.14, 0.48, 0, 0.24, 0); part(head, hair, 0.48, 0.3, 0.1, 0, 0.06, -0.2); };
+  if (hat === 'haar') haar();
+  else if (hat === 'staart') { haar(); part(head, hair, 0.16, 0.5, 0.14, 0, -0.2, -0.28); }
+  else if (hat === 'muts') { haar(); part(head, mat(0xffffff, 'glad'), 0.5, 0.16, 0.5, 0, 0.36, 0); }
+  else if (hat === 'koksmuts') { part(head, mat(0xffffff, 'glad'), 0.46, 0.12, 0.46, 0, 0.28, 0); part(head, mat(0xffffff, 'glad'), 0.54, 0.4, 0.54, 0, 0.52, 0); part(g, mat(0xd0362f, 'glad'), 0.3, 0.1, 0.3, 0, 1.44, 0.02); }
+  else if (hat === 'strohoed') { part(head, mat(0xe8c860, 'vacht'), 0.84, 0.05, 0.84, 0, 0.24, 0); part(head, mat(0xe8c860, 'vacht'), 0.46, 0.18, 0.46, 0, 0.34, 0); }
+  else if (hat === 'pet') { haar(); part(head, mat(0x4a5a3a, 'glad'), 0.5, 0.12, 0.5, 0, 0.3, 0); part(head, mat(0x4a5a3a, 'glad'), 0.4, 0.04, 0.2, 0, 0.26, 0.32); }
+  else if (hat === 'hoge hoed') { part(head, mat(0x1a1a1e, 'glad'), 0.66, 0.05, 0.66, 0, 0.24, 0); part(head, mat(0x1a1a1e, 'glad'), 0.4, 0.4, 0.4, 0, 0.46, 0); part(head, glowMat(0x5fe3e8), 0.12, 0.12, 0.03, 0.1, 0.02, 0.23); }
+  else if (hat === 'helm') { part(head, mat(0xe8b02a, 'metaal'), 0.52, 0.2, 0.52, 0, 0.28, 0); part(head, glowMat(0xfff6c0), 0.12, 0.1, 0.06, 0, 0.3, 0.27); }
+  else if (hat === 'kap') { part(head, shirt, 0.54, 0.3, 0.54, 0, 0.22, -0.02); part(head, shirt, 0.54, 0.5, 0.12, 0, -0.04, -0.24); part(head, shirt, 0.08, 0.4, 0.5, -0.25, 0, 0); part(head, shirt, 0.08, 0.4, 0.5, 0.25, 0, 0); part(g, glowMat(0xb46bff), 0.12, 0.12, 0.05, 0, 1.2, 0.16); }
+  else if (hat === 'chefpet') { haar(); part(head, mat(0xc8262c, 'glad'), 0.5, 0.16, 0.5, 0, 0.32, 0); part(head, mat(0xe8c040, 'glad'), 0.51, 0.05, 0.51, 0, 0.26, 0); part(head, mat(0x1a1a1e, 'glad'), 0.4, 0.04, 0.18, 0, 0.24, 0.32); }
+  else if (hat === 'kroon') {
+    part(head, mat(0xe8e8e8, 'vacht'), 0.48, 0.14, 0.48, 0, 0.24, 0); part(head, mat(0xe8e8e8, 'vacht'), 0.3, 0.2, 0.08, 0, -0.26, 0.2);      // grijs haar en een baard
+    part(head, glowMat(0xffd23a), 0.5, 0.1, 0.5, 0, 0.36, 0);
+    for (let i = 0; i < 5; i++) part(head, glowMat(0xffd23a), 0.07, 0.16, 0.07, -0.2 + i * 0.1, 0.48, 0.2);
+    part(head, glowMat(0xff3a5a), 0.08, 0.08, 0.04, 0, 0.36, 0.26);
+    part(g, mat(0xf4f4f0, 'vacht'), 0.64, 0.14, 0.4, 0, 1.4, 0); part(g, mat(0xf4f4f0, 'vacht'), 0.64, 0.1, 0.4, 0, 0.22, 0);                 // hermelijn
+  }
+  if (job === 'houthakker') part(head, hair, 0.34, 0.2, 0.08, 0, -0.22, 0.2);          // baard
+  return root;
+}
+
+function ridder(evil) {
+  const root = base('biped'), g = root.userData.a.inner, a = root.userData.a;
+  const steel = mat(evil ? 0x5a5a66 : 0xb8c4d8, 'metaal'), dark = mat(evil ? 0x2a2a34 : 0x6a7486, 'metaal');
+  a.legs = [limb(g, dark, 0.26, 0.78, 0.26, -0.14, 0.78, 0), limb(g, dark, 0.26, 0.78, 0.26, 0.14, 0.78, 0)];
+  part(g, steel, 0.6, 0.72, 0.34, 0, 1.14, 0);
+  part(g, mat(evil ? 0x7a1420 : 0x2f5fd0, 'glad'), 0.34, 0.5, 0.03, 0, 1.12, 0.18);      // wapenkleed
+  a.arms = [limb(g, steel, 0.22, 0.6, 0.22, -0.42, 1.46, 0), limb(g, steel, 0.22, 0.6, 0.22, 0.42, 1.46, 0)];
+  part(g, steel, 0.3, 0.16, 0.34, -0.42, 1.5, 0); part(g, steel, 0.3, 0.16, 0.34, 0.42, 1.5, 0);
+  // schild links, zwaard rechts
+  part(a.arms[0], mat(evil ? 0x3a2a2a : 0x2f5fd0, 'glad'), 0.06, 0.56, 0.44, -0.14, -0.4, 0.06);
+  part(a.arms[0], glowMat(evil ? 0x9a9a9a : 0xffd23a), 0.03, 0.2, 0.16, -0.18, -0.38, 0.06);
+  const sw = part(a.arms[1], mat(0xdfe6f0, 'metaal'), 0.06, 0.06, 0.9, 0, -0.56, 0.42);
+  part(a.arms[1], mat(0x8a5a30, 'glad'), 0.24, 0.06, 0.06, 0, -0.56, 0.02); void sw;
+  const head = new THREE.Group(); head.position.set(0, 1.72, 0); g.add(head); a.head = head;
+  part(head, steel, 0.46, 0.46, 0.46, 0, 0, 0);
+  part(head, mat(0x101014, 'glad'), 0.34, 0.07, 0.03, 0, 0.04, 0.23);                   // kijkspleet
+  part(head, dark, 0.05, 0.3, 0.03, 0, -0.06, 0.235);
+  part(head, mat(evil ? 0x7a1420 : 0x2f5fd0, 'vacht'), 0.08, 0.3, 0.4, 0, 0.36, -0.06);  // pluim
+  return root;
+}
 
 // Een skelet. soort: '' (boogschutter), 'ridder' (helm en zwaard) of 'koning' (kroon en mantel).
 function skelet(soort) {
@@ -440,6 +518,8 @@ export function buildModel(kind, opts) {
     case 'geest': m = geest(def.tint || 0xffffff, !!def.boss); break;
     case 'vleugel': m = vleugel(def.boss ? 0x3a4a8a : 0x6a86b0); break;
     case 'draak': m = draak(def.dragon || opts.dtype || 'vuur', opts.growth); break;
+    case 'mens': m = mens(opts.job, opts.variant || 0); break;
+    case 'ridder': m = ridder(false); break;
     case 'skelet': m = skelet(''); break;
     case 'schaap': m = schaap(SCHAAP_COLOR[opts.world] || SCHAAP_COLOR.groen); break;
     case 'koe': m = koe(); break;

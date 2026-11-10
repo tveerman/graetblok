@@ -97,8 +97,14 @@ item(298, 'munt', 'Gouden munt', { icon: ['coin'], stack: 999 });
 item(299, 'bot', 'Bot', { icon: ['bone'] });
 item(324, 'leer', 'Leer', { icon: ['hide', '#9a6a3c'] });
 item(325, 'draad', 'Spinnendraad', { icon: ['thread'] });
+item(326, 'tarwe', 'Tarwe', { icon: ['wheat'] });
+item(327, 'brood', 'Brood', { icon: ['bread'], food: 7 });
 item(328, 'emmer', 'Emmer', { icon: ['bucket', '#7a8894'], stack: 16 });
 item(329, 'melk', 'Emmer melk', { icon: ['bucket', '#ffffff'], food: 6, stack: 1, leaves: 328 });
+item(330, 'pannenkoek', 'Pannenkoeken', { icon: ['pancake'], food: 10 });
+item(331, 'stoofpot', 'Stoofpot', { icon: ['bowl', '#b8642c'], food: 14 });
+item(332, 'heldenmaal', 'Heldenmaal', { icon: ['bowl', '#ffd23a'], food: 40, stack: 16 });
+item(333, 'appeltaart', 'Appeltaart', { icon: ['pie'], food: 12 });
 item(339, 'harnas_leer', 'Leren harnas', { icon: ['armor', '#9a6a3c'], armor: 0.15, stack: 1 });
 
 export const isBlock = (id) => id > 0 && id < 256;
@@ -205,11 +211,26 @@ recipe(B.lamp, 2, [[B.zwamhoed_blauw, 1], [B.glas, 1]], 'werkbank');
 
 // ---- recepten voor rails, treinen, boerderij en huizenbouw ----
 recipe(I.emmer, 1, [[I.ijzerstaaf, 3]], 'werkbank');
+recipe(I.brood, 1, [[I.tarwe, 3]], 'oven');
+recipe(I.appeltaart, 1, [[I.appel, 2], [I.tarwe, 2]], 'oven');
+recipe(B.tarwe, 1, [[I.tarwe, 1]]);
+recipe(B.akker, 2, [[B.aarde, 2], ['blad', 2]]);
+recipe(B.hooi, 1, [[I.tarwe, 4]]);
+recipe(B.stro, 2, [[B.hooi, 1]]);
 recipe(B.bed, 1, [[B.planken, 3], [B.wol, 2]], 'werkbank');
 recipe(B.wol_rood, 1, [[B.wol, 1], [B.bloem_rood, 1]]);
 recipe(B.wol_blauw, 1, [[B.wol, 1], [B.bloem_blauw, 1]]);
+recipe(B.luifel, 2, [[B.wol, 1], [B.wol_rood, 1]], 'werkbank');
 recipe(I.boog, 1, [[I.stok, 3], [I.draad, 2]], 'werkbank');
 recipe(I.harnas_leer, 1, [[I.leer, 5]], 'werkbank');
+recipe(B.dakpan, 4, [[B.baksteen, 4]], 'werkbank');
+recipe(B.vakwerk, 4, [[B.planken, 2], [B.zand, 2]], 'werkbank');
+recipe(B.grind, 4, [[B.keisteen, 2], [B.zand, 2]]);
+recipe(B.tafel, 1, [[B.planken, 3], [I.stok, 4]], 'werkbank');
+recipe(B.kruk, 2, [[B.planken, 1], [I.stok, 3]], 'werkbank');
+recipe(B.boekenkast, 1, [[B.planken, 4], [I.leer, 1]], 'werkbank');
+recipe(B.aambeeld, 1, [[B.ijzerblok, 1], [I.ijzerstaaf, 2]], 'werkbank');
+recipe(B.kookpot, 1, [[I.ijzerstaaf, 4], [I.steenkool, 1]], 'werkbank');
 
 export function matches(need, id) {
   return typeof need === 'string' ? GROUPS[need].includes(id) : need === id;

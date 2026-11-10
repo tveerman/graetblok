@@ -23,6 +23,7 @@
   "src/server/npcs.js",
   "src/server/quests.js",
   "src/server/server.js",
+  "src/server/sites.js",
   "src/server/storage.js",
   "src/server/worker.js",
   "src/server/world.js",

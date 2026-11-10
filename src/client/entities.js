@@ -33,7 +33,7 @@ export class Entities {
   spawn(m) {
     if (this.map.has(m.id)) this.despawn(m.id);
     const def = MOBS[m.k];
-    const group = buildModel(m.k, { world: this.world, dtype: m.d, growth: m.g });
+    const group = buildModel(m.k, { world: this.world, dtype: m.d, growth: m.g, job: m.j, variant: m.v });
     group.scale.setScalar(m.s);
     group.position.set(m.x, m.y, m.z);
     group.rotation.y = m.yaw;
@@ -136,6 +136,11 @@ export class Entities {
       }
       e.group.position.set(e.x, e.y, e.z);
       e.group.rotation.y = e.yaw;
+      // wezens die ver weg zijn tekenen we niet (een dorp vol mensen kost anders te veel)
+      const far = e.def.boss || e.scale > 1.4 ? 150 : 62;
+      const vis = Math.abs(e.x - player.pos.x) < far && Math.abs(e.z - player.pos.z) < far;
+      if (e.group.visible !== vis) { e.group.visible = vis; if (e.wagons) for (const w of e.wagons) w.visible = vis; }
+      if (!vis) continue;
       const hurt = e.flags & 8;
       const s = e.scale * (hurt ? 1.08 : 1);
       if (e.group.scale.x !== s) e.group.scale.setScalar(s);

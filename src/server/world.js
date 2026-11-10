@@ -4,9 +4,10 @@ import { B, B_SOLID, B_SHAPE, SHAPE_LIQUID } from '../shared/blocks.js';
 import { WorldGen } from './worldgen.js';
 
 export class ServerWorld {
-  constructor(id, seed, edits) {
+  constructor(id, seed, edits, genOpts) {
     this.id = id;
-    this.gen = new WorldGen(id, seed);
+    this.gen = new WorldGen(id, seed, genOpts);
+    this.pop = new Map();             // bouwwerken waar nu bewoners rondlopen: sleutel -> { site, ids }
     this.chunks = new Map();          // sleutel -> Uint8Array
     this.edits = edits || new Map();  // sleutel -> Map(index -> blok)
     this.dirty = new Set();           // chunks met wijzigingen die nog opgeslagen moeten worden

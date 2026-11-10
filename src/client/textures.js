@@ -1030,11 +1030,165 @@ const wolTex = (base, seed) => (x, y, u, v) => {
   if (HQ) HH = 0.4 + pluis * 0.4 + krul * 0.2;
   return mul(base, 0.8 + pluis * 0.26 + krul * 0.06);
 };
+const boekKleur = [[150, 40, 36], [44, 84, 150], [52, 120, 60], [176, 132, 44], [110, 60, 130], [70, 70, 78], [190, 96, 40]];
 Object.assign(PX, {
+  stro: (x, y, u, v) => {
+    // lagen stro die over elkaar heen hangen
+    const laag = (v * 4) % 1, halm = vn(u * 40, v * 3, 40, 3, 500) * 0.6 + vn(u * 90, v * 5, 90, 5, 501) * 0.4;
+    let c = mul(mix([150, 116, 44], [228, 196, 96], halm), 0.7 + 0.42 * laag);
+    if (laag < 0.08) c = mul(c, 0.6);
+    if (HQ) HH = 0.2 + 0.5 * laag + 0.3 * halm;
+    return c;
+  },
+  dakpan: (x, y, u, v) => {
+    // rijen ronde pannen, om en om een halve pan verschoven
+    const r = Math.floor(v * 4), fv = v * 4 - r, su = u * 4 + (r & 1) * 0.5;
+    const bol = Math.sin((su % 1) * Math.PI);
+    let c = mul(mix([146, 50, 32], [208, 94, 56], hash2(Math.floor(su) % 4, r, 502)), (0.58 + 0.46 * bol) * (0.74 + 0.3 * fv));
+    if (fv > 0.9) c = mul(c, 1.14);
+    if (HQ) { HH = 0.25 + 0.5 * bol + 0.25 * fv; HS = 0.22; c = mul(c, 0.9 + fbm(u, v, 20, 20, 2, 503) * 0.2); }
+    return c;
+  },
+  vakwerk: (x, y, u, v) => {
+    // witte gepleisterde muur tussen donkere balken
+    const balk = v < 0.085 || v > 0.915 || u < 0.075 || u > 0.925;
+    if (balk) {
+      const langs = (v < 0.085 || v > 0.915) ? vn(u * 4, v * 60, 4, 60, 504) : vn(u * 60, v * 4, 60, 4, 504);
+      if (HQ) HH = 0.75 + langs * 0.2;
+      return mul([92, 62, 38], 0.75 + langs * 0.45);
+    }
+    const rand = Math.min(v - 0.085, 0.915 - v, u - 0.075, 0.925 - u);
+    if (HQ) HH = 0.4 + fbm(u, v, 14, 14, 3, 505) * 0.2;
+    return mul([234, 226, 206], (0.9 + fbm(u, v, 6, 6, 3, 505) * 0.14) * (rand < 0.03 ? 0.82 : 1));
+  },
+  grind: (x, y, u, v) => {
+    cell(u, v, 13, 508);
+    const e = sst(0.02, 0.2, F2 - F1), id = CID, kant = c01(0.5 + (-CDX - CDY) * 0.8);
+    const c = mul(mix([118, 110, 98], [198, 190, 174], id), (0.5 + 0.52 * e) * (0.85 + 0.25 * kant));
+    if (HQ) HH = e * 0.7 + id * 0.25;
+    return c;
+  },
   wol: wolTex([238, 236, 228], 509),
   wol_rood: wolTex([198, 44, 40], 510),
   wol_blauw: wolTex([54, 94, 200], 511),
+  hooi: (x, y, u, v) => {
+    const halm = vn(u * 3, v * 46, 3, 46, 512) * 0.6 + vn(u * 6, v * 90, 6, 90, 513) * 0.4;
+    if (Math.abs(u - 0.25) < 0.028 || Math.abs(u - 0.75) < 0.028) { if (HQ) HH = 0.9; return mul([122, 86, 50], 0.85 + halm * 0.3); }      // het touw
+    if (HQ) HH = 0.3 + halm * 0.5;
+    return mix([160, 124, 42], [238, 206, 106], halm);
+  },
+  hooi_top: (x, y, u, v) => {
+    const d = Math.hypot(u - 0.5, v - 0.5), w = fbm(u, v, 6, 6, 2, 514);
+    const ring = Math.sin(d * 70 + w * 5) * 0.5 + 0.5;
+    if (HQ) HH = 0.3 + ring * 0.4;
+    return mul(mix([156, 120, 40], [236, 204, 104], ring * 0.7 + w * 0.3), d < 0.05 ? 0.7 : 1);
+  },
+  luifel: (x, y, u, v) => {
+    const st = Math.floor(u * 4) & 1;
+    const c = mul(st ? [210, 48, 44] : [242, 238, 228], 0.88 + fbm(u, v, 4, 16, 2, 515) * 0.16);
+    return v > 0.9 ? mul(c, 0.8) : c;
+  },
+  tafel_top: (x, y, u, v) => {
+    const b = Math.min(u, v, 1 - u, 1 - v);
+    return mul(planks([156, 108, 62], 516)(x, y, u, v), b < 0.05 ? 0.66 : 1);
+  },
+  // de zijkant van een tafel: een blad op poten, met schaduw eronder
+  tafel_side: (x, y, u, v) => {
+    const hout = mul([150, 102, 58], 0.82 + vn(u * 30, v * 4, 30, 4, 517) * 0.34);
+    if (v < 0.2) return v > 0.16 ? mul(hout, 0.6) : hout;
+    if (u < 0.14 || u > 0.86) return mul(hout, u < 0.03 || u > 0.97 ? 0.6 : 0.85);
+    return mul([44, 32, 24], 0.8 + v * 0.3);
+  },
+  kruk_side: (x, y, u, v) => {
+    const hout = mul([164, 118, 70], 0.82 + vn(u * 30, v * 4, 30, 4, 518) * 0.34);
+    if (v < 0.3) return v > 0.24 ? mul(hout, 0.6) : hout;
+    if ((u > 0.1 && u < 0.24) || (u > 0.76 && u < 0.9)) return mul(hout, 0.8);
+    if (Math.abs(v - 0.7) < 0.05) return mul(hout, 0.7);
+    return mul([46, 34, 26], 0.8 + v * 0.3);
+  },
+  kookpot: (x, y, u, v) => {
+    const bol = Math.sin(u * Math.PI);
+    let c = mul([50, 52, 60], 0.5 + 0.7 * bol + fbm(u, v, 8, 8, 2, 519) * 0.12);
+    if (v < 0.13) c = mul([86, 88, 98], 0.6 + 0.6 * bol);                                // de rand
+    else if (Math.abs(v - 0.13) < 0.02) c = mul(c, 0.5);
+    if (v > 0.82) {                                                                       // vuurtje eronder
+      const k = fbm(u, v, 8, 4, 2, 520);
+      if (k > 0.42) { if (HQ) HE = 1; return mix([255, 120, 20], [255, 232, 110], (k - 0.42) * 3); }
+      return [34, 26, 22];
+    }
+    if (HQ) { HS = 0.6; HH = 0.3 + 0.5 * bol; }
+    return c;
+  },
+  kookpot_top: (x, y, u, v) => {
+    const d = Math.hypot(u - 0.5, v - 0.5);
+    if (d > 0.46) return [38, 38, 44];
+    if (d > 0.38) { if (HQ) HS = 0.6; return mul([92, 94, 104], 0.8 + fbm(u, v, 6, 6, 2, 521) * 0.3); }
+    cell(u, v, 7, 522);
+    const soep = mix([176, 84, 30], [226, 150, 60], fbm(u, v, 5, 5, 3, 523));
+    return F1 < 0.2 ? mix([255, 220, 150], soep, F1 / 0.2) : soep;                        // belletjes
+  },
+  aambeeld: (x, y, u, v) => {
+    let c = mul([78, 82, 92], 0.78 + fbm(u, v, 3, 12, 3, 524) * 0.34);
+    // smal in het midden, breed boven en onder
+    const breed = v < 0.3 ? 0.5 : v < 0.7 ? 0.26 : 0.42;
+    if (Math.abs(u - 0.5) > breed) c = mul(c, 0.42);
+    if (v < 0.06) c = mul(c, 1.3);
+    if (HQ) HS = 0.75;
+    return c;
+  },
+  aambeeld_top: bevel([126, 130, 142], 525),
+  boekenkast: (x, y, u, v) => {
+    const r = Math.floor(v * 3), fv = v * 3 - r;
+    if (fv > 0.86 || u < 0.04 || u > 0.96) { if (HQ) HH = 0.8; return mul([120, 84, 48], 0.8 + vn(u * 20, v * 3, 20, 3, 526) * 0.3); }      // plank
+    const k = Math.floor(u * 9 + hash2(r, 0, 527) * 3), fu = (u * 9 + hash2(r, 0, 527) * 3) % 1;
+    const hoog = 0.08 + hash2(k, r, 528) * 0.2;
+    if (fv < hoog) return [34, 24, 18];                                                    // lege ruimte boven de boeken
+    let c = mul(boekKleur[Math.floor(hash2(k, r, 529) * boekKleur.length)], 0.7 + 0.5 * Math.sin(fu * Math.PI));
+    if (fu < 0.08) c = mul(c, 0.5);
+    if (Math.abs(fv - 0.4) < 0.03 || Math.abs(fv - 0.72) < 0.02) c = mix(c, [236, 206, 120], 0.7);      // gouden bandjes
+    if (HQ) HH = 0.4 + 0.4 * Math.sin(fu * Math.PI);
+    return c;
+  },
+  akker_top: (x, y, u, v) => {
+    const rib = Math.sin(v * Math.PI * 8) * 0.5 + 0.5;
+    if (HQ) HH = 0.2 + rib * 0.6;
+    return mul(mix([58, 38, 24], [112, 78, 48], fbm(u, v, 6, 6, 3, 532)), 0.7 + 0.42 * rib);
+  },
+  pompoen: (x, y, u, v) => {
+    const fu = (u * 5) % 1, bol = Math.sin(fu * Math.PI);
+    let c = mul(mix([214, 104, 14], [248, 152, 36], fbm(u, v, 3, 3, 2, 533)), 0.56 + 0.5 * bol);
+    c = mul(c, 0.78 + 0.3 * Math.sin(v * Math.PI));
+    if (HQ) { HH = 0.3 + 0.6 * bol; HS = 0.3; }
+    return c;
+  },
+  pompoen_top: (x, y, u, v) => {
+    const du = u - 0.5, dv = v - 0.5, d = Math.hypot(du, dv);
+    if (d < 0.09) return mul([86, 120, 40], 0.8 + hash2(x, y, 534) * 0.3);               // het steeltje
+    const rib = Math.abs(Math.sin(Math.atan2(dv, du) * 5));
+    return mul([236, 132, 26], (0.62 + 0.4 * rib) * (1.05 - d * 0.5));
+  },
+  tarwe_halm: (x, y, u, v) => mul(mix([214, 186, 84], [128, 150, 52], v), 0.85 + vn(u * 10, v * 3, 10, 3, 541) * 0.3),
+  tarwe_aar: (x, y, u, v) => {
+    // een aar: twee rijen korrels langs een steeltje, met naaldjes eraan
+    const t = 1 - v, w = 0.3 * Math.sin(Math.PI * Math.pow(c01(t * 1.05), 0.8)) + 0.03;
+    const d = Math.abs(u - 0.5);
+    const korrel = Math.abs(Math.sin(t * 22 + (u > 0.5 ? 1.5 : 0)));
+    let c = mul(mix([196, 150, 40], [250, 220, 110], korrel), 0.9 + 0.2 * (1 - d / 0.3));
+    const naald = Math.abs(d - t * 0.42) < 0.018 && t > 0.2;
+    if (naald) c = [226, 200, 110];
+    return [c[0], c[1], c[2], (d < w && t > 0.03) || naald ? 255 : 0];
+  },
 });
+DRAW.tarwe = (g) => {
+  g.lineCap = 'round';
+  for (let i = 0; i < 7; i++) {
+    const x = 8 + i * 8, h = 40 + hash2(i, 1, 545) * 16, sw = (hash2(i, 2, 545) - 0.5) * 10;
+    g.strokeStyle = '#a89a3c'; g.lineWidth = 2.5; g.beginPath(); g.moveTo(x, 64); g.quadraticCurveTo(x, 40, x + sw, 64 - h + 12); g.stroke();
+    g.fillStyle = hash2(i, 3, 545) > 0.5 ? '#f0cc5a' : '#dcb040';
+    g.beginPath(); g.ellipse(x + sw, 64 - h + 4, 3.6, 10, sw * 0.03, 0, 6.3); g.fill();
+    g.strokeStyle = 'rgba(120,84,20,0.7)'; g.lineWidth = 1; g.stroke();
+  }
+};
 
 // welke plaatjes niet naadloos herhalen (losse sprites)
 const NO_WRAP = new Set(Object.keys(DRAW));
@@ -1161,6 +1315,7 @@ function hqMat(name) {
   else if (is(/^(blad_|levensblad_)/)) spec = 0.12;
   else if (is(/^(marmerblok|granietblok|marmerzuil)/)) spec = 0.45;
   else if (is(/^(marmer|graniet)$/)) spec = 0.15;
+  if (is(/^(aambeeld|kookpot)/)) spec = 0.6;
   if (name === 'bes') spec = 0.7;
   else if (is(/^(gras_spriet|plant_blad|bloemblad_)/)) { spec = 0.1; bump = 0.5; }
   if (name === 'vlam') { emis = 1; bump = 0; }
@@ -1345,12 +1500,50 @@ const ICONS = {
     for (let y = 18; y < 50; y += 4) { g.beginPath(); g.moveTo(18, y); g.lineTo(46, y + 3); g.stroke(); }
     g.strokeStyle = '#f2f2f6'; g.lineWidth = 2; g.beginPath(); g.moveTo(46, 44); g.quadraticCurveTo(58, 46, 54, 58); g.stroke();
   },
+  wheat: (g) => {
+    g.lineCap = 'round';
+    for (const [x, sw] of [[22, -8], [32, 0], [42, 8]]) {
+      g.strokeStyle = '#a89a3c'; g.lineWidth = 3; g.beginPath(); g.moveTo(32, 60); g.quadraticCurveTo(x, 44, x + sw * 0.4, 30); g.stroke();
+      g.fillStyle = '#f0cc5a'; g.strokeStyle = 'rgba(120,84,20,0.8)'; g.lineWidth = 1.2;
+      for (let k = 0; k < 4; k++) for (const s of [-1, 1]) { g.beginPath(); g.ellipse(x + sw * 0.4 + s * 3.4, 26 - k * 6, 3.2, 4.6, s * 0.5, 0, 6.3); g.fill(); g.stroke(); }
+    }
+  },
+  bread: (g) => {
+    g.fillStyle = '#c8843a'; g.strokeStyle = 'rgba(0,0,0,0.6)'; g.lineWidth = 2;
+    g.beginPath(); g.moveTo(8, 44); g.quadraticCurveTo(6, 20, 32, 18); g.quadraticCurveTo(58, 20, 56, 44); g.quadraticCurveTo(32, 54, 8, 44); g.closePath(); g.fill(); g.stroke();
+    g.fillStyle = '#e8b060'; g.beginPath(); g.ellipse(32, 30, 18, 7, 0, 0, 6.3); g.fill();
+    g.strokeStyle = '#8a5220'; g.lineWidth = 2.5; for (const x of [20, 32, 44]) { g.beginPath(); g.moveTo(x - 3, 24); g.lineTo(x + 3, 36); g.stroke(); }
+  },
   bucket: (g, c) => {
     g.strokeStyle = 'rgba(0,0,0,0.65)'; g.lineWidth = 2;
     g.fillStyle = '#9aa6b2'; g.beginPath(); g.moveTo(12, 20); g.lineTo(52, 20); g.lineTo(46, 56); g.lineTo(18, 56); g.closePath(); g.fill(); g.stroke();
     g.fillStyle = c; g.beginPath(); g.ellipse(32, 20, 20, 7, 0, 0, 6.3); g.fill(); g.stroke();
     g.fillStyle = 'rgba(255,255,255,0.3)'; g.fillRect(18, 26, 5, 26);
     g.strokeStyle = '#5a646e'; g.lineWidth = 3; g.beginPath(); g.moveTo(12, 20); g.quadraticCurveTo(32, -8, 52, 20); g.stroke();
+  },
+  pancake: (g) => {
+    g.strokeStyle = 'rgba(0,0,0,0.6)'; g.lineWidth = 2;
+    g.fillStyle = '#e8e8ee'; g.beginPath(); g.ellipse(32, 50, 27, 8, 0, 0, 6.3); g.fill(); g.stroke();
+    for (let i = 0; i < 4; i++) { g.fillStyle = i % 2 ? '#e8b458' : '#d89a40'; g.beginPath(); g.ellipse(32, 46 - i * 7, 22, 7, 0, 0, 6.3); g.fill(); g.stroke(); }
+    g.fillStyle = '#8a4a1c'; g.beginPath(); g.ellipse(32, 24, 14, 4, 0, 0, 6.3); g.fill();
+    g.beginPath(); g.moveTo(44, 24); g.quadraticCurveTo(50, 30, 46, 38); g.lineTo(42, 30); g.closePath(); g.fill();
+    g.fillStyle = '#fff2a0'; g.fillRect(27, 16, 10, 7); g.strokeRect(27, 16, 10, 7);
+  },
+  bowl: (g, c) => {
+    g.strokeStyle = 'rgba(0,0,0,0.6)'; g.lineWidth = 2;
+    g.fillStyle = '#8a5a34'; g.beginPath(); g.moveTo(6, 30); g.quadraticCurveTo(10, 58, 32, 58); g.quadraticCurveTo(54, 58, 58, 30); g.closePath(); g.fill(); g.stroke();
+    g.fillStyle = c; g.beginPath(); g.ellipse(32, 30, 26, 9, 0, 0, 6.3); g.fill(); g.stroke();
+    g.fillStyle = 'rgba(255,255,255,0.45)'; for (const [x, y] of [[22, 28], [36, 32], [42, 27]]) { g.beginPath(); g.arc(x, y, 3, 0, 6.3); g.fill(); }
+    g.strokeStyle = 'rgba(255,255,255,0.75)'; g.lineWidth = 2.5; g.lineCap = 'round';
+    for (const x of [22, 32, 42]) { g.beginPath(); g.moveTo(x, 20); g.quadraticCurveTo(x - 5, 14, x, 9); g.quadraticCurveTo(x + 4, 5, x, 2); g.stroke(); }
+  },
+  pie: (g) => {
+    g.strokeStyle = 'rgba(0,0,0,0.6)'; g.lineWidth = 2;
+    g.fillStyle = '#b8742c'; g.beginPath(); g.moveTo(6, 34); g.lineTo(58, 34); g.lineTo(52, 52); g.lineTo(12, 52); g.closePath(); g.fill(); g.stroke();
+    g.fillStyle = '#e8b866'; g.beginPath(); g.ellipse(32, 34, 26, 12, 0, 0, 6.3); g.fill(); g.stroke();
+    g.strokeStyle = '#a8662a'; g.lineWidth = 3;
+    for (let i = -2; i <= 2; i++) { g.beginPath(); g.moveTo(32 + i * 9 - 6, 26); g.lineTo(32 + i * 9 + 6, 42); g.stroke(); g.beginPath(); g.moveTo(32 + i * 9 + 6, 26); g.lineTo(32 + i * 9 - 6, 42); g.stroke(); }
+    g.fillStyle = '#d8281e'; g.beginPath(); g.arc(32, 22, 5, 0, 6.3); g.fill();
   },
   boots: (g, c) => {
     g.lineWidth = 2; g.strokeStyle = 'rgba(0,0,0,0.65)'; g.lineJoin = 'round';

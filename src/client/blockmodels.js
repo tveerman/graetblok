@@ -345,6 +345,22 @@ function rank(tile, soort) {
   return M.finish();
 }
 
+// Tarwe: een bosje halmen met een aar bovenaan.
+function tarwe(seed) {
+  const r = mulberry32(seed), M = new Model({ jit: 0.06, vary: 0.18, swayFrom: 0.1, plant: 1 });
+  const halm = tileId('tarwe_halm'), aar = tileId('tarwe_aar');
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * TAU + r() * 0.9, rad = 0.1 + r() * 0.24;
+    const bx = 0.5 + Math.cos(a) * rad, bz = 0.5 + Math.sin(a) * rad, h = 0.62 + r() * 0.2, lean = 0.05 + r() * 0.1;
+    const tx = bx + Math.cos(a) * lean, tz = bz + Math.sin(a) * lean;
+    const pa = a + Math.PI / 2, w = 0.022;
+    M.quad(halm, [[bx - Math.cos(pa) * w, 0, bz - Math.sin(pa) * w], [bx + Math.cos(pa) * w, 0, bz + Math.sin(pa) * w], [tx + Math.cos(pa) * w, h, tz + Math.sin(pa) * w], [tx - Math.cos(pa) * w, h, tz - Math.sin(pa) * w]], [[0.3, 1], [0.7, 1], [0.7, 0], [0.3, 0]]);
+    M.flat(aar, [tx, h - 0.03, tz], a, 1.2 - r() * 0.5, 0.32, 0.15);
+    M.flat(aar, [tx, h - 0.03, tz], a + Math.PI / 2, 1.35, 0.3, 0.13);
+  }
+  return M.finish();
+}
+
 // ---------- welk blok krijgt welk model ----------
 // Per blok een lijstje: de mesher kiest er per plek één uit.
 
@@ -361,3 +377,4 @@ BLOCK_MODELS[B.kampvuur] = [kampvuur()];
 BLOCK_MODELS[B.gloeipaddenstoel] = [paddenstoelen('turkoois', true)];
 ZWAM_KEYS.forEach((k) => { BLOCK_MODELS[B['gloeizwam_' + k]] = [paddenstoelen(k, false)]; });
 TREE_KEYS.forEach((k) => { const t = tileId('lichtvrucht_' + k); BLOCK_MODELS[LIFE_VINES[k]] = [rank(t, 0), rank(t, 1), rank(t, 2)]; });
+BLOCK_MODELS[B.tarwe] = [tarwe(21), tarwe(22), tarwe(23)];

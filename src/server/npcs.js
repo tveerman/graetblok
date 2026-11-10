@@ -7,7 +7,54 @@ import { I, ITEMS, itemName, maxStack, matches, GROUP_NAMES } from '../shared/it
 import { WORLDS, WORLD_ORDER } from '../shared/worlds.js';
 import { MOBS, DRAGONS, BREATH } from '../shared/mobs.js';
 
+const M = I.munt;
 const r2 = (v) => Math.round(v * 100) / 100;
+
+// Beroepen. trades: [wat jij geeft, hoeveel, wat je krijgt, hoeveel]
+export const JOBS = {
+  dorpeling: { title: '', trades: [] },
+  bakker: { title: 'Bakker', hi: 'Vers brood! Net uit de oven.',
+    trades: [[M, 2, I.brood, 1], [M, 5, I.appeltaart, 1], [I.tarwe, 6, M, 2], [I.appel, 3, M, 1]] },
+  kok: { title: 'Kok', hi: 'Welkom in het restaurant! Wat mag het zijn?',
+    trades: [[M, 3, I.pannenkoek, 1], [M, 5, I.stoofpot, 1], [M, 12, I.heldenmaal, 1], [I.rauw_vlees, 2, M, 1], [I.bessen, 6, M, 1]] },
+  smid: { title: 'Smid', hi: 'Goed staal, eerlijke prijzen. En ik koop al je staven.',
+    trades: [[M, 10, I.houweel_ijzer, 1], [M, 10, I.zwaard_ijzer, 1], [M, 8, I.bijl_ijzer, 1], [M, 24, I.harnas_ijzer, 1], [M, 2, I.pijl, 8],
+      [I.ijzerstaaf, 1, M, 2], [I.koperstaaf, 1, M, 1], [I.goudstaaf, 1, M, 4], [I.steenkool, 4, M, 1]] },
+  winkelier: { title: 'Winkelier', hi: 'Kijk gerust rond. Ik heb van alles!',
+    trades: [[M, 2, B.fakkel, 6], [M, 4, B.lantaarn, 1], [M, 6, B.bed, 1], [M, 5, I.emmer, 1], [M, 8, I.boog, 1],
+      [B.wol, 2, M, 1], [I.leer, 2, M, 1], [I.draad, 3, M, 1], [I.bot, 3, M, 1]] },
+  boer: { title: 'Boer', hi: 'Alles vers van het land.',
+    trades: [[M, 1, I.tarwe, 4], [M, 2, B.pompoen, 1], [M, 1, I.appel, 2], [M, 3, B.hooi, 2], [I.bessen, 8, M, 1]] },
+  houthakker: { title: 'Houthakker', hi: 'Hout nodig? Of heb je stammen voor mij?',
+    trades: [[M, 1, B.planken, 8], [M, 2, B.stam_eik, 6], [M, 6, I.bijl_ijzer, 1], ['stam', 8, M, 1]] },
+  juwelier: { title: 'Juwelier', hi: 'Oooh, heb je edelstenen gevonden? Laat eens zien!',
+    trades: [[I.robijn, 1, M, 8], [I.saffier, 1, M, 8], [I.smaragd, 1, M, 8], [I.amethist, 1, M, 4], [I.kristal, 1, M, 5], [B.gloeikristal, 2, M, 1],
+      [M, 30, I.verrekijker, 1], [M, 45, I.springlaarzen, 1], [M, 12, B.lamp, 2]] },
+  mijnwerker: { title: 'Mijnwerker', hi: 'Het mijnbedrijf koopt alles wat uit de grond komt.',
+    trades: [[M, 6, B.dynamiet, 2], [M, 14, I.houweel_ijzer, 1], [M, 3, B.fakkel, 8],
+      [B.keisteen, 16, M, 1], [B.ijzer_erts, 2, M, 3], [B.koper_erts, 2, M, 2], [B.goud_erts, 1, M, 3], [B.marmer, 8, M, 2]] },
+  marktkoopman: { title: 'Marktkoopman', hi: 'Appels, bessen, drankjes! Kom dat zien!',
+    trades: [[M, 1, I.bessen, 4], [M, 1, I.appel, 2], [M, 2, I.gebraden_vlees, 1], [M, 4, I.drankje, 1]] },
+  drakenhandelaar: { title: 'Drakenhandelaar', hi: 'Psst... zoek je iets bijzonders? Ik heb eieren van heel ver weg.',
+    trades: [[M, 40, B.ei_vuur, 1], [M, 40, B.ei_ijs, 1], [M, 50, B.ei_bliksem, 1], [M, 50, B.ei_schaduw, 1], [M, 80, B.ei_kristal, 1],
+      [M, 6, I.drakenschub, 1], [I.drakenschub, 1, M, 4]] },
+};
+const NAMES = ['Sanne', 'Daan', 'Lotte', 'Bram', 'Fenna', 'Joep', 'Noor', 'Siem', 'Tess', 'Gijs', 'Jet', 'Koen', 'Maud', 'Pim', 'Roos', 'Teun', 'Vera', 'Wout', 'Yara', 'Ties', 'Mila', 'Finn', 'Evi', 'Stijn'];
+const KINGS = ['Alfred', 'Boudewijn', 'Karel', 'Lodewijk', 'Willem', 'Floris'];
+const TIPS = [
+  'Wat een mooie dag! Heb je het kasteel al gezien? Volg het torentje op je kompas.',
+  '\'s Nachts komen de spinnen en de skeletten. Blijf dan maar in het dorp: de ridders passen op.',
+  'Met een paar botten kun je een wolf temmen. Dan loopt hij met je mee en vecht hij voor je.',
+  'Tik op een schaap en je krijgt wol. En met een emmer kun je een koe melken!',
+  'De trein rijdt naar het volgende dorp. De stationschef verkoopt locomotieven en rails.',
+  'Trollen bewaken hun schat in een kamp met een palissade. Pas op voor de hoofdman!',
+  'Als het onweert kun je beter niet buiten blijven staan. Bliksem!',
+  'Ze zeggen dat er wilde draken door de lucht vliegen. Blijf uit hun buurt, anders spuwen ze vuur.',
+  'Verkoop je edelstenen aan de juwelier. Die betaalt er goed voor.',
+  'In het spookkasteel woont de Skeletkoning. Onze koning geeft honderd munten voor zijn kroon.',
+];
+const GUARD_LINES = ['Wees gerust, wij houden de wacht.', 'Geen monster komt hier voorbij!', 'Goedendag, reiziger.', 'Blijf \'s nachts dicht bij de fakkels.'];
+const TREE_LINES = ['Hrrrm... de boom leeft weer. Dank je, kleine vriend.', 'Wij waken over de wortels.', 'De magie stroomt. Ik voel het in mijn takken.'];
 
 // Het weer per wereld: [soort, kans]. De rest van de tijd schijnt de zon.
 const WEATHER = {
@@ -25,6 +72,104 @@ export const npcMethods = {
     if (m.owner || m.dead || m.site === 'x') return false;
     const ai = m.def.ai;
     return ai === 'melee' || ai === 'ranged' || ai === 'boss' || ((ai === 'wolf' || ai === 'neutral' || ai === 'wilddragon') && m.angry > 0);
+  },
+
+  // ---------- bouwwerken en hun bewoners ----------
+
+  // elke seconde, per speler: bewoners neerzetten bij bouwwerken waar je in de buurt komt
+  updateSites(p) {
+    const w = this.worlds[p.world], gen = w.gen;
+    const near = gen.sitesNear(p.x, p.z, 170);
+    let inside = null;
+    for (const s of near) {
+      const d = Math.hypot(s.x - p.x, s.z - p.z);
+      if (d < s.r0 + 60 && !w.pop.has(s.key)) this.populate(w, s);
+      if (d < s.r0 - 6 && s.name) inside = s;
+    }
+    if (inside) {
+      if (p.inSite !== inside.key) {
+        p.inSite = inside.key;
+        this.toast(p, (inside.kind === 'dorp' ? 'Welkom in ' : inside.kind === 'kamp' ? 'Pas op: je bent bij ' : 'Je bent bij ') + inside.name + (inside.evil && inside.kind === 'kasteel' ? '. Het spookt hier...' : '!'), inside.evil ? 'boss' : 'good');
+      }
+    } else p.inSite = null;
+    // het kompas wijst naar dorpen en kastelen in de buurt
+    const cell = Math.floor(p.x / 224) + ',' + Math.floor(p.z / 224);
+    if (cell !== p.siteCell) { p.siteCell = cell; this.sendSites(p); }
+  },
+
+  sendSites(p) {
+    const w = this.worlds[p.world];
+    const l = [];
+    for (const s of w.gen.sitesNear(p.x, p.z, 560)) l.push([s.kind === 'dorp' ? 0 : s.kind === 'kasteel' ? (s.evil ? 2 : 1) : 3, s.x, s.z, s.name]);
+    this.send(p, { t: 'sites', l });
+  },
+
+  populate(w, s) {
+    const ids = [];
+    const key = w.id + ':' + s.key;
+    const cl = this.meta.cleared && this.meta.cleared[key];
+    const empty = cl !== undefined && this.meta.time - cl < DAY_LENGTH * 4;      // de baas is verslagen: het blijft een paar dagen rustig
+    const list = s.kind === 'boom' ? this.treeGuards(w, s) : w.gen.sitePlan(s).npcs;
+    let n = 0;
+    for (const q of list) {
+      n++;
+      const def = MOBS[q.k];
+      const bad = def.ai === 'melee' || def.ai === 'ranged';
+      if (bad && empty && s.kind !== 'boom') continue;
+      let y = q.y, guard = 0;
+      const bx = Math.floor(q.x), bz = Math.floor(q.z);
+      while (w.solid(bx, Math.floor(y), bz) && guard++ < 6) y++;
+      while (!w.solid(bx, Math.floor(y) - 1, bz) && guard++ < 14 && y > 2) y--;
+      const extra = { site: s.key, home: { x: q.x, y, z: q.z, r: q.r || 4, yaw: q.yaw } };
+      if (q.job) {
+        extra.job = q.job;
+        const h = (Math.abs(Math.floor(q.x) * 7919 + Math.floor(q.z) * 104729) + n * 31) >>> 0;
+        extra.look = h % 1000;
+        const first = q.job === 'koning' ? KINGS[h % KINGS.length] : NAMES[h % NAMES.length];
+        extra.name = JOBS[q.job].title ? JOBS[q.job].title + ' ' + first : first;
+      }
+      const e = this.spawnEnt(w, q.k, q.x, y, q.z, extra);
+      if (q.yaw !== undefined) e.yaw = q.yaw;
+      ids.push(e.id);
+    }
+    w.pop.set(s.key, { site: s, ids });
+  },
+
+  depopulate(w, key) {
+    const rec = w.pop.get(key);
+    if (!rec) return;
+    for (const id of rec.ids) w.ents.delete(id);
+    w.pop.delete(key);
+  },
+
+  // Staat hier een dorp of een bewoond kasteel? (daar komen geen monsters uit de grond)
+  safePlace(w, x, z) {
+    for (const s of w.gen.sitesNear(x, z, 90)) if (!s.evil && Math.hypot(s.x - x, s.z - z) < s.r0 + 10) return true;
+    return false;
+  },
+
+  // ---------- gedrag ----------
+
+  aiNpc(w, e, dt) {
+    const h = e.home;
+    if (e.talk > 0) e.talk -= dt;
+    const n = this.nearest(w, e, 4.5);
+    if (n || e.talk > 0) {
+      if (n) e.yaw = Math.atan2(n.p.x - e.x, n.p.z - e.z);
+      e.vx = 0; e.vz = 0;
+      return;
+    }
+    if (!h) { this.wander(w, e, dt); return; }
+    const dx = h.x - e.x, dz = h.z - e.z, d = Math.hypot(dx, dz);
+    const night = WORLDS[w.id].cycle && isNight(this.meta.time);
+    if (d > (night ? Math.min(h.r, 1.5) : h.r)) {
+      const sp = e.def.speed * (d > h.r + 5 ? 1 : 0.6);
+      e.vx = dx / d * sp; e.vz = dz / d * sp; e.yaw = Math.atan2(dx, dz);
+      if (d > 40) { e.x = h.x; e.y = h.y; e.z = h.z; e.vy = 0; }          // helemaal verdwaald: terug naar huis
+      return;
+    }
+    if (h.r < 2 || night) { e.vx = 0; e.vz = 0; if (h.yaw !== undefined) e.yaw = h.yaw; return; }
+    this.wander(w, e, dt);
   },
 
   // zoek de dichtstbijzijnde vijand (af en toe, niet elke tik)
@@ -52,6 +197,12 @@ export const npcMethods = {
       e.cd = cd; e.atk = 0.4;
       this.damageEntity(w, m, dmg, null, dx, dz);
     }
+  },
+
+  aiGuard(w, e, dt) {
+    const m = this.findFoe(w, e, e.x, e.y, e.z, 15, dt);
+    if (m) { this.chase(w, e, m, e.def.dmg, 1.0); return; }
+    this.aiNpc(w, e, dt);
   },
 
   // Wolven: overdag schuw (tenzij je ze slaat), 's nachts jagen ze in een roedel.
@@ -197,6 +348,23 @@ export const npcMethods = {
   useNpc(p, w, e) {
     const held = p.inv[p.sel], hid = held ? held.id : 0;
     const ai = e.def.ai;
+    if (e.job) {
+      const J = JOBS[e.job];
+      e.talk = 25;
+      let say = J.hi || TIPS[(e.id + Math.floor(this.meta.time / 40)) % TIPS.length];
+      if (!p.flags.welkom) {
+        p.flags.welkom = 1;
+        this.giveLoot(p, M, 5); this.sendInv(p);
+        say = 'Welkom, vreemdeling! Hier heb je vijf gouden munten om mee te beginnen. ' + say;
+      }
+      this.send(p, { t: 'trade', id: e.id, name: e.name, say, offers: J.trades });
+      return true;
+    }
+    if (ai === 'guard') {
+      const lines = e.kind === 'boomwachter' ? TREE_LINES : GUARD_LINES;
+      this.toast(p, e.def.name + ': "' + lines[(e.id + Math.floor(this.meta.time / 30)) % lines.length] + '"');
+      return true;
+    }
     if (e.kind === 'schaap') {
       if (e.sheared !== undefined && this.meta.time - e.sheared < 90) { this.toast(p, 'Dit schaap is net geschoren. De wol moet nog groeien.'); return true; }
       e.sheared = this.meta.time;
@@ -239,6 +407,26 @@ export const npcMethods = {
       return true;
     }
     return false;
+  },
+
+  on_trade(p, m) {
+    const w = this.worlds[p.world], e = w.ents.get(m.id);
+    if (!e || !e.job || Math.hypot(e.x - p.x, e.y - p.y, e.z - p.z) > 9) return;
+    const T = JOBS[e.job].trades[m.i | 0];
+    if (!T) return;
+    const [pay, pn, get, gn] = T;
+    if (this.count(p, pay) < pn) { this.toast(p, 'Je hebt niet genoeg: ' + pn + ' × ' + (typeof pay === 'string' ? GROUP_NAMES[pay] : itemName(pay)) + '.', 'warn'); return; }
+    if (this.space(p, get) < gn) { this.toast(p, 'Je rugzak is vol!', 'warn'); return; }
+    this.take(p, pay, pn);
+    this.give(p, get, gn);
+    e.talk = 25;
+    this.send(p, { t: 'traded', id: get, n: gn });
+    if (pay === I.spookkroon) {
+      this.send(p, { t: 'dialog', title: 'De koning is je dankbaar', lines: ['"De Skeletkoning is verslagen! Het hele land is je dankbaar, held."', 'Je krijgt honderd gouden munten. Daarvoor kun je bij de koning een gouden drakenei kopen.'] });
+      this.addXp(p, 150);
+    }
+    this.sendInv(p);
+    this.checkQuests(p);
   },
 
   // ---------- kuddes ----------

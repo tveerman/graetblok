@@ -16,6 +16,8 @@ const SPAWNS = {
   schaduw: [['schim', 3, 'any'], ['kruiper', 3, 'any'], ['pluizel', 2, 'any'], ['spin', 3, 'any'], ['skelet', 2, 'any'], ['wolf', 1, 'any'], ['wildedraak', 1, 'sky']],
   wolken: [['stormvleugel', 3, 'any'], ['pluizel', 3, 'any'], ['hert', 2, 'any'], ['schaap', 1, 'any'], ['wildedraak', 1, 'sky']],
 };
+// deze wezens doe je geen pijn: dorpelingen, ridders, boomwachters en treinen
+const FRIEND = { npc: 1, guard: 1, none: 1 };
 // de adem van monsters die drakenvuur spuwen (de Drakenkoning)
 const MONSTER_BREATH = { drakenvuur: BREATH.koning };
 
@@ -52,6 +54,7 @@ export const entityMethods = {
     else {
       if (e.dtype) m.d = e.dtype;
       if (e.name) m.n = e.name;
+      if (e.job) { m.j = e.job; m.v = e.look || 0; }
     }
     return m;
   },
@@ -140,6 +143,8 @@ export const entityMethods = {
       else if (ai === 'boss') this.aiBoss(w, e, dt);
       else if (ai === 'passive') this.aiPassive(w, e, dt);
       else if (ai === 'melee') this.aiMelee(w, e, dt);
+      else if (ai === 'npc') this.aiNpc(w, e, dt);
+      else if (ai === 'guard') this.aiGuard(w, e, dt);
       else if (ai === 'wolf') this.aiWolf(w, e, dt);
       else if (ai === 'neutral') this.aiNeutral(w, e, dt);
       else if (ai === 'wilddragon') this.aiWildDragon(w, e, dt);
@@ -412,7 +417,7 @@ export const entityMethods = {
         if (w.solid(Math.floor(pr.x), Math.floor(pr.y), Math.floor(pr.z))) { end = true; break; }
         if (pr.side === 'p') {
           for (const e of w.ents.values()) {
-            if (e.owner || (pr.seen && pr.seen.has(e.id))) continue;
+            if (e.owner || FRIEND[e.def.ai] || (pr.seen && pr.seen.has(e.id))) continue;
             const hw = e.w / 2 + 0.25;
             if (pr.x > e.x - hw && pr.x < e.x + hw && pr.z > e.z - hw && pr.z < e.z + hw && pr.y > e.y - 0.25 && pr.y < e.y + e.h + 0.25) {
               const owner = this.playerById(pr.owner);
@@ -448,7 +453,7 @@ export const entityMethods = {
   // ---------- vechten ----------
 
   damageEntity(w, e, dmg, p, dx, dz, duid) {
-    if (e.owner || e.dead) return;
+    if (e.owner || e.dead || FRIEND[e.def.ai]) return;
     e.hp -= dmg; e.hurtT = 0.3;
     const ai = e.def.ai;
     if (ai === 'wolf' || ai === 'neutral' || ai === 'wilddragon') {
@@ -530,6 +535,7 @@ export const entityMethods = {
     if (this.meta.time - p.atkCd < 0.22) return;
     p.atkCd = this.meta.time;
     if (Math.hypot(e.x - p.x, e.y + e.h / 2 - p.y - 1, e.z - p.z) > 5.5 + e.w) return;
+    if (FRIEND[e.def.ai]) { if (this.meta.time - (p.sorryT || 0) > 4) { p.sorryT = this.meta.time; this.toast(p, 'Niet slaan! Dat is een vriend.', 'warn'); } return; }
     const s = p.inv[p.sel], it = s && ITEMS[s.id];
     const dmg = ((it && it.dmg) || 1) + Math.floor(p.level / 5);
     this.damageEntity(w, e, dmg, p, e.x - p.x, e.z - p.z);
@@ -767,6 +773,7 @@ export const entityMethods = {
     const x = Math.floor(p.x + Math.cos(a) * r), z = Math.floor(p.z + Math.sin(a) * r);
     const hostile = def.ai === 'melee' || def.ai === 'ranged' || def.ai === 'wolf';
     if (hostile && p.spawn && p.spawn.w === p.world && Math.hypot(p.spawn.x - x, p.spawn.z - z) < 28) return;
+    if (hostile && this.safePlace(w, x, z)) return;       // in een dorp komen geen monsters uit de grond
     const T = WORLDS[p.world].tree;
     if (Math.hypot(T.x - x, T.z - z) < 30) return;
     let y;
@@ -799,8 +806,14 @@ export const entityMethods = {
 
   cleanup(w) {
     const day = WORLDS[w.id].cycle && !isNight(this.meta.time);
+    // bewoners van een dorp, kasteel of kamp verdwijnen pas als er niemand meer in de buurt is
+    for (const [key, rec] of w.pop) {
+      let near = false;
+      for (const p of this.players.values()) if (p.world === w.id && Math.hypot(p.x - rec.site.x, p.z - rec.site.z) < rec.site.r0 + 115) { near = true; break; }
+      if (!near) this.depopulate(w, key);
+    }
     for (const e of w.ents.values()) {
-      if (e.owner || e.def.boss) continue;
+      if (e.owner || e.def.boss || e.site || e.keep) continue;
       let near = false;
       for (const p of this.players.values()) if (p.world === w.id && Math.hypot(p.x - e.x, p.z - e.z) < 90) { near = true; break; }
       if (!near) { w.ents.delete(e.id); continue; }

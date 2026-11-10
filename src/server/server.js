@@ -18,6 +18,7 @@ import { ServerWorld } from './world.js';
 import { QUESTS, computerLines } from './quests.js';
 import { entityMethods } from './entities.js';
 import { npcMethods } from './npcs.js';
+import { WorldGen } from './worldgen.js';
 
 const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
 const SAVE_FIELDS = ['world', 'x', 'y', 'z', 'yaw', 'hp', 'xp', 'level', 'inv', 'sel', 'flags', 'q', 'dragons', 'pets', 'spawn', 'look', 'kills'];
@@ -35,7 +36,7 @@ export class GameServer {
 
   newMeta() {
     return { v: 1, seed: (Math.random() * 2147483647) | 0, time: DAY_LENGTH * 0.05, trees: {}, bossDead: {}, portals: [], eggs: {}, nextId: 1,
-      weather: {} };
+      gen2: 1, noSites: {}, oldChunks: {}, weather: {}, cleared: {} };
   }
 
   async init() {
@@ -47,10 +48,29 @@ export class GameServer {
       const parts = k.split('/');
       (per[parts[1]] = per[parts[1]] || new Map()).set(Number(parts[2]), new Map(v));
     }
-    for (const w of WORLD_ORDER) this.worlds[w] = new ServerWorld(w, meta.seed, per[w]);
+    if (!meta.gen2) this.upgradeWorld(meta, per);
+    for (const w of WORLD_ORDER) this.worlds[w] = new ServerWorld(w, meta.seed, per[w], { noSites: meta.noSites[w], oldChunks: meta.oldChunks[w] });
     this.ready = true;
     this.last = now();
     if (!this.timer) this.timer = setInterval(() => { try { this.tick(); } catch (e) { console.error('server tick', e); } }, TICK_MS);
+  }
+
+  // Een wereld van vóór de dorpen en kastelen: waar de speler al iets had gebouwd of gegraven
+  // komt geen dorp, kasteel, kamp of spoor. Zo raakt niemand zijn eigen bouwwerken kwijt.
+  upgradeWorld(meta, per) {
+    meta.gen2 = 1; meta.noSites = {}; meta.oldChunks = {};
+    for (const wid of WORLD_ORDER) {
+      const keys = per[wid] ? Array.from(per[wid].keys()) : [];
+      if (!keys.length) continue;
+      meta.oldChunks[wid] = keys;
+      const gen = new WorldGen(wid, meta.seed);
+      const blocked = new Set();
+      for (const key of keys) {
+        const x = (Math.floor(key / 65536) - 32768) * 16 + 8, z = ((key % 65536) - 32768) * 16 + 8;
+        for (const st of gen.sitesNear(x, z, 110)) if (Math.hypot(x - st.x, z - st.z) < st.r1 + 14) blocked.add(st.key);
+      }
+      meta.noSites[wid] = Array.from(blocked);
+    }
   }
 
   async reset() {
@@ -130,6 +150,7 @@ export class GameServer {
       isNew: !!p.isNew, saved: !!this.storage.persistent,
     });
     p.isNew = false;
+    p.siteCell = null; p.inSite = null;
     this.send(p, { t: 'weather', k: this.weatherOf(p.world), now: 1 });
     this.sendInv(p); this.sendStats(p); this.sendDragons(p);
     this.spawnOwned(p);
@@ -543,7 +564,7 @@ export class GameServer {
     }
     const r = mulberry32((hash3(x, y, z, this.meta.seed) * 4294967296) >>> 0);
     const crystal = { groen: I.kristal, ijs: I.ijskristal, vuur: I.vuurkristal, schaduw: I.schaduwkristal, wolken: I.hemelkristal }[w.id];
-    const table = [[I.ijzerstaaf, 2, 4], [I.goudstaaf, 1, 3], [crystal, 1, 3], [I.pijl, 6, 12], [I.drankje, 1, 2], [I.machineonderdeel, 1, 2], [I.bessen, 3, 6], [B.gloeikristal, 1, 3], [B.fakkel, 4, 8], [I.steenkool, 3, 6], [I.appel, 2, 4]];
+    const table = [[I.munt, 4, 9], [I.munt, 3, 6], [I.ijzerstaaf, 2, 4], [I.goudstaaf, 1, 3], [crystal, 1, 3], [I.pijl, 6, 12], [I.drankje, 1, 2], [I.machineonderdeel, 1, 2], [I.bessen, 3, 6], [B.gloeikristal, 1, 3], [B.fakkel, 4, 8], [I.steenkool, 3, 6], [I.appel, 2, 4]];
     const rolls = 3 + Math.floor(r() * 2);
     for (let i = 0; i < rolls; i++) {
       const [id, a, b] = table[Math.floor(r() * table.length)];
@@ -786,6 +807,7 @@ export class GameServer {
       this.send(p, { t: 'time', time: this.meta.time });
       this.wildSpawn(p);
       this.checkGuardian(p);
+      this.updateSites(p);
     }
     this.updateWeather(active);
     this.updateEggs();
@@ -832,6 +854,13 @@ export class GameServer {
     else if (m.c === 'egg') { for (const k in this.meta.eggs) this.meta.eggs[k].prog = 0.95; }
     else if (m.c === 'weather') this.setWeather(p.world, m.k || 'zon', m.dur || 120);
     else if (m.c === 'herd') { const top = w.topY(Math.floor(p.x) + 6, Math.floor(p.z)); this.spawnHerd(w, m.kind, Math.floor(p.x) + 6, top + 1, Math.floor(p.z)); }
+    else if (m.c === 'site') {
+      // spring naar het dichtstbijzijnde dorp ('dorp'), kasteel of kamp
+      let best = null;
+      for (const st of w.gen.sitesNear(p.x, p.z, 1400)) if (st.kind === m.kind && (m.evil === undefined || st.evil === !!m.evil) && (!best || Math.hypot(st.x - p.x, st.z - p.z) < Math.hypot(best.x - p.x, best.z - p.z))) best = st;
+      if (best) { p.x = best.x + 0.5 + (m.dx || 0); p.y = best.y + 2 + (m.dy || 0); p.z = best.z + 3.5 + (m.dz || 0); this.send(p, { t: 'tp', x: p.x, y: p.y, z: p.z }); }
+      this.send(p, { t: 'debugSite', s: best ? { kind: best.kind, x: best.x, y: best.y, z: best.z, name: best.name, evil: best.evil } : null });
+    }
     else if (m.c === 'tp') { p.x = m.x; p.y = m.y; p.z = m.z; this.send(p, { t: 'tp', x: m.x, y: m.y, z: m.z }); }
     else if (m.c === 'grow') { for (const d of p.dragons) { d.growth = 100; const e = w.ents.get(d.eid); if (e) { this.applyDragon(e); this.broadcast(w.id, { t: 'entMeta', id: e.id, s: e.scale, g: 100 }); } } this.sendDragons(p); this.checkQuests(p); }
   }

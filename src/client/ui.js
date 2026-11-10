@@ -1,7 +1,7 @@
 // Alles op het scherm dat geen 3D is: hartjes, rugzak, maken, opdrachten, menu's.
 import { RANKS, HOTBAR, INV_SIZE } from '../shared/constants.js';
 import { B, BLOCKS } from '../shared/blocks.js';
-import { ITEMS, RECIPES, GROUPS, GROUP_NAMES, matches, itemName } from '../shared/items.js';
+import { ITEMS, I, RECIPES, GROUPS, GROUP_NAMES, matches, itemName } from '../shared/items.js';
 import { WORLDS, WORLD_ORDER, CRASH } from '../shared/worlds.js';
 import { DRAGONS, dragonStage, STAGE_NAMES } from '../shared/mobs.js';
 import { iconURL } from './textures.js';
@@ -99,6 +99,7 @@ export class UI {
     const name = s ? itemName(s[0]) : '';
     if (nm.textContent !== name) { nm.textContent = name; nm.classList.remove('show'); void nm.offsetWidth; if (name) nm.classList.add('show'); }
     if (this.modal === 'inv') this.renderInventory();
+    if (this.modal === 'trade') this.renderTrade();
   }
 
   setStats(m) {
@@ -136,7 +137,7 @@ export class UI {
   loading(text) { const l = $('loading'); l.classList.toggle('hidden', !text); if (text) $('loadingText').textContent = text; }
 
   // kompas bovenin: N O Z W, plus het ruitje van de opdracht
-  frame(yaw, pos, worldId) {
+  frame(yaw, pos, worldId, sites) {
     const heading = -yaw;
     const strip = $('compassStrip');
     const W = strip.clientWidth || 300;
@@ -152,6 +153,8 @@ export class UI {
       this.cmp = ['N', 'O', 'Z', 'W'].map((t) => { const n = el('span', 'cdir' + (t === 'N' ? ' north' : ''), t); strip.appendChild(n); return n; });
       this.cmpMark = el('span', 'cmark', '◆'); strip.appendChild(this.cmpMark);
       this.cmpShip = el('span', 'cship', '🚀'); strip.appendChild(this.cmpShip);
+      this.cmpDorp = el('span', 'cship', '🏠'); strip.appendChild(this.cmpDorp);
+      this.cmpBurcht = el('span', 'cship', '🏰'); strip.appendChild(this.cmpBurcht);
     }
     for (let i = 0; i < 4; i++) place(this.cmp[i], i * Math.PI / 2);
     let extra = '';
@@ -166,6 +169,18 @@ export class UI {
       const c = Math.max(-1.66, Math.min(1.66, rel));
       this.cmpShip.style.left = (W / 2 + (c / 1.75) * (W / 2)) + 'px';
       extra += '  🚀 ' + Math.round(Math.hypot(dx, dz)) + ' m';
+    }
+    // het dichtstbijzijnde dorp (huisje) en kasteel (torentje)
+    for (const [node, kinds, icon] of [[this.cmpDorp, [0], '🏠'], [this.cmpBurcht, [1, 2], '🏰']]) {
+      let best = null, bd = 1e9;
+      if (sites) for (const st of sites) { if (!kinds.includes(st[0])) continue; const d = Math.hypot(st[1] - pos.x, st[2] - pos.z); if (d < bd) { bd = d; best = st; } }
+      node.style.display = best && bd > 30 ? '' : 'none';
+      if (best && bd > 30) {
+        let rel = Math.atan2(best[1] - pos.x, -(best[2] - pos.z)) - heading;
+        while (rel > Math.PI) rel -= 2 * Math.PI; while (rel < -Math.PI) rel += 2 * Math.PI;
+        node.style.left = (W / 2 + (Math.max(-1.6, Math.min(1.6, rel)) / 1.75) * (W / 2)) + 'px';
+        if (bd < 400 && Math.abs(rel) < 0.5) extra += '  ' + icon + ' ' + Math.round(bd) + ' m';
+      }
     }
     let mk = this.quest && this.quest.marker && this.quest.marker.w === worldId ? this.quest.marker : null;
     if (mk && ship && mk.x === CRASH.x && mk.z === CRASH.z) mk = null;      // de opdracht wijst al naar het schip
@@ -423,6 +438,42 @@ export class UI {
     if (DRAGONS[d.type].power) b.appendChild(el('p', 'dpower', '✨ <b>Kracht:</b> ' + DRAGONS[d.type].power));
     b.appendChild(el('p', 'hint', stage < 2 ? 'Draken lusten bessen, appels en vlees. Hoe meer eten, hoe groter!' : 'Je draak helpt je in gevechten en je kunt op hem vliegen.'));
     this.open('dragon', '🐉 ' + d.name, b, false);
+  }
+
+  // ---------- ruilen met een dorpeling ----------
+
+  openTrade(m) {
+    if (!m.offers.length) { this.openDialog(m.name, ['"' + m.say + '"'], 'Tot ziens!'); return; }
+    this.trade = m;
+    const b = el('div', 'trade');
+    b.appendChild(el('p', 'tsay', '"' + m.say + '"'));
+    this.tradeHead = el('div', 'tpurse'); b.appendChild(this.tradeHead);
+    this.tradeList = el('div', 'recipes tlist'); b.appendChild(this.tradeList);
+    this.open('trade', m.name, b, false);
+    this.renderTrade();
+  }
+
+  renderTrade() {
+    const g = this.g, m = this.trade;
+    if (!m || !this.tradeList) return;
+    this.tradeHead.innerHTML = '<img src="' + iconURL(I.munt) + '"> Je hebt <b>' + this.count(I.munt) + '</b> gouden munten';
+    const list = this.tradeList, keep = list.scrollTop;
+    list.innerHTML = '';
+    const nm = (need) => (typeof need === 'string' ? GROUP_NAMES[need] : itemName(need));
+    const ic = (need) => iconURL(typeof need === 'string' ? GROUPS[need][0] : need);
+    m.offers.forEach(([pay, pn, get, gn], i) => {
+      const have = this.count(pay), can = have >= pn;
+      const card = el('div', 'recipe trow' + (can ? ' can' : ''));
+      // verkopen (jij krijgt munten) of kopen (jij betaalt munten)
+      const sell = get === I.munt;
+      card.appendChild(el('span', 'tside' + (can ? '' : ' lack'), '<img src="' + ic(pay) + '"><b>' + pn + '</b> ' + nm(pay) + (sell || pay !== I.munt ? ' <small>(je hebt ' + Math.min(have, 999) + ')</small>' : '')));
+      card.appendChild(el('span', 'tarrow', '➜'));
+      card.appendChild(el('span', 'tside', '<img src="' + ic(get) + '"><b>' + gn + '</b> ' + nm(get)));
+      card.appendChild(el('span', 'tbtn', sell ? 'Verkoop' : (pay === I.munt ? 'Koop' : 'Ruil')));
+      tap(card, () => { if (can) g.net.send({ t: 'trade', id: m.id, i }); else g.sound.play('deny'); });
+      list.appendChild(card);
+    });
+    list.scrollTop = keep;
   }
 
   refreshDragon() { if (this.modal === 'dragon') this.openDragon(this.dragonUid); if (this.modal === 'quest') this.openQuest(); }

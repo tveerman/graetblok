@@ -76,6 +76,7 @@ export function computerLines(p, S) {
   else if (n < 4) lines.push('Sensoren: ' + n + ' van de 5 levensbomen zijn hersteld. Ga zo door!');
   else if (!t.groen) lines.push('Sensoren: enorme draak gemeten in het noordwesten. De Grote Levensboom wacht op je.');
   else lines.push('Alle levensbomen stralen weer. Oude gegevens gevonden: "Onder de wortels van de oudste boom slaapt iets dat ouder is dan de wereld."');
+  lines.push('Sensoren: rook uit schoorstenen gemeten. Er ligt een dorp in het zuidoosten: volg het huisje op je kompas. Daar kun je ruilen en eten kopen.');
   if (!p.dragons.length) lines.push('Tip: drakeneieren liggen in nesten op hoge bergtoppen. Een ei komt uit naast een warm kampvuur.');
   return lines;
 }

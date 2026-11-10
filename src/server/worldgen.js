@@ -4,6 +4,7 @@ import { CS, CH, CHUNK_VOL, SEA, idx, clamp, lerp, smoothstep } from '../shared/
 import { Simplex, hash2, hash3, mulberry32 } from '../shared/noise.js';
 import { B, LIFE_LEAVES, LIFE_VINES, LIFE_FRUIT, ZWAMMEN, ZWAMHOEDEN } from '../shared/blocks.js';
 import { WORLDS, CRASH, NEST_PEAK } from '../shared/worlds.js';
+import { siteMethods, SITE_ODDS } from './sites.js';
 
 const M = 4;                 // rand om de chunk heen (voor bomen die over de grens hangen)
 const W = CS + 2 * M;
@@ -16,8 +17,15 @@ export const NEST_REGION = 144;
 export const RUIN_REGION = 96;
 
 export class WorldGen {
-  constructor(world, seed) {
+  // opts.noSites = vakken waar geen dorp of kasteel mag komen, opts.oldChunks = chunks waar geen
+  // spoor doorheen mag (in werelden die al bestonden: daar had de speler al gebouwd)
+  constructor(world, seed, opts = {}) {
     this.world = world;
+    this.siteCache = new Map();
+    this.noSites = new Set(opts.noSites || []);
+    this.oldChunks = new Set(opts.oldChunks || []);
+    this.raw = false;
+    this.hasSites = !!SITE_ODDS[world];
     this.def = WORLDS[world];
     this.tree = this.def.tree;
     const s = (seed + WORLD_SALT[world]) | 0;
@@ -48,6 +56,7 @@ export class WorldGen {
       case 'schaduw': this.colSchaduw(x, z, c); break;
       default: this.colWolken(x, z, c);
     }
+    if (this.hasSites) this.applySite(x, z, c);          // vlakke grond rond dorpen, kastelen en kampen
     c.h = clamp(Math.floor(c.h), 2, CH - 16);
     return c;
   }
@@ -656,6 +665,8 @@ export class WorldGen {
       const n = this.regionRuin(rx, rz);
       if (n && near(n.x, n.z, 3)) this.ruin(put, n.x, n.y, n.z);
     }
+    // dorpen, kastelen, trollenkampen en spoorlijnen (zie sites.js)
+    this.drawSites(blocks, ox >> 4, oz >> 4);
   }
 
   nest(put, x, y, z, egg) {
@@ -934,5 +945,7 @@ export class WorldGen {
     }
   }
 }
+
+Object.assign(WorldGen.prototype, siteMethods);
 
 export const VAULT_Y = 3;

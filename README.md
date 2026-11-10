@@ -100,6 +100,7 @@ you left off.
 | Full screen on / off | the ⛶ button next to ⚙️ | the same button |
 | Dragon window (feed, name, stay/follow) | "🐉 <name>" button when it is near, or tap the dragon | `G` |
 | Mount / dismount dragon | "🐉 Vliegen" / "Afstappen" | `R` |
+| Talk and trade, shear a sheep, milk a cow | tap the villager or animal | right mouse button or `F` |
 | Hotbar | tap a slot | `1`–`9` or scroll |
 
 While any window is open (backpack, quest log, a dialog or the pause menu) the world stands
@@ -147,6 +148,14 @@ From Jorian's design document (`spel.txt`), following development phases 1–4, 
   colours, and a spiral staircase of mushrooms around the trunk (it starts on the tall root at
   the back). Everything glows in the dark; a restored tree glows much brighter and fills the
   air with drifting lights.
+- **Villages** – on the plaza a well and market stalls, along four streets a restaurant,
+  bakery, smithy, shop, farm with a wheat field and houses, plus (per village) a sawmill,
+  jeweller or mining company. Every building has someone living in it, with a name and
+  clothes that fit the job. Tap a villager to trade: sell what you find for gold coins
+  ("munten") and buy tools, food, meals or dragon eggs. The first villager you meet gives
+  you five coins. Two knights guard each village and fight monsters that come near. In the
+  green world there is always a village south-east of the spaceship; the compass shows the
+  nearest village (🏠) and castle (🏰).
 - **Dragon species** – the eight kinds now differ in shape (flame crest, ice crystals, leaf
   collar, zigzag horns, jets and antenna, crown, crystal spikes...), in flying speed and
   strength, and in what they breathe: exploding fireballs, three freezing ice shards, a
@@ -168,6 +177,10 @@ From Jorian's design document (`spel.txt`), following development phases 1–4, 
 Not in yet: vehicles and robots you can drive, villages and traders, the economy (question 19
 in the design is still open), hunger/thirst, weather and disasters, the other five worlds, and
 real multiplayer.
+
+Worlds that were started before villages existed are upgraded the first time they are loaded:
+no village, castle, camp or railway is placed where the player had already built or dug, so
+nothing of theirs is overwritten.
 
 ## How the code is organised
 
@@ -194,6 +207,11 @@ talk through messages (plain objects such as `{ t: 'break', x, y, z }`).
   `postMessage`.
 - `src/client/net.js` is the only client file that knows how the server is reached.
 - `src/server/storage.js` is a small key/value interface (IndexedDB in the browser).
+- `src/server/sites.js` decides where villages, castles, troll camps and railways are and
+  draws them (the world is divided into cells of 224 blocks, at most one site per cell, all
+  derived from the seed). The same "plan" that draws a site also lists its inhabitants.
+- `src/server/npcs.js` puts those inhabitants in the world when a player comes near, and
+  holds trading, guards, herds, wolves, bears, wild dragons, dragon breath, weather and trains.
 
 To make it real multiplayer later, the server code can move to another machine largely as-is:
 
@@ -251,6 +269,8 @@ unchanged and remains the default. There are still no real shadows or post-proce
 - "Mooie graphics" costs two texture lookups and per-pixel lighting for every block pixel, and
   about 50 MB of texture memory; the pause menu shows the frame rate and resolution so you
   can see what a device can handle.
+- Creatures further than about 60 blocks away are not drawn (a village has some twenty
+  inhabitants, each built from a dozen boxes).
 - The render resolution lowers itself automatically when the frame rate drops
   ("Scherpte aanpassen" in the pause menu), and "Kijkafstand" sets how far you can see
   (default 4 on touch devices, 5 on desktop).
@@ -266,6 +286,7 @@ game.net.send({ t: 'debug', c: 'world', w: 'wolken' })     // jump to the cloud 
 game.net.send({ t: 'debug', c: 'time', v: 0 })             // morning
 game.net.send({ t: 'debug', c: 'god', v: 1 })              // cannot be hurt
 game.net.send({ t: 'debug', c: 'grow' })                   // all your dragons become adults
+game.net.send({ t: 'debug', c: 'site', kind: 'dorp' })     // jump to the nearest village ('kasteel', 'kamp')
 game.net.send({ t: 'debug', c: 'weather', k: 'onweer' })   // 'zon', 'regen', 'onweer', 'sneeuw', 'storm'
 game.net.send({ t: 'debug', c: 'herd', kind: 'schaap' })   // a herd next to you ('koe', 'wolf', 'beer')
 ```

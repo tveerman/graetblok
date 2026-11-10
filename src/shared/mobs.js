@@ -39,6 +39,10 @@ export const MOBS = {
   spin: { name: 'Reuzenspin', model: 'reuzenspin', hp: 14, dmg: 3, speed: 4.4, w: 1.0, h: 0.7, ai: 'melee', leap: true, xp: 9, drops: [[I.draad, 1, 2, 0.9]] },
   skelet: { name: 'Skelet', model: 'skelet', hp: 18, dmg: 4, speed: 2.6, w: 0.6, h: 1.8, ai: 'ranged', proj: 'pijl', xp: 11, drops: [[I.bot, 1, 2, 0.9], [I.pijl, 1, 3, 0.6]] },
 
+  // ---- vrienden: dorpelingen, ridders en boomwachters ----
+  dorpeling: { name: 'Dorpeling', model: 'mens', hp: 20, speed: 2.2, w: 0.6, h: 1.8, ai: 'npc', tap: true, xp: 0, drops: [] },
+  ridder: { name: 'Ridder', model: 'ridder', hp: 60, dmg: 7, speed: 3.6, w: 0.7, h: 1.9, ai: 'guard', tap: true, xp: 0, drops: [] },
+
   // ---- wilde draken en de trein ----
   wildedraak: { name: 'Wilde draak', model: 'draak', scale: 1.5, hp: 90, dmg: 5, speed: 7, w: 2.0, h: 1.8, ai: 'wilddragon', fly: true, xp: 90, drops: [[I.drakenschub, 2, 3, 1], [I.munt, 4, 8, 0.8]] },
 };

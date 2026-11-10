@@ -203,4 +203,18 @@ body.touch #crosshair { opacity: .6; }
   #btnBreak { right: 72px; bottom: 24px; }
   #btnUse { right: 6px; bottom: 74px; }
 }
+
+/* ruilen met dorpelingen */
+.trade .tsay { font-style: italic; margin: 0 0 8px; }
+.trade .tpurse { display: flex; align-items: center; gap: 6px; margin: 0 0 8px; font-size: 15px; }
+.trade .tpurse img { width: 26px; height: 26px; image-rendering: pixelated; }
+.trade .tlist { max-height: 52vh; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+.trade .trow { display: flex; align-items: center; gap: 8px; }
+.trade .tside { flex: 1 1 0; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 14px; }
+.trade .tside img { width: 30px; height: 30px; image-rendering: pixelated; }
+.trade .tside small { opacity: 0.7; }
+.trade .tside.lack { color: #ff9a8a; }
+.trade .tarrow { font-size: 18px; opacity: 0.8; }
+.trade .tbtn { background: rgba(255, 255, 255, 0.14); border-radius: 8px; padding: 6px 10px; font-weight: bold; font-size: 13px; }
+.trade .trow.can .tbtn { background: #3fa34a; color: #fff; }
 .dragon .dpower { background: rgba(255, 255, 255, 0.08); border-radius: 8px; padding: 6px 10px; }

@@ -253,6 +253,7 @@ export class Sound {
       case 'death': [392, 330, 262, 196].forEach((f, i) => this.tone(f, 0.35, 'triangle', 0.16 * v, 0, i * 0.18)); break;
       case 'restore': [262, 330, 392, 523, 659, 784, 1047, 1319].forEach((f, i) => this.tone(f, 0.9, 'sine', 0.13 * v, 0, i * 0.14, 0.05)); this.noise(2, 'bandpass', 800, 0.08 * v, 5000, 0, 2); break;
       // ---- dorpen, dieren, weer en treinen ----
+      case 'coin': this.tone(1568, 0.07, 'square', 0.05 * v); this.tone(2093, 0.16, 'square', 0.05 * v, 0, 0.06); this.tone(2637, 0.2, 'sine', 0.07 * v, 0, 0.12); break;
       case 'zap': this.noise(0.14, 'highpass', 3000, 0.25 * v); this.tone(1900 * r, 0.1, 'sawtooth', 0.1 * v, 200); this.tone(120, 0.22, 'square', 0.12 * v, 50, 0.03); break;
       case 'ijs': this.tone(2600 * r, 0.12, 'sine', 0.1 * v, 3900); this.tone(3300 * r, 0.14, 'sine', 0.07 * v, 0, 0.05); this.noise(0.12, 'highpass', 5000, 0.14 * v); break;
       case 'gif': this.noise(0.5, 'bandpass', 500, 0.22 * v, 1500, 0, 3); for (let i = 0; i < 3; i++) this.tone(300 + i * 90, 0.09, 'sine', 0.08 * v, 520 + i * 90, 0.1 + i * 0.09); break;
