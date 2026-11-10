@@ -1,0 +1,10 @@
+{
+  "name": "graet-blok",
+  "version": "0.1.0",
+  "description": "Graet Blok - een blokkenwereld met draken, monsters en levensbomen. Ontworpen door Jorian.",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "python3 -m http.server 8123"
+  }
+}

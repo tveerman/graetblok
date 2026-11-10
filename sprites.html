@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Graet Blok - alle plaatjes</title>
+<style>
+  body { background: #20242c; color: #eee; font-family: system-ui, sans-serif; margin: 16px; }
+  h1 { font-size: 20px; } h2 { font-size: 16px; margin-top: 24px; }
+  .grid { display: flex; flex-wrap: wrap; gap: 8px; }
+  .cellx { width: 92px; text-align: center; font-size: 10px; word-break: break-all; }
+  .cellx canvas { width: 80px; height: 80px; image-rendering: auto; background: repeating-conic-gradient(#3a4050 0% 25%, #2c313c 0% 50%) 50% / 16px 16px; border-radius: 6px; }
+  #atlas { max-width: 100%; background: #000; }
+</style>
+</head>
+<body>
+<h1>Graet Blok – alle plaatjes (gemaakt met JavaScript)</h1>
+<p id="info"></p>
+<h2>Blokken</h2><div class="grid" id="tiles"></div>
+<h2>Icoontjes</h2><div class="grid" id="icons"></div>
+<h2>Atlas</h2><canvas id="atlas"></canvas>
+<script type="module">
+import { buildAtlas, setIconAtlas, iconCanvas } from './src/client/textures.js';
+import { TILE_NAMES, BLOCKS } from './src/shared/blocks.js';
+import { ITEMS } from './src/shared/items.js';
+const t0 = performance.now();
+const atlas = buildAtlas();
+setIconAtlas(atlas);
+document.getElementById('info').textContent = TILE_NAMES.length + ' plaatjes getekend in ' + Math.round(performance.now() - t0) + ' ms. Atlas: ' + atlas.W + ' x ' + atlas.H;
+const add = (parent, cv, label) => { const d = document.createElement('div'); d.className = 'cellx'; d.appendChild(cv); d.appendChild(document.createTextNode(label)); parent.appendChild(d); };
+TILE_NAMES.forEach((n, i) => add(document.getElementById('tiles'), atlas.canvases[i], n));
+for (const b of BLOCKS) if (b && b.id) add(document.getElementById('icons'), iconCanvas(b.id), b.name);
+for (const id in ITEMS) add(document.getElementById('icons'), iconCanvas(+id), ITEMS[id].name);
+const ac = document.getElementById('atlas'); ac.width = atlas.W; ac.height = atlas.H;
+ac.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(atlas.data), atlas.W, atlas.H), 0, 0);
+window.__ok = true;
+</script>
+</body>
+</html>

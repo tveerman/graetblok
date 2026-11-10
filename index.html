@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Graet Blok">
+<meta name="theme-color" content="#14202c">
+<title>Graet Blok</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cpath d='M32 4 60 18 32 32 4 18z' fill='%235fa83c'/%3E%3Cpath d='M4 18 32 32v28L4 46z' fill='%237a5636'/%3E%3Cpath d='M60 18 32 32v28l28-14z' fill='%235a3e26'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="hud" class="hidden">
+  <div id="crosshair"></div>
+  <div id="compass"><div id="compassStrip"></div><div id="coords"></div></div>
+  <div id="boss" class="hidden"><div id="bossName"></div><div class="bar"><div id="bossFill"></div></div></div>
+  <div id="quest"><div id="questTitle"></div><div id="questText"></div></div>
+  <div id="topbtns">
+    <button id="btnInv" title="Rugzak (E)">🎒</button>
+    <button id="btnQuest" title="Opdrachten (Q)">📜</button>
+    <button id="btnCam" title="Camera (V)">📷</button>
+    <button id="btnMenu" title="Menu (Esc)">⚙️</button>
+  </div>
+  <div id="toasts"></div>
+  <div id="gots"></div>
+  <div id="bottom">
+    <div id="heldName"></div>
+    <div id="status">
+      <div id="hearts"></div>
+      <div id="xpwrap"><div id="xpbar"><div id="xpfill"></div></div><div id="lvl"></div></div>
+    </div>
+    <div id="hotbar"></div>
+  </div>
+  <button id="btnRide" class="hidden">🐉 Vliegen</button>
+  <div id="joy"><div id="joyknob"></div></div>
+  <div id="touchbtns">
+    <button id="btnOff">Afstappen</button>
+    <button id="btnDown">⬇</button>
+    <button id="btnUse">✋</button>
+    <button id="btnBreak">⛏</button>
+    <button id="btnJump">⬆</button>
+  </div>
+</div>
+
+<div id="vignette"></div>
+<div id="tint"></div>
+<div id="fade"><div id="fadeText"></div></div>
+
+<div id="modal" class="hidden">
+  <div id="modalBox">
+    <div id="modalHead"><span id="modalTitle"></span><button id="modalClose">✕</button></div>
+    <div id="modalBody"></div>
+  </div>
+</div>
+
+<div id="loading" class="hidden"><div class="spinner"></div><div id="loadingText"></div></div>
+
+<div id="menu">
+  <div id="menuBox">
+    <h1>GRAET BLOK</h1>
+    <p class="tag">Een gigantische wereld vol monsters, draken, machines, geheimen en vrienden.</p>
+    <button id="btnPlay" class="btn big">▶ Spelen</button>
+    <div class="lookbox">
+      <div class="looklabel">Wie ben jij?</div>
+      <div id="lookTypes" class="btnrow"></div>
+      <div id="lookColors" class="btnrow"></div>
+    </div>
+    <button id="btnNew" class="btn small danger">Nieuwe wereld beginnen</button>
+    <p id="menuError"></p>
+    <p class="credit">Bedacht door Jorian · versie 0.1</p>
+  </div>
+</div>
+
+<script type="module" src="src/client/main.js"></script>
+</body>
+</html>
