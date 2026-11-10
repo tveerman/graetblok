@@ -60,7 +60,7 @@ export class Entities {
     e.name = name;
     const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: nameTex(name), depthTest: false, fog: false, transparent: true }));
     sp.scale.set(1.6 / e.scale, 0.4 / e.scale, 1);
-    sp.position.y = 2.3;
+    sp.position.y = Math.max(2.3, (e.def.h + 0.45) / e.scale);
     sp.renderOrder = 10;
     e.group.add(sp);
     e.tag = sp;
@@ -140,6 +140,11 @@ export class Entities {
       const s = e.scale * (hurt ? 1.08 : 1);
       if (e.group.scale.x !== s) e.group.scale.setScalar(s);
       animate(e.group, time, e.speed, e.flags, dt);
+      // bevroren (blauwe glinsters) of vergiftigd (groene belletjes)
+      if ((e.flags & 48) && Math.random() < dt * 9) {
+        const ice = e.flags & 16;
+        this.particles.add(e.x + (Math.random() - 0.5) * e.w, e.y + Math.random() * e.h, e.z + (Math.random() - 0.5) * e.w, 0, ice ? -0.3 : 0.8, 0, ice ? 0.75 : 0.5, ice ? 0.95 : 1, ice ? 1 : 0.3, 0.16, 0.7, 0);
+      }
     }
     // projectielen
     for (const p of this.projs.values()) {
@@ -149,7 +154,16 @@ export class Entities {
       p.x += p.vx * dt; p.y += p.vy * dt; p.z += p.vz * dt;
       p.obj.position.set(p.x, p.y, p.z);
       if (p.arrow) p.obj.lookAt(p.x + p.vx, p.y + p.vy, p.z + p.vz);
-      if (p.def.trail && Math.random() < 0.7) {
+      const tr = p.def.trail === true ? 1 : (p.def.trail || 0);
+      if (tr > 1) {
+        // drakenadem: een dikke staart van vonken in twee kleuren
+        const n = Math.max(1, Math.round(tr * dt * 40));
+        for (let i = 0; i < n; i++) {
+          const c = Math.random() < 0.45 ? p.rgb2 : p.rgb, f = Math.random();
+          this.particles.add(p.x - p.vx * dt * f, p.y - p.vy * dt * f, p.z - p.vz * dt * f, (Math.random() - 0.5) * 1.6, (Math.random() - 0.5) * 1.6 + 0.4, (Math.random() - 0.5) * 1.6, c[0], c[1], c[2], p.def.size * (0.35 + Math.random() * 0.5), 0.3 + Math.random() * 0.35, -1);
+        }
+        p.obj.scale.setScalar(p.def.size * (2.0 + Math.sin(this.clock * 40 + p.id) * 0.3));
+      } else if (tr && Math.random() < 0.7) {
         const c = p.rgb;
         this.particles.add(p.x, p.y, p.z, (Math.random() - 0.5) * 0.6, (Math.random() - 0.5) * 0.6, (Math.random() - 0.5) * 0.6, c[0], c[1], c[2], p.def.size * 0.7, 0.35, 0);
       }
@@ -166,8 +180,8 @@ export class Entities {
     }
     obj.position.set(m.x, m.y, m.z);
     this.scene.add(obj);
-    const c = new THREE.Color(def.color);
-    this.projs.set(m.id, { id: m.id, k: m.k, def, obj, arrow, x: m.x, y: m.y, z: m.z, vx: m.vx, vy: m.vy, vz: m.vz, g: m.g, life: 4.5, rgb: [c.r, c.g, c.b] });
+    const c = new THREE.Color(def.color), c2 = new THREE.Color(def.color2 === undefined ? def.color : def.color2);
+    this.projs.set(m.id, { id: m.id, k: m.k, def, obj, arrow, x: m.x, y: m.y, z: m.z, vx: m.vx, vy: m.vy, vz: m.vz, g: m.g, life: 4.5, rgb: [c.r, c.g, c.b], rgb2: [c2.r, c2.g, c2.b] });
   }
 
   endProj(m) {
@@ -176,7 +190,18 @@ export class Entities {
     this.scene.remove(p.obj);
     if (!p.arrow) p.obj.material.dispose();
     this.projs.delete(m.id);
-    this.particles.burst(m.x, m.y, m.z, p.arrow ? 4 : 14, p.rgb, { speed: p.arrow ? 1.5 : 4, size: p.def.size * 0.6, life: 0.4, grav: 2 });
+    const B = p.def.blast;
+    if (B) {
+      // de inslag van drakenadem: een vuurbol, een ring over de grond en vonken die omhoog spatten
+      const P = this.particles, n = Math.round(14 + B * 16);
+      P.burst(m.x, m.y, m.z, n, p.rgb, { speed: 2.5 + B * 2.2, size: 0.3 + B * 0.16, life: 0.6, grav: p.def.cloud ? -0.4 : 1, spread: B * 0.5 });
+      P.burst(m.x, m.y, m.z, Math.round(n * 0.7), p.rgb2, { speed: 1.5 + B * 3.4, size: 0.16 + B * 0.05, life: 0.5, grav: 7, up: 2 });
+      for (let i = 0; i < Math.round(B * 8); i++) {
+        const a = (i / Math.round(B * 8)) * 6.283, v = 2.5 + B * 1.6;
+        P.add(m.x, m.y + 0.15, m.z, Math.cos(a) * v, 0.3, Math.sin(a) * v, p.rgb[0], p.rgb[1], p.rgb[2], 0.3 + B * 0.1, p.def.cloud ? 1.6 : 0.6, 0);
+      }
+      if (B > 2.5 && !p.def.cloud) P.burst(m.x, m.y + 0.5, m.z, 14, [0.3, 0.28, 0.28], { speed: 2.5, size: 0.8, life: 1.3, grav: -1.4, spread: B * 0.6 });
+    } else this.particles.burst(m.x, m.y, m.z, p.arrow ? 4 : 14, p.rgb, { speed: p.arrow ? 1.5 : 4, size: p.def.size * 0.6, life: 0.4, grav: 2 });
     return p;
   }
 

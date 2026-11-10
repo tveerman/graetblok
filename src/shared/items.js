@@ -93,6 +93,7 @@ item(322, 'schaduwhart', 'Schaduwhart', { icon: ['heart', '#9b4dff'], stack: 1 }
 item(323, 'hemelhart', 'Hemelhart', { icon: ['heart', '#ffe98a'], stack: 1 });
 
 // ---- dorpen, dieren en treinen ----
+item(298, 'munt', 'Gouden munt', { icon: ['coin'], stack: 999 });
 item(299, 'bot', 'Bot', { icon: ['bone'] });
 item(324, 'leer', 'Leer', { icon: ['hide', '#9a6a3c'] });
 item(325, 'draad', 'Spinnendraad', { icon: ['thread'] });

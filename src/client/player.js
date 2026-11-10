@@ -3,6 +3,7 @@ import * as THREE from '../../vendor/three.module.min.js';
 import { EYE, REACH, CH, clamp } from '../shared/constants.js';
 import { B, BLOCKS, B_SHAPE, SHAPE_LIQUID, PORTAL_TO, TILE_CRACK } from '../shared/blocks.js';
 import { ITEMS, I } from '../shared/items.js';
+import { BREATH } from '../shared/mobs.js';
 import { playerModel, animate } from './models.js';
 import { iconCanvas } from './textures.js';
 
@@ -418,7 +419,8 @@ export class Player {
   shoot(dir) {
     if (this.shootCd > 0) return;
     const it = ITEMS[this.heldItem()];
-    this.shootCd = this.mount ? 0.5 : (it && it.ranged ? it.ranged.cd + 0.02 : 0.5);
+    const ride = this.mount ? this.g.ents.map.get(this.mount) : null;
+    this.shootCd = this.mount ? (BREATH[ride && ride.dtype] || BREATH.vuur).cd : (it && it.ranged ? it.ranged.cd + 0.02 : 0.5);
     this.swing = 0.25;
     this.g.net.send({ t: 'shoot', dx: dir.x, dy: dir.y, dz: dir.z });
   }

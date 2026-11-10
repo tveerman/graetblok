@@ -282,7 +282,14 @@ class Game {
       case 'despawn': this.ents.despawn(m.id); break;
       case 'entMeta': this.ents.meta(m); break;
       case 'proj': this.ents.addProj(m); if (m.s === 'm') this.sound.play('vuurbal', this.vol(m.x, m.y, m.z) * 0.6); break;
-      case 'projEnd': { const pr = this.ents.endProj(m); if (pr) this.sound.play(pr.arrow ? 'hit' : 'boom', this.vol(m.x, m.y, m.z) * 0.7); break; }
+      case 'projEnd': {
+        const pr = this.ents.endProj(m);
+        if (!pr) break;
+        const v = this.vol(m.x, m.y, m.z), B = pr.def.blast || 0;
+        this.sound.play(pr.arrow ? 'hit' : (pr.def.snd || 'boom'), v * (B > 2.5 ? 0.9 : 0.7));
+        if (B > 2.5) { const d = Math.hypot(m.x - p.pos.x, m.y - p.pos.y, m.z - p.pos.z); if (d < 20) p.shake = Math.max(p.shake || 0, 0.4 * (1 - d / 20)); }
+        break;
+      }
       case 'fx': this.fx(m); break;
       case 'mount': p.setMount(m.id, m.s); ui.setMounted(!!m.id); if (m.id) { this.sound.play('roar', 0.6); ui.toast(this.touch ? 'Duw de stick naar voren om te vliegen. ⬆ omhoog, ⬇ omlaag.' : 'W = vliegen waar je kijkt · spatie omhoog · shift omlaag · R afstappen'); } break;
       case 'weather': this.sky.set(m.k, m.now); break;
@@ -322,8 +329,18 @@ class Game {
       case 'grow': P.burst(x, y, z, 36, [0.5, 1, 0.5], { speed: 3, size: 0.26, life: 1.2, grav: -2, spread: 1.5 }); s.play('levelup', v); break;
       case 'slam': P.burst(x, y + 0.3, z, 26, [0.6, 0.5, 0.4], { speed: 5, size: 0.4, life: 0.8, grav: 6, spread: 2 }); s.play('boom', v); break;
       case 'roar': s.play('roar', Math.max(0.3, v)); break;
-      case 'breath': s.play('breath', Math.max(0.4, v)); break;
+      case 'breath': s.play('breath', Math.max(0.4, v)); P.burst(x, y, z, 10, [1, 0.8, 0.4], { speed: 3, size: 0.3, life: 0.3, grav: 0 }); break;
       case 'wool': P.burst(x, y, z, 12, [1, 1, 1], { speed: 1.6, size: 0.3, life: 0.7, grav: 2, up: 1 }); s.play('baa', Math.max(0.4, v)); break;
+      case 'zap': {
+        // een bliksemschicht van de ene vijand naar de andere
+        const n = 14;
+        for (let i = 0; i <= n; i++) {
+          const f = i / n, j = Math.sin(f * Math.PI) * 0.5;
+          P.add(x + (m.x2 - x) * f + (Math.random() - 0.5) * j, y + (m.y2 - y) * f + (Math.random() - 0.5) * j, z + (m.z2 - z) * f + (Math.random() - 0.5) * j, 0, 0, 0, 1, 1, 0.7, 0.28, 0.28, 0);
+        }
+        s.play('zap', v * 0.8);
+        break;
+      }
       case 'bolt': {
         this.sky.bolt(x, y, z);
         P.burst(x, y + 0.3, z, 30, [1, 1, 0.8], { speed: 8, size: 0.3, life: 0.5, grav: 6, up: 2 });

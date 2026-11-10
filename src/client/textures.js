@@ -1314,6 +1314,15 @@ function shadeHex(h, f) {
 }
 
 const ICONS = {
+  coin: (g) => {
+    g.lineWidth = 2; g.strokeStyle = 'rgba(0,0,0,0.6)';
+    for (const [x, y] of [[24, 40], [40, 36], [32, 24]]) {
+      g.fillStyle = '#c8901c'; g.beginPath(); g.ellipse(x, y + 3, 14, 12, 0, 0, 6.3); g.fill(); g.stroke();
+      g.fillStyle = '#f8cc3c'; g.beginPath(); g.ellipse(x, y, 14, 12, 0, 0, 6.3); g.fill(); g.stroke();
+      g.fillStyle = '#ffec8a'; g.beginPath(); g.ellipse(x - 3, y - 3, 6, 4, -0.5, 0, 6.3); g.fill();
+      g.fillStyle = '#c8901c'; g.font = 'bold 13px sans-serif'; g.textAlign = 'center'; g.fillText('G', x + 1, y + 5);
+    }
+  },
   bone: (g) => {
     g.save(); g.translate(32, 32); g.rotate(-0.75);
     g.fillStyle = '#efe8d2'; g.strokeStyle = 'rgba(0,0,0,0.6)'; g.lineWidth = 2;

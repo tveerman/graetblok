@@ -203,9 +203,84 @@ export function draak(type, growth) {
     w.rotation.x = -Math.PI / 2; w.scale.set(s * 1.9, 1.3, 1); w.position.set(s * 0.95, 0, -0.3);
     piv.add(w); piv.userData.s = s; a.wings.push(piv);
   }
+  dragonExtras(type, D, g, head, a.tail[2], body, belly, bone);
   a.seatY = 1.17;
   setDragonGrowth(root, growth === undefined ? 100 : growth);
   return root;
+}
+
+// Elke drakensoort heeft zijn eigen vorm: stekels, hoorns, een staartpunt en dingen die licht geven.
+function dragonExtras(type, D, g, head, tip, body, belly, bone) {
+  const glow = glowMat(D.glow || 0xffffff);
+  const spine = (n, w, h, d, m, z0 = 0.55, dz = 0.3, y = 1.22) => { for (let i = 0; i < n; i++) { const s = part(g, m, w, h * (1 - Math.abs(i - (n - 1) / 2) / n), d, 0, y + h * 0.25, z0 - i * dz); s.rotation.x = -0.35; } };
+  switch (type) {
+    case 'vuur': {
+      // een kam van vlammen over de rug, gloeiende neusgaten en een brandende staartpunt
+      spine(6, 0.1, 0.42, 0.16, glow);
+      for (const s of [-1, 1]) part(head, glow, 0.06, 0.05, 0.06, s * 0.09, 0.08, 0.79);
+      part(tip, glow, 0.2, 0.24, 0.3, 0, 0.06, -0.72); part(tip, glowMat(0xffe070), 0.1, 0.3, 0.16, 0, 0.14, -0.74);
+      break;
+    }
+    case 'ijs': {
+      // ijskristallen op rug en kop, en een bevroren knots aan de staart
+      const ice = mat(0xdff6ff, 'glad', { transparent: true, opacity: 0.85, emissive: 0x9fe8ff, emissiveIntensity: 0.5 });
+      for (let i = 0; i < 5; i++) { const s = part(g, ice, 0.1, 0.34 + (i % 2) * 0.18, 0.1, (i % 2 ? 0.1 : -0.1), 1.36, 0.5 - i * 0.26); s.rotation.set(-0.3, 0.6, (i % 2 ? -0.3 : 0.3)); }
+      for (const s of [-1, 1]) { const h = part(head, ice, 0.07, 0.4, 0.07, s * 0.22, 0.3, 0.02); h.rotation.z = -s * 0.5; }
+      const k = part(tip, ice, 0.3, 0.3, 0.3, 0, 0, -0.74); k.rotation.set(0.6, 0.6, 0);
+      break;
+    }
+    case 'natuur': {
+      // een kraag van bladeren, mos op de rug en een bloem aan de staart
+      const leaf = mat(0x6fc23a, 'vacht'), bloem = glowMat(0xff8fd0);
+      for (let i = 0; i < 6; i++) { const a = (i / 6) * Math.PI * 2; const l = part(head, leaf, 0.08, 0.34, 0.2, Math.cos(a) * 0.26, Math.sin(a) * 0.24, -0.1); l.rotation.z = a - Math.PI / 2; }
+      for (let i = 0; i < 4; i++) part(g, leaf, 0.5, 0.08, 0.2, 0, 1.2, 0.42 - i * 0.3);
+      part(tip, bloem, 0.3, 0.3, 0.08, 0, 0.02, -0.7); part(tip, glowMat(0xffe040), 0.12, 0.12, 0.1, 0, 0.02, -0.72);
+      break;
+    }
+    case 'bliksem': {
+      // zigzag-hoorns en vonkende stekels
+      for (const s of [-1, 1]) {
+        const h1 = part(head, glow, 0.06, 0.3, 0.06, s * 0.2, 0.36, -0.1); h1.rotation.z = -s * 0.7;
+        const h2 = part(head, glow, 0.06, 0.3, 0.06, s * 0.34, 0.56, -0.1); h2.rotation.z = s * 0.5;
+      }
+      spine(7, 0.06, 0.3, 0.1, glow, 0.6, 0.24);
+      const t = part(tip, glow, 0.08, 0.4, 0.3, 0, 0.1, -0.74); t.rotation.x = 0.7;
+      break;
+    }
+    case 'schaduw': {
+      // lange gebogen hoorns, paarse gloed onder de buik en rookpluimen
+      for (const s of [-1, 1]) { const h = part(head, mat(0x120a1e, 'glad'), 0.08, 0.08, 0.7, s * 0.2, 0.34, -0.3); h.rotation.set(0.75, s * 0.25, 0); }
+      part(g, glow, 0.36, 0.05, 1.0, 0, 0.4, 0);
+      spine(5, 0.12, 0.3, 0.22, mat(0x1c1230, 'glad'));
+      part(tip, glow, 0.16, 0.16, 0.34, 0, 0, -0.74);
+      break;
+    }
+    case 'robot': {
+      // antenne, straalmotoren en lampjes
+      part(head, mat(0x56606c, 'metaal'), 0.04, 0.36, 0.04, 0, 0.4, 0); part(head, glowMat(0xff3020), 0.1, 0.1, 0.1, 0, 0.6, 0);
+      for (const s of [-1, 1]) { part(g, mat(0x56606c, 'metaal'), 0.22, 0.22, 0.6, s * 0.46, 1.0, -0.3); part(g, glow, 0.14, 0.14, 0.08, s * 0.46, 1.0, -0.62); }
+      for (let i = 0; i < 4; i++) part(g, glow, 0.72, 0.05, 0.06, 0, 0.9, 0.45 - i * 0.3);
+      part(tip, glow, 0.24, 0.24, 0.14, 0, 0, -0.7);
+      break;
+    }
+    case 'goud': {
+      // een kroontje, gouden schubbenplaten en een juweel op de borst
+      for (let i = 0; i < 5; i++) part(head, glow, 0.06, 0.16 + (i % 2) * 0.1, 0.06, -0.16 + i * 0.08, 0.28, 0.12);
+      spine(5, 0.3, 0.14, 0.2, mat(0xfff0a0, 'schub'), 0.5, 0.28, 1.16);
+      part(g, glowMat(0xff3a5a), 0.16, 0.16, 0.08, 0, 0.9, 0.68);
+      part(tip, glow, 0.26, 0.26, 0.26, 0, 0, -0.74);
+      break;
+    }
+    case 'kristal': {
+      // grote kristallen op de rug en de staart
+      const k1 = mat(0xd8a8ff, 'glad', { emissive: 0xb06ae8, emissiveIntensity: 0.8 }), k2 = mat(0x9ff0ff, 'glad', { emissive: 0x5fe3e8, emissiveIntensity: 0.8 });
+      for (let i = 0; i < 6; i++) { const c = part(g, i % 2 ? k1 : k2, 0.14, 0.4 + (i % 3) * 0.14, 0.14, (i % 2 ? 0.14 : -0.14), 1.34, 0.52 - i * 0.22); c.rotation.set(0.3 - i * 0.1, 0.78, (i % 2 ? -0.4 : 0.4)); }
+      for (const s of [-1, 1]) { const h = part(head, k1, 0.08, 0.36, 0.08, s * 0.18, 0.34, -0.06); h.rotation.set(0.4, 0.78, -s * 0.3); }
+      const t = part(tip, k2, 0.22, 0.44, 0.22, 0, 0.08, -0.72); t.rotation.set(0.9, 0.78, 0);
+      break;
+    }
+  }
+  void body; void belly; void bone;
 }
 
 // babydraken hebben een grote kop en kleine vleugels

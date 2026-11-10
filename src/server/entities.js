@@ -4,18 +4,20 @@ import { CH, clamp, isNight } from '../shared/constants.js';
 import { B, BLOCKS, B_SHAPE, SHAPE_LIQUID, EGG_TYPE } from '../shared/blocks.js';
 import { I, ITEMS } from '../shared/items.js';
 import { WORLDS } from '../shared/worlds.js';
-import { MOBS, DRAGONS, DRAGON_NAMES, dragonStage, dragonScale, STAGE_NAMES } from '../shared/mobs.js';
+import { MOBS, DRAGONS, BREATH, DRAGON_NAMES, dragonStage, dragonScale, STAGE_NAMES } from '../shared/mobs.js';
 import { FOODS } from './quests.js';
 
 // [soort, maximum in de buurt, wanneer]
 const SPAWNS = {
   groen: [['pluizel', 3, 'day'], ['hert', 3, 'day'], ['pluizel', 2, 'any'], ['kruiper', 3, 'night'], ['robotspin', 2, 'night'], ['golem', 1, 'cave'], ['kruiper', 2, 'cave'],
-    ['schaap', 1, 'day'], ['koe', 1, 'day'], ['wolf', 1, 'any'], ['beer', 1, 'day'], ['spin', 2, 'night'], ['skelet', 2, 'night'], ['spin', 2, 'cave'], ['skelet', 2, 'cave']],
-  ijs: [['ijswolf', 3, 'any'], ['pluizel', 2, 'day'], ['ijswolf', 4, 'night'], ['hert', 2, 'day'], ['beer', 1, 'day'], ['schaap', 1, 'day'], ['skelet', 2, 'night']],
-  vuur: [['vuurgeest', 4, 'any'], ['golem', 2, 'any'], ['skelet', 2, 'any']],
-  schaduw: [['schim', 3, 'any'], ['kruiper', 3, 'any'], ['pluizel', 2, 'any'], ['spin', 3, 'any'], ['skelet', 2, 'any'], ['wolf', 1, 'any']],
-  wolken: [['stormvleugel', 3, 'any'], ['pluizel', 3, 'any'], ['hert', 2, 'any'], ['schaap', 1, 'any']],
+    ['schaap', 1, 'day'], ['koe', 1, 'day'], ['wolf', 1, 'any'], ['beer', 1, 'day'], ['spin', 2, 'night'], ['skelet', 2, 'night'], ['spin', 2, 'cave'], ['skelet', 2, 'cave'], ['wildedraak', 1, 'sky']],
+  ijs: [['ijswolf', 3, 'any'], ['pluizel', 2, 'day'], ['ijswolf', 4, 'night'], ['hert', 2, 'day'], ['beer', 1, 'day'], ['schaap', 1, 'day'], ['skelet', 2, 'night'], ['wildedraak', 1, 'sky']],
+  vuur: [['vuurgeest', 4, 'any'], ['golem', 2, 'any'], ['skelet', 2, 'any'], ['wildedraak', 1, 'sky']],
+  schaduw: [['schim', 3, 'any'], ['kruiper', 3, 'any'], ['pluizel', 2, 'any'], ['spin', 3, 'any'], ['skelet', 2, 'any'], ['wolf', 1, 'any'], ['wildedraak', 1, 'sky']],
+  wolken: [['stormvleugel', 3, 'any'], ['pluizel', 3, 'any'], ['hert', 2, 'any'], ['schaap', 1, 'any'], ['wildedraak', 1, 'sky']],
 };
+// de adem van monsters die drakenvuur spuwen (de Drakenkoning)
+const MONSTER_BREATH = { drakenvuur: BREATH.koning };
 
 const r2 = (v) => Math.round(v * 100) / 100;
 
@@ -47,6 +49,10 @@ export const entityMethods = {
     const m = { t: 'spawn', id: e.id, k: e.kind, x: r2(e.x), y: r2(e.y), z: r2(e.z), yaw: r2(e.yaw), s: e.scale };
     if (e.owner) m.o = e.owner;
     if (e.dragon) { m.d = e.dragon.type; m.n = e.dragon.name; m.g = e.dragon.growth; }
+    else {
+      if (e.dtype) m.d = e.dtype;
+      if (e.name) m.n = e.name;
+    }
     return m;
   },
 
@@ -125,14 +131,21 @@ export const entityMethods = {
       if (e.hurtT > 0) e.hurtT -= dt;
       if (e.rider) continue;
       const ai = e.def.ai;
+      if (e.poisonT > 0) {
+        // gif: elke tel een beetje pijn
+        e.poisonT -= dt; e.pt = (e.pt || 0) + dt;
+        if (e.pt >= 1) { e.pt = 0; this.damageEntity(w, e, 2, this.playerById(e.poisonBy), 0, 0); if (e.dead) continue; }
+      }
       if (ai === 'dragon') this.aiDragon(w, e, dt);
       else if (ai === 'boss') this.aiBoss(w, e, dt);
       else if (ai === 'passive') this.aiPassive(w, e, dt);
       else if (ai === 'melee') this.aiMelee(w, e, dt);
       else if (ai === 'wolf') this.aiWolf(w, e, dt);
       else if (ai === 'neutral') this.aiNeutral(w, e, dt);
+      else if (ai === 'wilddragon') this.aiWildDragon(w, e, dt);
       else this.aiRanged(w, e, dt);
       if (e.dead) continue;
+      if (e.slowT > 0) { e.slowT -= dt; e.vx *= 0.3; e.vz *= 0.3; if (e.fly) e.vy *= 0.3; }      // bevroren: heel traag
       if (e.fly) this.moveFly(w, e, dt); else this.moveWalk(w, e, dt);
       if (e.y < -30) { e.dead = true; w.ents.delete(e.id); }
     }
@@ -351,7 +364,7 @@ export const entityMethods = {
       e.cd = 0.5;
       let best = null, bd = 16;
       for (const m of w.ents.values()) {
-        if (m.owner || m.def.ai === 'passive' || m.def.ai === 'dragon') continue;
+        if (!this.hostile(m)) continue;
         const md = Math.hypot(m.x - o.x, m.y - o.y, m.z - o.z);
         if (md < bd) { bd = md; best = m; }
       }
@@ -359,7 +372,10 @@ export const entityMethods = {
         e.cd = 1.9; e.atk = 0.4;
         e.still = 0; e.landed = false;                  // in een gevecht blijft hij in de lucht
         e.yaw = Math.atan2(best.x - e.x, best.z - e.z);
-        this.shootAt(w, e, best.x, best.y + best.h * 0.5, best.z, DRAGONS[d.type].proj, 4 + stage * 4 + (d.level || 1), 20, 'p', o.id, 0, d.uid);
+        const ox = e.x, oy = e.y + e.h * 0.65, oz = e.z;
+        const bx = best.x - ox, by = best.y + best.h * 0.5 - oy, bz = best.z - oz, bl = Math.hypot(bx, by, bz) || 1;
+        const off = e.w / 2 + 0.4;
+        this.breathDir(w, ox + bx / bl * off, oy, oz + bz / bl * off, bx / bl, by / bl, bz / bl, d.type, 4 + stage * 4 + (d.level || 1), 'p', o.id, d.uid, 0.8);
       }
     }
   },
@@ -379,13 +395,15 @@ export const entityMethods = {
     const pr = { id: this.meta.nextId++, k: kind, x, y, z, vx, vy, vz, g: grav, dmg, side, owner, duid, life: 4 };
     w.projs.push(pr);
     this.broadcast(w.id, { t: 'proj', id: pr.id, k: kind, x: r2(x), y: r2(y), z: r2(z), vx: r2(vx), vy: r2(vy), vz: r2(vz), g: grav, s: side });
+    return pr;
   },
 
   updateProjectiles(w, dt) {
     for (let i = w.projs.length - 1; i >= 0; i--) {
       const pr = w.projs[i];
       pr.life -= dt;
-      let end = pr.life <= 0;
+      let end = pr.life <= 0, hitId = 0;
+      if (!pr.b && pr.side === 'm' && MONSTER_BREATH[pr.k]) pr.b = MONSTER_BREATH[pr.k];
       const sp = Math.hypot(pr.vx, pr.vy, pr.vz);
       const steps = Math.max(1, Math.ceil(sp * dt / 0.45)), sdt = dt / steps;
       for (let s = 0; s < steps && !end; s++) {
@@ -394,10 +412,17 @@ export const entityMethods = {
         if (w.solid(Math.floor(pr.x), Math.floor(pr.y), Math.floor(pr.z))) { end = true; break; }
         if (pr.side === 'p') {
           for (const e of w.ents.values()) {
-            if (e.owner) continue;
+            if (e.owner || (pr.seen && pr.seen.has(e.id))) continue;
             const hw = e.w / 2 + 0.25;
             if (pr.x > e.x - hw && pr.x < e.x + hw && pr.z > e.z - hw && pr.z < e.z + hw && pr.y > e.y - 0.25 && pr.y < e.y + e.h + 0.25) {
-              this.damageEntity(w, e, pr.dmg, this.playerById(pr.owner), pr.vx, pr.vz, pr.duid);
+              const owner = this.playerById(pr.owner);
+              this.damageEntity(w, e, pr.dmg, owner, pr.vx, pr.vz, pr.duid);
+              hitId = e.id;
+              if (pr.b) {
+                this.breathHit(w, pr, e, owner);
+                // schaduwvlam vliegt door een paar vijanden heen
+                if (pr.b.pierce) { if (!pr.seen) pr.seen = new Set(); pr.seen.add(e.id); if (pr.seen.size < pr.b.pierce) continue; }
+              }
               end = true; break;
             }
           }
@@ -413,6 +438,7 @@ export const entityMethods = {
         }
       }
       if (end) {
+        if (pr.b) this.breathEnd(w, pr, hitId);
         w.projs.splice(i, 1);
         this.broadcast(w.id, { t: 'projEnd', id: pr.id, x: r2(pr.x), y: r2(pr.y), z: r2(pr.z) });
       }
@@ -455,6 +481,7 @@ export const entityMethods = {
       }
     }
     if (!p) return;
+    if (e.dtype && this.rnd() < 0.3) this.giveLoot(p, this.eggOf(e.dtype), 1);      // een wilde draak laat soms een ei achter
     for (const [id, a, b, ch] of e.def.drops) {
       if (this.rnd() <= ch) this.giveLoot(p, id, a + Math.floor(this.rnd() * (b - a + 1)));
     }
@@ -519,12 +546,13 @@ export const entityMethods = {
     dx /= l; dy /= l; dz /= l;
     if (p.mount) {
       const e = w.ents.get(p.mount);
-      if (!e || t - p.shootCd < 0.45) return;
+      if (!e || !e.dragon) return;                       // op een trein kun je niet schieten
+      const d = e.dragon, b = BREATH[d.type] || BREATH.vuur;
+      if (t - p.shootCd < b.cd - 0.05) return;
       p.shootCd = t;
-      const d = e.dragon;
       const off = 2.2 * e.scale;
-      this.spawnProj(w, DRAGONS[d.type].proj, p.x + dx * off, p.y + 0.4 + dy * off, p.z + dz * off, dx * 28, dy * 28, dz * 28, 0, 10 + (d.level || 1) * 2, 'p', p.id, d.uid);
-      this.fx(w.id, 'breath', p.x, p.y, p.z);
+      this.breathDir(w, p.x + dx * off, p.y + 0.4 + dy * off, p.z + dz * off, dx, dy, dz, d.type, 10 + (d.level || 1) * 2, 'p', p.id, d.uid);
+      this.fx(w.id, 'breath', p.x + dx * off, p.y + 0.4 + dy * off, p.z + dz * off);
       return;
     }
     const s = p.inv[p.sel], it = s && ITEMS[s.id];
@@ -584,7 +612,7 @@ export const entityMethods = {
     e.scale = dragonScale(d.growth);
     e.fly = stage >= 1;
     e.w = 0.9 * e.scale + 0.3; e.h = 1.0 * e.scale + 0.2;
-    e.max = 30 + stage * 40; e.hp = e.max;
+    e.max = Math.round((30 + stage * 40) * (DRAGONS[d.type].hp || 1)); e.hp = e.max;
   },
 
   on_dragon(p, m) {
@@ -705,7 +733,7 @@ export const entityMethods = {
         this.applyDragon(e);
         d.eid = e.id;
         this.fx(g.w, 'hatch', g.x + 0.5, g.y + 0.5, g.z + 0.5);
-        this.send(o, { t: 'dialog', title: 'Het ei komt uit!', lines: ['Krak... krak... Het is een ' + DRAGONS[g.type].name.toLowerCase() + '!', 'Je babydraak heet ' + d.name + '. Tik op hem om hem eten te geven of een andere naam te kiezen.', 'Geef hem bessen, appels of vlees. Dan groeit hij tot je op hem kunt vliegen!'] });
+        this.send(o, { t: 'dialog', title: 'Het ei komt uit!', lines: ['Krak... krak... Het is een ' + DRAGONS[g.type].name.toLowerCase() + '!', 'Je babydraak heet ' + d.name + '. Tik op hem om hem eten te geven of een andere naam te kiezen.', 'Zijn kracht: ' + DRAGONS[g.type].power, 'Geef hem bessen, appels of vlees. Dan groeit hij tot je op hem kunt vliegen!'] });
         this.sendDragons(o);
         this.addXp(o, 40);
         this.checkQuests(o);
@@ -750,6 +778,14 @@ export const entityMethods = {
       if (y < 0) return;
     } else {
       const top = w.topY(x, z);
+      if (sky) {
+        const dx = Math.floor(p.x + Math.cos(a) * 60), dz = Math.floor(p.z + Math.sin(a) * 60);
+        const e = this.spawnEnt(w, kind, dx + 0.5, Math.max(top, 50) + 22 + this.rnd() * 10, dz + 0.5);
+        e.dtype = this.wildDragonType(p.world);
+        e.name = this.wildDragonName(e.dtype);
+        e.home = { x: e.x, y: e.y, z: e.z, r: 30 };
+        return;
+      }
       if (top < 2) { if (!def.fly) return; y = 58 + this.rnd() * 20; }
       else {
         if (w.liquid(x, top + 1, z)) return;
@@ -807,7 +843,7 @@ export const entityMethods = {
         if (Math.abs(e.x - p.x) > far || Math.abs(e.z - p.z) > far) continue;
         seen.add(e.id);
         if (!p.known.has(e.id)) { p.known.add(e.id); this.send(p, this.entDesc(e)); }
-        const flags = (e.atk > 0 ? 1 : 0) | ((e.fly && !e.landed) ? 2 : 0) | (e.mode === 'stay' ? 4 : 0) | (e.hurtT > 0 ? 8 : 0);
+        const flags = (e.atk > 0 ? 1 : 0) | ((e.fly && !e.landed) ? 2 : 0) | (e.mode === 'stay' ? 4 : 0) | (e.hurtT > 0 ? 8 : 0) | (e.slowT > 0 ? 16 : 0) | (e.poisonT > 0 ? 32 : 0);
         list.push(e.id, r2(e.x), r2(e.y), r2(e.z), r2(e.yaw), flags, r2(e.hp / e.max));
         if (e.def.boss) boss = [e.def.name, r2(e.hp / e.max)];
       }

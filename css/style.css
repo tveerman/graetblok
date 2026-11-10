@@ -203,3 +203,4 @@ body.touch #crosshair { opacity: .6; }
   #btnBreak { right: 72px; bottom: 24px; }
   #btnUse { right: 6px; bottom: 74px; }
 }
+.dragon .dpower { background: rgba(255, 255, 255, 0.08); border-radius: 8px; padding: 6px 10px; }

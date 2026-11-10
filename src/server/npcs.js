@@ -5,8 +5,9 @@ import { DAY_LENGTH, clamp, isNight } from '../shared/constants.js';
 import { B, BLOCKS, EGGS } from '../shared/blocks.js';
 import { I, ITEMS, itemName, maxStack, matches, GROUP_NAMES } from '../shared/items.js';
 import { WORLDS, WORLD_ORDER } from '../shared/worlds.js';
-import { MOBS, DRAGONS } from '../shared/mobs.js';
+import { MOBS, DRAGONS, BREATH } from '../shared/mobs.js';
 
+const r2 = (v) => Math.round(v * 100) / 100;
 
 // Het weer per wereld: [soort, kans]. De rest van de tijd schijnt de zon.
 const WEATHER = {
@@ -15,6 +16,7 @@ const WEATHER = {
   wolken: [['regen', 0.18]],
   schaduw: [['regen', 0.2], ['onweer', 0.1]],
 };
+const WILD_DRAGONS = { groen: ['natuur', 'vuur', 'natuur', 'goud'], ijs: ['ijs'], vuur: ['vuur'], schaduw: ['schaduw'], wolken: ['bliksem', 'kristal'] };
 
 export const npcMethods = {
 
@@ -82,6 +84,104 @@ export const npcMethods = {
     if (n && n.d < 3.2 && !n.p.god) e.angry = Math.max(e.angry || 0, 7);
     if (e.angry > 0 && n) { this.aiMelee(w, e, dt); return; }
     this.aiPassive(w, e, dt);
+  },
+
+  // Wilde draken zweven hoog rond. Kom je te dichtbij, dan cirkelen ze om je heen en spuwen ze.
+  aiWildDragon(w, e, dt) {
+    if (e.angry > 0) e.angry -= dt;
+    const n = this.nearest(w, e, 70);
+    const flyTo = (tx, ty, tz, sp) => {
+      const ex = tx - e.x, ey = ty - e.y, ez = tz - e.z, l = Math.hypot(ex, ey, ez) || 1;
+      const s = Math.min(sp, l * 2);
+      e.vx = ex / l * s; e.vy = ey / l * s; e.vz = ez / l * s;
+      return l;
+    };
+    e.orb = (e.orb || 0) + dt * (e.angry > 0 ? 0.5 : 0.16);
+    if (n && n.d < 20 && !n.p.god) e.angry = Math.max(e.angry || 0, 9);
+    if (n && e.angry > 0) {
+      const p = n.p;
+      flyTo(p.x + Math.cos(e.orb) * 13, p.y + 7 + Math.sin(e.orb * 1.7) * 2, p.z + Math.sin(e.orb) * 13, e.def.speed * 1.5);
+      e.yaw = Math.atan2(p.x - e.x, p.z - e.z);
+      if (e.cd <= 0 && n.d < 34) {
+        e.cd = 2.6; e.atk = 0.7;
+        const ox = e.x, oy = e.y + e.h * 0.6, oz = e.z;
+        const dx = p.x - ox, dy = p.y + 1 - oy, dz = p.z - oz, l = Math.hypot(dx, dy, dz) || 1;
+        this.breathDir(w, ox + dx / l * 1.6, oy, oz + dz / l * 1.6, dx / l, dy / l, dz / l, e.dtype, e.def.dmg, 'm', e.id, 0, 0.62);
+        if (this.rnd() < 0.3) this.fx(w.id, 'roar', e.x, e.y, e.z);
+      }
+      return;
+    }
+    const h = e.home;
+    const l = flyTo(h.x + Math.cos(e.orb) * 26, h.y + Math.sin(e.orb * 2.3) * 3, h.z + Math.sin(e.orb) * 26, e.def.speed);
+    if (l > 0.5) e.yaw = Math.atan2(e.vx, e.vz);
+  },
+
+  // ---------- drakenadem ----------
+
+  // Spuwt de adem van een drakensoort in een richting. power = de kracht van de draak,
+  // side: 'p' = van de speler (raakt monsters), 'm' = van een monster (raakt spelers).
+  breathDir(w, x, y, z, dx, dy, dz, type, power, side, owner, duid, slower = 1) {
+    const b = BREATH[type] || BREATH.vuur;
+    for (let i = 0; i < b.n; i++) {
+      const a = (i - (b.n - 1) / 2) * b.spread, c = Math.cos(a), s = Math.sin(a);
+      const vx = dx * c - dz * s, vz = dx * s + dz * c, sp = b.speed * slower;
+      const pr = this.spawnProj(w, b.proj, x, y, z, vx * sp, dy * sp, vz * sp, 0, Math.max(1, Math.round(power * b.dmg)), side, owner, duid);
+      pr.b = b;
+    }
+  },
+
+  // Wat er gebeurt als drakenadem iets raakt of ergens inslaat.
+  breathHit(w, pr, e, owner) {
+    const b = pr.b;
+    if (b.slow) e.slowT = b.slow;
+    if (b.poison) { e.poisonT = b.poison; e.poisonBy = pr.owner; }
+    if (owner && (b.heal || b.leech)) {
+      const max = this.maxHp(owner);
+      if (owner.hp < max) { owner.hp = Math.min(max, owner.hp + (b.heal || b.leech)); this.sendStats(owner); }
+    }
+    if (b.coins && e.dead && owner) { this.giveLoot(owner, I.munt, 1 + Math.floor(this.rnd() * 3)); this.sendInv(owner); }
+    if (b.chain) {
+      // de bliksem springt over naar vijanden in de buurt
+      let n = 0, from = e;
+      const seen = new Set([e.id]);
+      while (n < b.chain) {
+        let best = null, bd = 9;
+        for (const m of w.ents.values()) {
+          if (seen.has(m.id) || !this.hostile(m)) continue;
+          const d = Math.hypot(m.x - from.x, m.y - from.y, m.z - from.z);
+          if (d < bd) { bd = d; best = m; }
+        }
+        if (!best) break;
+        seen.add(best.id); n++;
+        this.broadcast(w.id, { t: 'fx', k: 'zap', x: r2(from.x), y: r2(from.y + from.h * 0.6), z: r2(from.z), x2: r2(best.x), y2: r2(best.y + best.h * 0.6), z2: r2(best.z) });
+        this.damageEntity(w, best, Math.max(1, Math.round(pr.dmg * 0.6)), owner, best.x - from.x, best.z - from.z, pr.duid);
+        from = best;
+      }
+    }
+  },
+
+  breathEnd(w, pr, hitId) {
+    const b = pr.b;
+    if (!b || !b.aoe) return;
+    if (pr.side === 'p') {
+      const owner = this.playerById(pr.owner);
+      for (const e of Array.from(w.ents.values())) {
+        if (e.id === hitId || !this.hostile(e) && e.def.ai !== 'wolf' && e.def.ai !== 'neutral' && e.def.ai !== 'wilddragon') continue;
+        if (e.owner) continue;
+        const d = Math.hypot(e.x - pr.x, e.y + e.h / 2 - pr.y, e.z - pr.z);
+        if (d > b.aoe + e.w / 2) continue;
+        this.damageEntity(w, e, Math.max(1, Math.round(pr.dmg * (1 - 0.5 * d / b.aoe))), owner, e.x - pr.x, e.z - pr.z, pr.duid);
+        if (b.poison && !e.dead) { e.poisonT = b.poison; e.poisonBy = pr.owner; }
+        if (b.coins && e.dead && owner) this.giveLoot(owner, I.munt, 1 + Math.floor(this.rnd() * 3));
+      }
+      if (owner && b.coins) this.sendInv(owner);
+    } else {
+      for (const q of this.players.values()) {
+        if (q.world !== w.id || q.dead) continue;
+        const d = Math.hypot(q.x - pr.x, q.y + 0.9 - pr.y, q.z - pr.z);
+        if (d < b.aoe * 0.8) this.hurtPlayer(q, Math.max(1, Math.round(pr.dmg * 0.6)), { x: pr.x, z: pr.z });
+      }
+    }
   },
 
   // ---------- praten, ruilen, scheren en melken ----------
@@ -210,6 +310,9 @@ export const npcMethods = {
     }
   },
 
+  wildDragonType(wid) { const l = WILD_DRAGONS[wid]; return l[Math.floor(this.rnd() * l.length)]; },
+  wildDragonName(type) { return 'Wilde ' + DRAGONS[type].name.toLowerCase(); },
+  eggOf(type) { return EGGS[type]; },
 };
 
 void clamp; void BLOCKS; void matches;

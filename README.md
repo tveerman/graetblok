@@ -147,6 +147,13 @@ From Jorian's design document (`spel.txt`), following development phases 1–4, 
   colours, and a spiral staircase of mushrooms around the trunk (it starts on the tall root at
   the back). Everything glows in the dark; a restored tree glows much brighter and fills the
   air with drifting lights.
+- **Dragon species** – the eight kinds now differ in shape (flame crest, ice crystals, leaf
+  collar, zigzag horns, jets and antenna, crown, crystal spikes...), in flying speed and
+  strength, and in what they breathe: exploding fireballs, three freezing ice shards, a
+  lingering poison cloud that also heals the rider, chain lightning, a shadow flame that
+  passes through enemies, twin rapid lasers, golden fire that makes monsters drop coins, and
+  a fan of five crystal shards. Wild dragons circle high in the sky and attack if you come
+  too close; a beaten one sometimes leaves an egg.
 - **Weather** – sun, rain and thunderstorms in the green and shadow worlds, snow and
   blizzards in the ice world, showers in the cloud world, and snow instead of rain high in
   the mountains. The sky turns grey, you hear the rain (muffled under a roof), and lightning

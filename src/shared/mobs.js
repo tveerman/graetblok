@@ -23,7 +23,7 @@ export const MOBS = {
     drops: [[I.schaduwhart, 1, 1, 1], [I.schaduwkristal, 6, 8, 1], [I.drakenschub, 3, 3, 1]] },
   stormwachter: { name: 'Stormwachter, bewaker van de Hemelboom', model: 'vleugel', scale: 3.2, hp: 320, dmg: 6, speed: 7, w: 3.0, h: 1.8, ai: 'boss', boss: 'wolken', proj: 'bliksem', fly: true, xp: 380,
     drops: [[I.hemelhart, 1, 1, 1], [I.hemelkristal, 6, 8, 1], [I.drakenschub, 4, 4, 1]] },
-  drakenkoning: { name: 'De Drakenkoning', model: 'draak', dragon: 'koning', scale: 3.0, hp: 520, dmg: 7, speed: 8, w: 4.0, h: 3.6, ai: 'boss', boss: 'groen', proj: 'vuurbal', fly: true, xp: 800,
+  drakenkoning: { name: 'De Drakenkoning', model: 'draak', dragon: 'koning', scale: 3.0, hp: 520, dmg: 7, speed: 8, w: 4.0, h: 3.6, ai: 'boss', boss: 'groen', proj: 'drakenvuur', fly: true, xp: 800,
     drops: [[I.drakenkroon, 1, 1, 1], [I.drakenschub, 8, 8, 1], [B.ei_goud, 1, 1, 1]] },
 
   draak: { name: 'Draak', model: 'draak', hp: 60, speed: 6, w: 0.9, h: 0.9, ai: 'dragon', fly: true, xp: 0, drops: [] },
@@ -38,19 +38,48 @@ export const MOBS = {
   // ---- meer monsters ----
   spin: { name: 'Reuzenspin', model: 'reuzenspin', hp: 14, dmg: 3, speed: 4.4, w: 1.0, h: 0.7, ai: 'melee', leap: true, xp: 9, drops: [[I.draad, 1, 2, 0.9]] },
   skelet: { name: 'Skelet', model: 'skelet', hp: 18, dmg: 4, speed: 2.6, w: 0.6, h: 1.8, ai: 'ranged', proj: 'pijl', xp: 11, drops: [[I.bot, 1, 2, 0.9], [I.pijl, 1, 3, 0.6]] },
+
+  // ---- wilde draken en de trein ----
+  wildedraak: { name: 'Wilde draak', model: 'draak', scale: 1.5, hp: 90, dmg: 5, speed: 7, w: 2.0, h: 1.8, ai: 'wilddragon', fly: true, xp: 90, drops: [[I.drakenschub, 2, 3, 1], [I.munt, 4, 8, 0.8]] },
 };
 
-// De acht drakensoorten uit het ontwerp
+// De acht drakensoorten uit het ontwerp. Elke soort heeft een eigen kleur, een eigen vorm
+// (zie models.js) en een eigen kracht:
+//   breath = waarmee hij spuwt (zie BREATH), fly = hoe snel hij vliegt, hp = hoe sterk hij is.
 export const DRAGONS = {
-  vuur: { name: 'Vuurdraak', body: 0xc2331f, belly: 0xf5a13a, wing: 0x7a1a12, proj: 'vuurbal' },
-  ijs: { name: 'IJsdraak', body: 0x7fc4e8, belly: 0xe8f6ff, wing: 0x4a8fc0, proj: 'ijspegel' },
-  natuur: { name: 'Natuurdraak', body: 0x3f9a3a, belly: 0xc9d96a, wing: 0x2a6a2c, proj: 'gifbol' },
-  bliksem: { name: 'Bliksemdraak', body: 0xe8c832, belly: 0xfff6b0, wing: 0x5a6ad0, proj: 'bliksem' },
-  schaduw: { name: 'Schaduwdraak', body: 0x3a2a55, belly: 0x7a4dff, wing: 0x1c1230, proj: 'schaduwbol' },
-  robot: { name: 'Robotdraak', body: 0x8a96a4, belly: 0x4ae0ff, wing: 0x56606c, proj: 'laser' },
-  goud: { name: 'Gouden draak', body: 0xe8b02a, belly: 0xfff0a0, wing: 0xb87a14, proj: 'vuurbal' },
-  kristal: { name: 'Kristaldraak', body: 0x5fe3e8, belly: 0xe8ffff, wing: 0xb06ae8, proj: 'magie' },
-  koning: { name: 'De Drakenkoning', body: 0x2a1a22, belly: 0xd9a020, wing: 0x7a1420, proj: 'vuurbal' },
+  vuur: { name: 'Vuurdraak', body: 0xc2331f, belly: 0xf5a13a, wing: 0x7a1a12, glow: 0xff8a2a, fly: 1.0, hp: 1.1,
+    power: 'Spuwt grote vuurballen die ontploffen en alles in de buurt raken.' },
+  ijs: { name: 'IJsdraak', body: 0x7fc4e8, belly: 0xe8f6ff, wing: 0x4a8fc0, glow: 0xcff4ff, fly: 0.95, hp: 1.2,
+    power: 'Spuwt drie ijspegels tegelijk. Wie geraakt wordt, bevriest en loopt heel traag.' },
+  natuur: { name: 'Natuurdraak', body: 0x3f9a3a, belly: 0xc9d96a, wing: 0x2a6a2c, glow: 0xa8ff5a, fly: 0.95, hp: 1.3,
+    power: 'Spuwt gifwolken die blijven hangen, en geneest jou een beetje bij elke treffer.' },
+  bliksem: { name: 'Bliksemdraak', body: 0xe8c832, belly: 0xfff6b0, wing: 0x5a6ad0, glow: 0xfff27a, fly: 1.35, hp: 0.9,
+    power: 'De snelste draak. Zijn bliksem springt over naar drie vijanden.' },
+  schaduw: { name: 'Schaduwdraak', body: 0x3a2a55, belly: 0x7a4dff, wing: 0x1c1230, glow: 0xb46bff, fly: 1.1, hp: 1.0,
+    power: 'Zijn schaduwvlam vliegt dwars door vijanden heen en geeft jou hun kracht.' },
+  robot: { name: 'Robotdraak', body: 0x8a96a4, belly: 0x4ae0ff, wing: 0x56606c, glow: 0x4ae0ff, fly: 1.2, hp: 1.4,
+    power: 'Schiet razendsnel met twee lasers en kan heel goed tegen een stootje.' },
+  goud: { name: 'Gouden draak', body: 0xe8b02a, belly: 0xfff0a0, wing: 0xb87a14, glow: 0xffe680, fly: 1.1, hp: 1.5,
+    power: 'Spuwt gouden vuur. Monsters die hij verslaat laten gouden munten vallen.' },
+  kristal: { name: 'Kristaldraak', body: 0x5fe3e8, belly: 0xe8ffff, wing: 0xb06ae8, glow: 0xd8a8ff, fly: 1.15, hp: 1.2,
+    power: 'Schiet een waaier van vijf vlijmscherpe kristalscherven.' },
+  koning: { name: 'De Drakenkoning', body: 0x2a1a22, belly: 0xd9a020, wing: 0x7a1420, glow: 0xff5a1a, fly: 1, hp: 1, power: '' },
+};
+
+// Waarmee elke soort spuwt. n = hoeveel tegelijk, spread = hoe wijd de waaier is, dmg = deel van
+// de kracht per schot, aoe = straal van de ontploffing, slow/poison = hoe lang (tellen),
+// chain = springt over naar zoveel vijanden, pierce = vliegt door zoveel vijanden heen,
+// cd = tellen tussen twee keer spuwen als je op de draak zit.
+export const BREATH = {
+  vuur: { proj: 'drakenvuur', n: 1, spread: 0, speed: 27, dmg: 1.0, aoe: 3.6, cd: 0.55 },
+  ijs: { proj: 'drakenijs', n: 3, spread: 0.07, speed: 33, dmg: 0.5, slow: 5, cd: 0.5 },
+  natuur: { proj: 'drakengif', n: 1, spread: 0, speed: 23, dmg: 0.6, aoe: 2.8, poison: 6, heal: 1, cd: 0.6 },
+  bliksem: { proj: 'drakenbliksem', n: 1, spread: 0, speed: 58, dmg: 0.9, chain: 3, cd: 0.42 },
+  schaduw: { proj: 'schaduwvlam', n: 1, spread: 0, speed: 31, dmg: 0.9, pierce: 3, leech: 1, cd: 0.5 },
+  robot: { proj: 'laser', n: 2, spread: 0.035, speed: 62, dmg: 0.45, cd: 0.2 },
+  goud: { proj: 'goudvuur', n: 1, spread: 0, speed: 28, dmg: 1.1, aoe: 3.2, coins: 1, cd: 0.6 },
+  kristal: { proj: 'kristalscherf', n: 5, spread: 0.09, speed: 35, dmg: 0.4, cd: 0.55 },
+  koning: { proj: 'drakenvuur', n: 1, spread: 0, speed: 19, dmg: 1, aoe: 2.6, cd: 1 },
 };
 
 export const DRAGON_NAMES = ['Vlam', 'Vonk', 'Storm', 'Schub', 'Gloed', 'Nacht', 'Ster', 'Bliksem', 'Draco', 'Vuurtje', 'Klauw', 'Wolk', 'Zilver', 'Rook', 'Komeet', 'Smaragd'];
@@ -74,4 +103,12 @@ export const PROJ = {
   schaduwbol: { color: 0x7a3aff, size: 0.6, trail: true, glow: true },
   bliksem: { color: 0xfff6a0, size: 0.6, trail: true, glow: true },
   gifbol: { color: 0x7ae03a, size: 0.55, trail: true, glow: true },
+  // de adem van draken: groter, met een dikke staart van vonken; blast = ontploft bij de inslag
+  drakenvuur: { color: 0xff6a10, color2: 0xffe070, size: 1.4, trail: 3, glow: true, blast: 3.4, snd: 'explode' },
+  drakenijs: { color: 0xbfefff, color2: 0xffffff, size: 0.7, trail: 2, glow: true, blast: 1.2, snd: 'ijs' },
+  drakengif: { color: 0x7ae03a, color2: 0xd8ff7a, size: 1.0, trail: 2, glow: true, blast: 2.8, snd: 'gif', cloud: true },
+  drakenbliksem: { color: 0xfff6a0, color2: 0xffffff, size: 0.9, trail: 3, glow: true, blast: 1.6, snd: 'zap' },
+  schaduwvlam: { color: 0x9a4aff, color2: 0x2a1040, size: 1.1, trail: 3, glow: true, blast: 1.4, snd: 'boom' },
+  goudvuur: { color: 0xffd23a, color2: 0xffffff, size: 1.3, trail: 3, glow: true, blast: 3.0, snd: 'explode' },
+  kristalscherf: { color: 0x9ff0ff, color2: 0xd8a8ff, size: 0.5, trail: 1, glow: true, blast: 0.9, snd: 'ijs' },
 };

@@ -420,6 +420,7 @@ export class UI {
     mk(d.mode === 'follow' ? '✋ Blijf hier' : '🐾 Volg mij', () => g.net.send({ t: 'dragon', uid, cmd: d.mode === 'follow' ? 'stay' : 'follow' }));
     mk('✏️ Naam', () => { const n = window.prompt('Hoe heet je draak?', d.name); if (n) g.net.send({ t: 'dragon', uid, cmd: 'name', name: n }); });
     b.appendChild(row);
+    if (DRAGONS[d.type].power) b.appendChild(el('p', 'dpower', '✨ <b>Kracht:</b> ' + DRAGONS[d.type].power));
     b.appendChild(el('p', 'hint', stage < 2 ? 'Draken lusten bessen, appels en vlees. Hoe meer eten, hoe groter!' : 'Je draak helpt je in gevechten en je kunt op hem vliegen.'));
     this.open('dragon', '🐉 ' + d.name, b, false);
   }
