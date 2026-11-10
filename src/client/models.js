@@ -542,6 +542,57 @@ function reuzenspin() {
   return root;
 }
 
+// ---------- de trein ----------
+
+const WIEL = new THREE.CylinderGeometry(0.5, 0.5, 1, 10);
+function wielen(g, m, r, y, list, a) {
+  for (const [x, z] of list) {
+    const w = new THREE.Mesh(WIEL, m);
+    w.rotation.z = Math.PI / 2; w.scale.set(r * 2, 0.12, r * 2); w.position.set(x, y, z);
+    g.add(w); if (a) a.wheels.push(w);
+  }
+}
+function trein() {
+  const root = base('trein'), g = root.userData.a.inner, a = root.userData.a;
+  a.wheels = [];
+  const zwart = mat(0x2a2e36, 'metaal'), rood = mat(0xc8362c, 'glad'), goud = mat(0xe0a03a, 'metaal'), staal = mat(0x9aa6b2, 'metaal');
+  part(g, goud, 1.2, 0.14, 2.3, 0, 0.42, 0);                                                 // onderstel
+  // de ketel: een liggende cilinder
+  const ketel = new THREE.Mesh(WIEL, zwart); ketel.rotation.x = Math.PI / 2; ketel.scale.set(0.94, 1.36, 0.94); ketel.position.set(0, 0.96, 0.42); g.add(ketel);
+  for (const z of [-0.1, 0.5, 1.0]) { const b = new THREE.Mesh(WIEL, goud); b.rotation.x = Math.PI / 2; b.scale.set(0.98, 0.07, 0.98); b.position.set(0, 0.96, z); g.add(b); }
+  const neus = new THREE.Mesh(WIEL, staal); neus.rotation.x = Math.PI / 2; neus.scale.set(0.7, 0.1, 0.7); neus.position.set(0, 0.96, 1.14); g.add(neus);
+  part(g, glowMat(0xfff6c0), 0.2, 0.2, 0.06, 0, 1.0, 1.2);                                   // koplamp
+  // schoorsteen en stoomdom
+  const pijp = new THREE.Mesh(WIEL, zwart); pijp.scale.set(0.26, 0.5, 0.26); pijp.position.set(0, 1.62, 0.84); g.add(pijp);
+  const rand = new THREE.Mesh(WIEL, goud); rand.scale.set(0.38, 0.1, 0.38); rand.position.set(0, 1.9, 0.84); g.add(rand);
+  const dom = new THREE.Mesh(WIEL, goud); dom.scale.set(0.3, 0.26, 0.3); dom.position.set(0, 1.52, 0.3); g.add(dom);
+  // het machinistenhuis, open aan de zijkanten zodat je erin kunt zitten
+  part(g, rood, 1.2, 0.56, 0.08, 0, 0.78, -1.06); part(g, rood, 1.2, 0.56, 0.08, 0, 0.78, -0.28);
+  part(g, rood, 0.08, 0.56, 0.86, -0.56, 0.78, -0.67); part(g, rood, 0.08, 0.56, 0.86, 0.56, 0.78, -0.67);
+  for (const [x, z] of [[-0.56, -1.06], [0.56, -1.06], [-0.56, -0.28], [0.56, -0.28]]) part(g, rood, 0.08, 0.8, 0.08, x, 1.46, z);
+  part(g, zwart, 1.36, 0.1, 1.06, 0, 1.9, -0.67);                                            // dak
+  // baanschuiver vooraan
+  const sch = part(g, staal, 1.1, 0.3, 0.08, 0, 0.3, 1.24); sch.rotation.x = -0.5;
+  wielen(g, staal, 0.3, 0.3, [[-0.62, 0.7], [0.62, 0.7], [-0.62, -0.1]], a);
+  wielen(g, staal, 0.3, 0.3, [[0.62, -0.1]], a);
+  wielen(g, rood, 0.36, 0.36, [[-0.62, -0.84], [0.62, -0.84]], a);
+  a.chimney = [0, 1.98, 0.84];
+  return root;
+}
+// een wagon: een open bak met een afdakje
+export function wagonModel(i) {
+  const g = new THREE.Group();
+  const kleur = [0x9a6a3c, 0x3f7a4a, 0x3a5a9a, 0xb89a3a][i % 4];
+  const hout = mat(kleur, 'vacht'), goud = mat(0xe0a03a, 'metaal'), staal = mat(0x9aa6b2, 'metaal');
+  part(g, goud, 1.2, 0.14, 1.9, 0, 0.42, 0);
+  part(g, hout, 1.2, 0.5, 0.08, 0, 0.74, 0.9); part(g, hout, 1.2, 0.5, 0.08, 0, 0.74, -0.9);
+  part(g, hout, 0.08, 0.5, 1.8, -0.56, 0.74, 0); part(g, hout, 0.08, 0.5, 1.8, 0.56, 0.74, 0);
+  for (const [x, z] of [[-0.56, 0.9], [0.56, 0.9], [-0.56, -0.9], [0.56, -0.9]]) part(g, hout, 0.07, 0.7, 0.07, x, 1.34, z);
+  part(g, mat(0x2a2e36, 'glad'), 1.3, 0.08, 2.0, 0, 1.72, 0);
+  part(g, mat(0x6a4a2c, 'glad'), 0.16, 0.08, 0.3, 0, 0.42, 1.06);                             // koppeling
+  wielen(g, staal, 0.3, 0.3, [[-0.62, 0.6], [0.62, 0.6], [-0.62, -0.6], [0.62, -0.6]], null);
+  return g;
+}
 
 const BEER_COLOR = { groen: 0x6a4428, ijs: 0xf2f2ee, vuur: 0x3a2a26, schaduw: 0x3a2a4a, wolken: 0xe8d8c0 };
 const SCHAAP_COLOR = { groen: 0xf2efe6, ijs: 0xf8fbff, vuur: 0x6a5a56, schaduw: 0x9a86c0, wolken: 0xffe6f2 };
@@ -573,6 +624,7 @@ export function buildModel(kind, opts) {
     case 'beer': m = beer(BEER_COLOR[opts.world] || BEER_COLOR.groen); break;
     case 'grijzewolf': m = quad(opts.world === 'schaduw' ? 0x2a2434 : 0x7a7e88, 'vacht', '#ffd040', true, 0); break;
     case 'reuzenspin': m = reuzenspin(); break;
+    case 'trein': m = trein(); break;
     default: m = pluizel(0xff00ff);
   }
   return m;
@@ -620,6 +672,10 @@ export function animate(root, time, speed, flags, dt) {
       a.inner.rotation.x = atk ? 0.4 : 0;
       break;
     }
+    case 'trein':
+      for (const w of a.wheels) w.rotation.x += speed * dt * 3;
+      a.inner.position.y = moving ? Math.sin(time * 26) * 0.012 : 0;
+      break;
     case 'draak': {
       const flying = flags & 2;
       const rate = 6.5;

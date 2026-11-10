@@ -6,6 +6,7 @@ import { B, BLOCKS, EGGS } from '../shared/blocks.js';
 import { I, ITEMS, itemName, maxStack, matches, GROUP_NAMES } from '../shared/items.js';
 import { WORLDS, WORLD_ORDER } from '../shared/worlds.js';
 import { MOBS, DRAGONS, BREATH } from '../shared/mobs.js';
+import { RAIL_YAW, railLinks } from '../shared/rails.js';
 
 const M = I.munt;
 const r2 = (v) => Math.round(v * 100) / 100;
@@ -38,6 +39,8 @@ export const JOBS = {
   drakenhandelaar: { title: 'Drakenhandelaar', hi: 'Psst... zoek je iets bijzonders? Ik heb eieren van heel ver weg.',
     trades: [[M, 40, B.ei_vuur, 1], [M, 40, B.ei_ijs, 1], [M, 50, B.ei_bliksem, 1], [M, 50, B.ei_schaduw, 1], [M, 80, B.ei_kristal, 1],
       [M, 6, I.drakenschub, 1], [I.drakenschub, 1, M, 4]] },
+  stationschef: { title: 'Stationschef', hi: 'Instappen! Zet een locomotief op de rails en tik erop om te rijden.',
+    trades: [[M, 25, I.locomotief, 1], [M, 10, I.wagon, 1], [M, 4, B.rails, 16], [I.steenkool, 6, M, 1]] },
   koning: { title: 'Koning', hi: 'Welkom in mijn kasteel, dappere held. Breng mij de kroon van de Skeletkoning en ik beloon je rijkelijk!',
     trades: [[I.spookkroon, 1, M, 100], [M, 100, B.ei_goud, 1], [M, 60, I.ridderharnas, 1], [M, 30, I.zwaard_zilver, 1], [I.drakenschub, 2, M, 10]] },
 };
@@ -370,6 +373,7 @@ export const npcMethods = {
   useNpc(p, w, e) {
     const held = p.inv[p.sel], hid = held ? held.id : 0;
     const ai = e.def.ai;
+    if (e.kind === 'trein') { this.useTrain(p, w, e, hid); return true; }
     if (e.job) {
       const J = JOBS[e.job];
       e.talk = 25;
@@ -518,6 +522,64 @@ export const npcMethods = {
       if (!this.hostile(e)) continue;
       if (Math.hypot(e.x - x, e.z - z) < 4 && Math.abs(e.y - top) < 6) this.damageEntity(w, e, 24, null, e.x - x, e.z - z);
     }
+  },
+
+  // ---------- treinen ----------
+
+  spawnTrain(rec) {
+    const w = this.worlds[rec.w];
+    if (!w) return;
+    const e = this.spawnEnt(w, 'trein', rec.x, rec.y, rec.z, { keep: true, train: rec });
+    e.yaw = rec.yaw || 0;
+    rec.eid = e.id;
+  },
+
+  on_placeTrain(p, m) {
+    const w = this.worlds[p.world];
+    const x = m.x | 0, y = m.y | 0, z = m.z | 0;
+    const s = p.inv[p.sel];
+    if (!s || !ITEMS[s.id] || !ITEMS[s.id].train || w.get(x, y, z) !== B.rails || Math.hypot(x + 0.5 - p.x, y - p.y, z + 0.5 - p.z) > 9) return;
+    if (!this.meta.trains) this.meta.trains = [];
+    for (const r of this.meta.trains) if (r.w === w.id && Math.hypot(r.x - x - 0.5, r.z - z - 0.5) < 2 && Math.abs(r.y - y) < 2) { this.toast(p, 'Hier staat al een trein.', 'warn'); return; }
+    const L = railLinks((a, b, c) => w.get(a, b, c), x, y, z, [0, 0, 0, 0]);
+    const d = L[0] || L[2] ? 0 : 1;
+    const rec = { uid: this.meta.nextId++, w: w.id, x: x + 0.5, y: y + 0.1, z: z + 0.5, yaw: RAIL_YAW[d], wg: 0 };
+    this.meta.trains.push(rec);
+    this.spawnTrain(rec);
+    s.n--; if (s.n <= 0) p.inv[p.sel] = null;
+    this.fx(w.id, 'poof', rec.x, rec.y + 1, rec.z, 1);
+    this.toast(p, 'De trein staat klaar! Tik erop om in te stappen.', 'good');
+    this.sendInv(p);
+  },
+
+  useTrain(p, w, e, hid) {
+    const rec = e.train;
+    if (hid === I.wagon) {
+      if (rec.wg >= 6) { this.toast(p, 'Deze trein is lang genoeg.', 'warn'); return; }
+      const s = p.inv[p.sel];
+      s.n--; if (s.n <= 0) p.inv[p.sel] = null;
+      rec.wg++;
+      this.broadcast(w.id, { t: 'entMeta', id: e.id, wg: rec.wg });
+      this.sendInv(p);
+      return;
+    }
+    if (e.rider || p.mount) return;
+    p.mount = e.id; e.rider = p.id;
+    this.send(p, { t: 'mount', id: e.id, s: 1, k: 'trein' });
+  },
+
+  // met een houweel sla je de trein weer los van de rails
+  pickTrain(p, w, e) {
+    if (e.rider) return;
+    const s = p.inv[p.sel], it = s && ITEMS[s.id];
+    if (!it || it.tool !== 'pick') { this.toast(p, 'Sla met een houweel op de trein om hem weer op te pakken.'); return; }
+    const rec = e.train;
+    this.giveLoot(p, I.locomotief, 1);
+    if (rec.wg) this.giveLoot(p, I.wagon, rec.wg);
+    this.meta.trains = this.meta.trains.filter((r) => r !== rec);
+    w.ents.delete(e.id);
+    this.fx(w.id, 'poof', e.x, e.y + 1, e.z, 1);
+    this.sendInv(p);
   },
 
   wildDragonType(wid) { const l = WILD_DRAGONS[wid]; return l[Math.floor(this.rnd() * l.length)]; },

@@ -36,7 +36,7 @@ export class GameServer {
 
   newMeta() {
     return { v: 1, seed: (Math.random() * 2147483647) | 0, time: DAY_LENGTH * 0.05, trees: {}, bossDead: {}, portals: [], eggs: {}, nextId: 1,
-      gen2: 1, noSites: {}, oldChunks: {}, weather: {}, cleared: {} };
+      gen2: 1, noSites: {}, oldChunks: {}, trains: [], weather: {}, cleared: {} };
   }
 
   async init() {
@@ -50,6 +50,7 @@ export class GameServer {
     }
     if (!meta.gen2) this.upgradeWorld(meta, per);
     for (const w of WORLD_ORDER) this.worlds[w] = new ServerWorld(w, meta.seed, per[w], { noSites: meta.noSites[w], oldChunks: meta.oldChunks[w] });
+    for (const rec of meta.trains || []) this.spawnTrain(rec);
     this.ready = true;
     this.last = now();
     if (!this.timer) this.timer = setInterval(() => { try { this.tick(); } catch (e) { console.error('server tick', e); } }, TICK_MS);
@@ -59,6 +60,7 @@ export class GameServer {
   // komt geen dorp, kasteel, kamp of spoor. Zo raakt niemand zijn eigen bouwwerken kwijt.
   upgradeWorld(meta, per) {
     meta.gen2 = 1; meta.noSites = {}; meta.oldChunks = {};
+    if (!meta.trains) meta.trains = [];
     for (const wid of WORLD_ORDER) {
       const keys = per[wid] ? Array.from(per[wid].keys()) : [];
       if (!keys.length) continue;
@@ -676,6 +678,8 @@ export class GameServer {
     const old = this.worlds[p.world];
     this.syncOwned(p);
     const mounted = p.mount;
+    const me = mounted ? old.ents.get(mounted) : null;
+    if (me && !me.owner) me.rider = 0;             // van de trein gestapt
     for (const d of p.dragons) {
       if (d.world === p.world && (d.mode === 'follow' || (mounted && d.eid === mounted))) { d.world = to; d.x = x; d.y = Math.max(2, y + 1); d.z = z + 1.5; d.far = 1; }
     }
@@ -713,7 +717,12 @@ export class GameServer {
     if (cx !== p.ccx || cz !== p.ccz) { p.ccx = cx; p.ccz = cz; this.updateWanted(p); }
     if (p.mount) {
       const e = this.worlds[p.world].ents.get(p.mount);
-      if (e) { e.x = p.x; e.y = p.y - 0.2 - 1.15 * e.scale; e.z = p.z; e.yaw = p.yaw; e.vx = e.vy = e.vz = 0; }
+      if (e && e.train) {
+        // de speler bestuurt de trein: de trein staat waar de speler zegt
+        const r = e.train;
+        e.x = r.x = p.x; e.y = r.y = p.y - 0.9; e.z = r.z = p.z;
+        if (typeof m.ry === 'number') e.yaw = r.yaw = m.ry;
+      } else if (e) { e.x = p.x; e.y = p.y - 0.2 - 1.15 * e.scale; e.z = p.z; e.yaw = p.yaw; e.vx = e.vy = e.vz = 0; }
       else p.mount = 0;
     }
   }

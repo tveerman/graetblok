@@ -59,7 +59,7 @@ export const QUESTS = [
     text: 'Vier bomen leven weer! De Drakenkoning bewaakt de Grote Levensboom: ver in het noordwesten van de Groene wereld, in een dal achter een ring van bergen.',
     done: (p, S) => S.meta.trees.groen },
   { id: 'einde', title: 'Held van Graet',
-    text: 'Je hebt alle levensbomen hersteld en Graet gered! Blijf bouwen, ontdek alles en verzamel alle acht draken. Er is nog één heel oud geheim...',
+    text: 'Je hebt alle levensbomen hersteld en Graet gered! Blijf bouwen, ontdek alles en verzamel alle acht draken. Bezoek de dorpen, rijd met de trein, versla de Trollenhoofdman en de Skeletkoning. En er is nog één heel oud geheim...',
     done: () => false },
 ];
 

@@ -404,6 +404,7 @@ export class UI {
       ds.appendChild(row);
     }
     b.appendChild(ds);
+    b.appendChild(el('div', 'qsec help', '<h4>De wereld</h4><p>🏠 <b>Dorpen</b>: tik op een dorpeling om te ruilen. Verkoop wat je vindt voor gouden munten en koop gereedschap, eten of een locomotief. 🏰 <b>Kastelen</b>: bij de koning ben je welkom, in een spookkasteel woont de Skeletkoning. 🚂 <b>Treinen</b>: zet een locomotief op rails en tik erop. 🐑 Tik op een schaap voor wol, op een koe met een emmer voor melk, en geef een wolf drie botten om hem te temmen.</p>'));
     b.appendChild(el('div', 'qsec help', g.input.touch
       ? '<h4>Besturing</h4><p>Linkerduim: lopen. Rechterduim: rondkijken. <b>Tik</b> = neerzetten of gebruiken. <b>Vinger ingedrukt houden</b> = hakken of slaan. Knoppen rechtsonder: ⛏ hakken, ✋ gebruiken, ⬆ springen. Is je draak in de buurt, dan staat er onderin een knop 🐉 om hem te voeren of op hem te vliegen.</p>'
       : '<h4>Besturing</h4><p><b>WASD</b> lopen · <b>muis</b> kijken (of pijltjestoetsen) · <b>linkermuisknop</b> hakken/slaan · <b>rechtermuisknop</b> of <b>F</b> neerzetten/gebruiken · <b>spatie</b> springen · <b>shift</b> rennen · <b>1-9</b> of scrollen: snelbalk · <b>E</b> rugzak · <b>Q</b> opdrachten · <b>V</b> camera · <b>R</b> op/van je draak · <b>G</b> venster van je draak · <b>Esc</b> menu</p>'));

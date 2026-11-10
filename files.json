@@ -33,5 +33,6 @@
   "src/shared/items.js",
   "src/shared/mobs.js",
   "src/shared/noise.js",
+  "src/shared/rails.js",
   "src/shared/worlds.js"
 ]

@@ -345,6 +345,60 @@ function rank(tile, soort) {
   return M.finish();
 }
 
+// ---------- rails ----------
+// Vier stukken: recht (langs x), bocht (van +x naar +z), helling (omhoog naar +x) en kruising.
+// De mesher kiest het stuk en draait het in kwartslagen (zie railShape in shared/rails.js).
+
+const RAIL_Y0 = 0.06, RAIL_Y1 = 0.16, RAIL_W = 0.045;
+// Een staaf langs een rij punten [x, y, z]; side(i) geeft de richting dwars op de staaf: [dx, dz].
+function staaf(M, tile, pts, side) {
+  for (let i = 0; i < pts.length - 1; i++) {
+    const a = pts[i], b = pts[i + 1], sa = side(i), sb = side(i + 1);
+    const al = [a[0] - sa[0] * RAIL_W, a[2] - sa[1] * RAIL_W], ar = [a[0] + sa[0] * RAIL_W, a[2] + sa[1] * RAIL_W];
+    const bl = [b[0] - sb[0] * RAIL_W, b[2] - sb[1] * RAIL_W], br = [b[0] + sb[0] * RAIL_W, b[2] + sb[1] * RAIL_W];
+    const out = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2 + (RAIL_Y0 + RAIL_Y1) / 2, (a[2] + b[2]) / 2];
+    const uv = [[0, 0], [1, 0], [1, 0.3], [0, 0.3]], uvz = [[0, 0.3], [1, 0.3], [1, 1], [0, 1]];
+    M.quad(tile, [[al[0], a[1] + RAIL_Y1, al[1]], [ar[0], a[1] + RAIL_Y1, ar[1]], [br[0], b[1] + RAIL_Y1, br[1]], [bl[0], b[1] + RAIL_Y1, bl[1]]], uv, { out });
+    M.quad(tile, [[al[0], a[1] + RAIL_Y0, al[1]], [al[0], a[1] + RAIL_Y1, al[1]], [bl[0], b[1] + RAIL_Y1, bl[1]], [bl[0], b[1] + RAIL_Y0, bl[1]]], uvz, { out });
+    M.quad(tile, [[ar[0], a[1] + RAIL_Y0, ar[1]], [ar[0], a[1] + RAIL_Y1, ar[1]], [br[0], b[1] + RAIL_Y1, br[1]], [br[0], b[1] + RAIL_Y0, br[1]]], uvz, { out });
+  }
+}
+function railModel(vorm) {
+  const M = new Model({ rot: 0, ao: 0 });
+  const staal = tileId('rail_staal'), biels = tileId('biels');
+  const bielzen = () => { for (let k = 0; k < 4; k++) M.box(biels, 0.06 + k * 0.25, 0, 0.06, 0.19 + k * 0.25, RAIL_Y0, 0.94, { uv: [0, 0, 1, 0.2], top: [0, 0, 1, 0.3] }); };
+  const recht = (stijg) => { for (const z of [0.25, 0.75]) staaf(M, staal, [[0, 0, z], [1, stijg, z]], () => [0, 1]); };
+  if (vorm === 0) { bielzen(); recht(0); }
+  else if (vorm === 2) {
+    // helling: alles loopt een heel blok omhoog naar +x
+    M.xf = (p) => [p[0], p[1] + p[0], p[2]];
+    bielzen();
+    M.xf = null;
+    recht(1);
+  } else if (vorm === 3) {
+    bielzen(); recht(0);
+    M.xf = rotY(Math.PI / 2, 0.5, 0.5);
+    recht(0);
+    M.xf = null;
+  } else {
+    // bocht om de hoek (1, 1): van de rand bij +z naar de rand bij +x
+    const N = 5;
+    for (const r of [0.25, 0.75]) {
+      const pts = [], dirs = [];
+      for (let i = 0; i <= N; i++) { const a = Math.PI + (i / N) * Math.PI / 2; pts.push([1 + Math.cos(a) * r, 0, 1 + Math.sin(a) * r]); dirs.push([Math.cos(a), Math.sin(a)]); }
+      staaf(M, staal, pts, (i) => dirs[i]);
+    }
+    for (let k = 0; k < 3; k++) {
+      const a = Math.PI + ((k + 0.5) / 3) * Math.PI / 2;
+      // een biels die naar het midden van de bocht wijst
+      M.xf = (p) => { const rr = p[0], t = p[2]; return [1 + Math.cos(a) * rr - Math.sin(a) * t, p[1], 1 + Math.sin(a) * rr + Math.cos(a) * t]; };
+      M.box(biels, 0.06, 0, -0.065, 0.94, RAIL_Y0, 0.065, { uv: [0, 0, 1, 0.2], top: [0, 0, 1, 0.3] });
+    }
+    M.xf = null;
+  }
+  return M.finish();
+}
+
 // Tarwe: een bosje halmen met een aar bovenaan.
 function tarwe(seed) {
   const r = mulberry32(seed), M = new Model({ jit: 0.06, vary: 0.18, swayFrom: 0.1, plant: 1 });
@@ -387,5 +441,6 @@ BLOCK_MODELS[B.kampvuur] = [kampvuur()];
 BLOCK_MODELS[B.gloeipaddenstoel] = [paddenstoelen('turkoois', true)];
 ZWAM_KEYS.forEach((k) => { BLOCK_MODELS[B['gloeizwam_' + k]] = [paddenstoelen(k, false)]; });
 TREE_KEYS.forEach((k) => { const t = tileId('lichtvrucht_' + k); BLOCK_MODELS[LIFE_VINES[k]] = [rank(t, 0), rank(t, 1), rank(t, 2)]; });
+BLOCK_MODELS[B.rails] = [railModel(0), railModel(1), railModel(2), railModel(3)];      // recht, bocht, helling, kruising
 BLOCK_MODELS[B.tarwe] = [tarwe(21), tarwe(22), tarwe(23)];
 BLOCK_MODELS[B.spinnenweb] = [spinnenweb()];

@@ -1195,6 +1195,15 @@ Object.assign(PX, {
     if (HQ) HH = Math.max(bot, knok) * 0.8;
     return mix([52, 46, 40], mul([232, 224, 200], 0.82 + CID * 0.2), Math.max(bot, knok));
   },
+  rail_staal: (x, y, u, v) => {
+    if (HQ) HS = 0.85;
+    return mul([156, 162, 174], 0.72 + vn(u * 3, v * 40, 3, 40, 538) * 0.36 + (v < 0.25 ? 0.22 : 0));
+  },
+  biels: (x, y, u, v) => {
+    const nerf = vn(u * 5, v * 36, 5, 36, 539) * 0.6 + vn(u * 11, v * 70, 11, 70, 540) * 0.4;
+    if (HQ) HH = 0.4 + nerf * 0.4;
+    return mul([94, 68, 46], 0.7 + nerf * 0.5);
+  },
   tarwe_halm: (x, y, u, v) => mul(mix([214, 186, 84], [128, 150, 52], v), 0.85 + vn(u * 10, v * 3, 10, 3, 541) * 0.3),
   tarwe_aar: (x, y, u, v) => {
     // een aar: twee rijen korrels langs een steeltje, met naaldjes eraan
@@ -1214,6 +1223,16 @@ Object.assign(PX, {
     return [246, 246, 250, (spaak || ring) && d < 0.7 ? 255 : 0];
   },
 });
+DRAW.rails = (g) => {
+  // twee rails op bielzen, schuin van voren gezien
+  g.fillStyle = '#6a4a30'; g.strokeStyle = 'rgba(0,0,0,0.6)'; g.lineWidth = 1.5;
+  for (let i = 0; i < 4; i++) { const y = 12 + i * 13, w = 30 + i * 7; g.fillRect(32 - w / 2, y, w, 6); g.strokeRect(32 - w / 2, y, w, 6); }
+  for (const s of [-1, 1]) {
+    g.beginPath(); g.moveTo(32 + s * 9, 6); g.lineTo(32 + s * 12.5, 6); g.lineTo(32 + s * 25, 60); g.lineTo(32 + s * 19, 60); g.closePath();
+    g.fillStyle = '#aab2c0'; g.fill(); g.stroke();
+    g.fillStyle = 'rgba(255,255,255,0.5)'; g.beginPath(); g.moveTo(32 + s * 10, 6); g.lineTo(32 + s * 11, 6); g.lineTo(32 + s * 22, 60); g.lineTo(32 + s * 20.5, 60); g.closePath(); g.fill();
+  }
+};
 DRAW.tarwe = (g) => {
   g.lineCap = 'round';
   for (let i = 0; i < 7; i++) {
@@ -1359,7 +1378,7 @@ function hqMat(name) {
   else if (is(/^(blad_|levensblad_)/)) spec = 0.12;
   else if (is(/^(marmerblok|granietblok|marmerzuil)/)) spec = 0.45;
   else if (is(/^(marmer|graniet)$/)) spec = 0.15;
-  if (is(/^(tralies|aambeeld|kookpot|troon)/)) spec = 0.6;
+  if (is(/^(rail_staal|tralies|aambeeld|kookpot|troon)/)) spec = 0.6;
   if (name === 'bes') spec = 0.7;
   else if (is(/^(gras_spriet|plant_blad|bloemblad_)/)) { spec = 0.1; bump = 0.5; }
   if (name === 'vlam') { emis = 1; bump = 0; }
@@ -1588,6 +1607,27 @@ const ICONS = {
     g.strokeStyle = '#a8662a'; g.lineWidth = 3;
     for (let i = -2; i <= 2; i++) { g.beginPath(); g.moveTo(32 + i * 9 - 6, 26); g.lineTo(32 + i * 9 + 6, 42); g.stroke(); g.beginPath(); g.moveTo(32 + i * 9 + 6, 26); g.lineTo(32 + i * 9 - 6, 42); g.stroke(); }
     g.fillStyle = '#d8281e'; g.beginPath(); g.arc(32, 22, 5, 0, 6.3); g.fill();
+  },
+  loco: (g) => {
+    g.strokeStyle = 'rgba(0,0,0,0.65)'; g.lineWidth = 2;
+    g.fillStyle = '#c8362c'; g.fillRect(34, 14, 22, 30); g.strokeRect(34, 14, 22, 30);
+    g.fillStyle = '#9fe8ff'; g.fillRect(39, 19, 12, 10); g.strokeRect(39, 19, 12, 10);
+    g.fillStyle = '#2a2e36'; g.fillRect(8, 26, 28, 18); g.strokeRect(8, 26, 28, 18);
+    g.fillRect(12, 12, 8, 14); g.strokeRect(12, 12, 8, 14); g.fillRect(9, 8, 14, 5); g.strokeRect(9, 8, 14, 5);
+    g.fillStyle = '#e0a03a'; g.fillRect(6, 42, 52, 5); g.strokeRect(6, 42, 52, 5);
+    g.fillStyle = '#3a3e48'; for (const x of [16, 32, 48]) { g.beginPath(); g.arc(x, 52, 7, 0, 6.3); g.fill(); g.stroke(); }
+    g.fillStyle = '#c8ccd4'; for (const x of [16, 32, 48]) { g.beginPath(); g.arc(x, 52, 2.5, 0, 6.3); g.fill(); }
+    g.fillStyle = 'rgba(240,240,240,0.85)'; g.beginPath(); g.arc(18, 4, 4, 0, 6.3); g.arc(26, 2, 3, 0, 6.3); g.fill();
+  },
+  wagon: (g) => {
+    g.strokeStyle = 'rgba(0,0,0,0.65)'; g.lineWidth = 2;
+    g.fillStyle = '#9a6a3c'; g.fillRect(8, 20, 48, 24); g.strokeRect(8, 20, 48, 24);
+    g.strokeStyle = 'rgba(60,36,16,0.8)'; for (const x of [20, 32, 44]) { g.beginPath(); g.moveTo(x, 20); g.lineTo(x, 44); g.stroke(); }
+    g.strokeStyle = 'rgba(0,0,0,0.65)';
+    g.fillStyle = '#e0a03a'; g.fillRect(6, 42, 52, 5); g.strokeRect(6, 42, 52, 5);
+    g.fillStyle = '#3a3e48'; for (const x of [18, 46]) { g.beginPath(); g.arc(x, 52, 7, 0, 6.3); g.fill(); g.stroke(); }
+    g.fillStyle = '#c8ccd4'; for (const x of [18, 46]) { g.beginPath(); g.arc(x, 52, 2.5, 0, 6.3); g.fill(); }
+    g.fillStyle = '#2a2a2e'; g.beginPath(); g.moveTo(10, 20); g.quadraticCurveTo(32, 6, 54, 20); g.closePath(); g.fill(); g.stroke();
   },
   club: (g) => {
     g.save(); g.translate(32, 32); g.rotate(0.75);

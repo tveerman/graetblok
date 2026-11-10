@@ -8,6 +8,7 @@ import {
 } from '../shared/blocks.js';
 import { hash2 } from '../shared/noise.js';
 import { BLOCK_MODELS } from './blockmodels.js';
+import { railShape } from '../shared/rails.js';
 
 const PW = CS + 2, PH = CH + 2;
 const SX = PW * PH, SZ = PH;
@@ -95,6 +96,7 @@ const T_BED_END = tileId('planken');
 const SKY_LUT = new Float32Array(16), BLK_LUT = new Float32Array(16);
 for (let i = 0; i < 16; i++) { SKY_LUT[i] = 0.03 + 0.97 * Math.pow(i / 15, 1.7); BLK_LUT[i] = Math.pow(i / 15, 1.3); }
 
+const RAILS = B.rails, RAIL_STR = [SX, SZ, -SX, -SZ], RL = [0, 0, 0, 0];
 // werkgeheugen voor de mesher
 const pad = new Uint8Array(PW * PW * PH);
 const BL = new Uint8Array(PW * PW * PH);
@@ -536,9 +538,15 @@ export class ChunkWorld {
           const sky = SKY_LUT[sl] * 242, blk = BLK_LUT[bl] * 255;
           const wx = cx * 16 + x, wz = cz * 16 + z;
           const h1 = hash2(wx, wz, 7001), h2 = hash2(wx, wz, 7002);
-          const M = models[(h1 * models.length) | 0];
+          let M = models[(h1 * models.length) | 0];
           let cs = 1, sn = 0;
-          if (M.rot === 2) { cs = Math.cos(h2 * 6.2832); sn = Math.sin(h2 * 6.2832); }
+          if (id === RAILS) {
+            // rails: het stuk (recht, bocht, helling, kruising) hangt af van de rails ernaast
+            for (let d = 0; d < 4; d++) { const np = p + RAIL_STR[d]; RL[d] = pad[np] === RAILS ? 1 : pad[np + 1] === RAILS ? 2 : pad[np - 1] === RAILS ? 3 : 0; }
+            const rs = railShape(RL), q = rs & 3;
+            M = models[rs >> 2];
+            cs = q === 0 ? 1 : q === 2 ? -1 : 0; sn = q === 1 ? 1 : q === 3 ? -1 : 0;
+          } else if (M.rot === 2) { cs = Math.cos(h2 * 6.2832); sn = Math.sin(h2 * 6.2832); }
           else if (M.rot === 1) { const q = (h2 * 4) | 0; cs = q === 0 ? 1 : q === 2 ? -1 : 0; sn = q === 1 ? 1 : q === 3 ? -1 : 0; }
           const ox = x + 0.5 + (hash2(wx, wz, 7003) - 0.5) * 2 * M.jit, oz = z + 0.5 + (hash2(wx, wz, 7004) - 0.5) * 2 * M.jit;
           const sy = 1 + (hash2(wx, wz, 7005) - 0.5) * 2 * M.vary;

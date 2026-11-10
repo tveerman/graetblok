@@ -38,6 +38,7 @@ class Game {
     this.world = new ChunkWorld(this.R.scene, this.atlas, this.R.chunkMats);
     this.particles = new Particles(this.R.scene);
     this.ents = new Entities(this.R.scene, this.particles);
+    this.ents.blocks = this.world;
     this.sky = new Weather(this.R.scene, this.world, touch);        // regen, sneeuw en onweer
     this.sites = [];                                                // dorpen en kastelen in de buurt (voor het kompas)
     this.sound = new Sound();
@@ -292,7 +293,11 @@ class Game {
         break;
       }
       case 'fx': this.fx(m); break;
-      case 'mount': p.setMount(m.id, m.s); ui.setMounted(!!m.id); if (m.id) { this.sound.play('roar', 0.6); ui.toast(this.touch ? 'Duw de stick naar voren om te vliegen. ⬆ omhoog, ⬇ omlaag.' : 'W = vliegen waar je kijkt · spatie omhoog · shift omlaag · R afstappen'); } break;
+      case 'mount':
+        p.setMount(m.id, m.s, m.k); ui.setMounted(!!m.id);
+        if (m.id && m.k === 'trein') { this.sound.play('toet', 0.8); ui.toast(this.touch ? 'Stick naar voren: rijden. Naar achteren: remmen en achteruit. Opzij: kiezen bij een wissel.' : 'W = rijden · S = remmen en achteruit · A/D = kiezen bij een wissel · shift = sneller · R uitstappen'); }
+        else if (m.id) { this.sound.play('roar', 0.6); ui.toast(this.touch ? 'Duw de stick naar voren om te vliegen. ⬆ omhoog, ⬇ omlaag.' : 'W = vliegen waar je kijkt · spatie omhoog · shift omlaag · R afstappen'); }
+        break;
       case 'trade': ui.openTrade(m); break;
       case 'traded': ui.got(m.id, m.n); this.sound.play('coin'); break;
       case 'weather': this.sky.set(m.k, m.now); break;
@@ -433,7 +438,19 @@ class Game {
     if (d) this.ui.openDragon(d.uid);
   }
 
-  rideNearest() { this.dragonButton(); }
+  // een trein waar je vlak naast staat
+  nearTrain() {
+    for (const e of this.ents.map.values()) {
+      if (e.kind === 'trein' && Math.hypot(e.x - this.player.pos.x, e.y - this.player.pos.y, e.z - this.player.pos.z) < 4.5) return e;
+    }
+    return null;
+  }
+
+  rideNearest() {
+    const t = this.player.mount ? null : this.nearTrain();
+    if (t && !this.nearDragon(5)) { this.net.send({ t: 'useEnt', id: t.id }); return; }
+    this.dragonButton();
+  }
 
   tileColor(t) {
     let c = this.tileCol.get(t);
@@ -533,7 +550,8 @@ class Game {
       const hd = this.hudT; this.hudT = 0;
       this.ui.frame(p.yaw, p.pos, this.worldId, this.sites);
       const own = p.mount ? null : this.nearDragon();
-      this.ui.setRide(!own ? '' : (dragonStage(own.growth) >= 2 ? '🐉 Vliegen' : '🐉 ' + (own.name || 'Draak')));
+      const train = p.mount || own ? null : this.nearTrain();
+      this.ui.setRide(train ? '🚂 Instappen' : !own ? '' : (dragonStage(own.growth) >= 2 ? '🐉 Vliegen' : '🐉 ' + (own.name || 'Draak')));
       this.animalSounds(hd);
       const surf = this.world.get(Math.floor(p.pos.x) >> 4, Math.floor(p.pos.z) >> 4);
       const under = surf ? p.pos.y < surf.hm[(Math.floor(p.pos.x) & 15) * 16 + (Math.floor(p.pos.z) & 15)] - 6 : false;

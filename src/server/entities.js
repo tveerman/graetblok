@@ -55,6 +55,7 @@ export const entityMethods = {
       if (e.dtype) m.d = e.dtype;
       if (e.name) m.n = e.name;
       if (e.job) { m.j = e.job; m.v = e.look || 0; }
+      if (e.train) m.wg = e.train.wg;
     }
     return m;
   },
@@ -134,6 +135,7 @@ export const entityMethods = {
       if (e.hurtT > 0) e.hurtT -= dt;
       if (e.rider) continue;
       const ai = e.def.ai;
+      if (ai === 'none') continue;                       // een trein staat stil tot iemand erop rijdt
       if (e.poisonT > 0) {
         // gif: elke tel een beetje pijn
         e.poisonT -= dt; e.pt = (e.pt || 0) + dt;
@@ -554,6 +556,7 @@ export const entityMethods = {
     if (this.meta.time - p.atkCd < 0.22) return;
     p.atkCd = this.meta.time;
     if (Math.hypot(e.x - p.x, e.y + e.h / 2 - p.y - 1, e.z - p.z) > 5.5 + e.w) return;
+    if (e.kind === 'trein') { this.pickTrain(p, w, e); return; }
     if (FRIEND[e.def.ai]) { if (this.meta.time - (p.sorryT || 0) > 4) { p.sorryT = this.meta.time; this.toast(p, 'Niet slaan! Dat is een vriend.', 'warn'); } return; }
     const s = p.inv[p.sel], it = s && ITEMS[s.id];
     const dmg = ((it && it.dmg) || 1) + Math.floor(p.level / 5);

@@ -333,6 +333,7 @@ export const siteMethods = {
     npcs.push({ k: 'dorpeling', job: 'marktkoopman', x: s.x - 5.5 + 1, y: s.y + 1, z: s.z - 6.5 + 1, r: 0.8, yaw: 0 });
     const dragon = rnd() < 0.55;
     if (dragon) npcs.push({ k: 'dorpeling', job: 'drakenhandelaar', x: s.x + 5.5, y: s.y + 1, z: s.z - 5.5, r: 0.8, yaw: 0 });
+    npcs.push({ k: 'dorpeling', job: 'stationschef', x: s.x + 20.5, y: s.y + 2, z: s.z + J_OFF - 2.5, r: 2.5, yaw: 0 });
     npcs.push({ k: 'ridder', x: s.x + 3.5, y: s.y + 1, z: s.z + 4.5, r: 12 }, { k: 'ridder', x: s.x - 3.5, y: s.y + 1, z: s.z + 4.5, r: 12 });
     return { buildings, npcs, dragon };
   },
@@ -381,6 +382,129 @@ export const siteMethods = {
       house(T, b.w, b.d, P, o);
       INSIDE[b.type](T, b.w, b.d, P);
     }
+    this.drawStation(S, s, P);
+  },
+
+  // Het station: een perron met een afdakje langs het spoor ten zuiden van het dorp.
+  drawStation(S, s, P) {
+    const y = s.y, zr = s.z + J_OFF, xj = s.x + J_OFF;
+    if (!S.hit(s.x - 8, zr - 6, xj + 2, zr + 2)) return;
+    // het zijspoor: van het stootblok tot het knooppunt
+    for (let x = s.x - 6; x <= xj; x++) this.railBed(S, x, y + 1, zr, 0, y, 1);
+    S.set(s.x - 7, y + 1, zr, B.steenblok); S.set(s.x - 7, y + 2, zr, B.wol_rood);
+    // een pad van de straat naar het perron, en het perron zelf
+    S.fill(s.x + 2, y, zr - 2, s.x + 11, y, zr - 1, P.road);
+    S.fill(s.x + 12, y + 1, zr - 2, s.x + 28, y + 1, zr - 1, B.steenblok);
+    S.fill(s.x + 15, y + 1, zr - 5, s.x + 25, y + 1, zr - 3, B.steenblok);
+    S.fill(s.x + 12, y + 2, zr - 5, s.x + 28, y + 7, zr - 1, 0);
+    // afdak met bankjes
+    for (const x of [s.x + 16, s.x + 24]) for (const z of [zr - 5, zr - 1]) S.fill(x, y + 2, z, x, y + 4, z, P.log);
+    S.fill(s.x + 15, y + 5, zr - 6, s.x + 25, y + 5, zr, P.roof);
+    S.fill(s.x + 16, y + 6, zr - 5, s.x + 24, y + 6, zr - 1, P.roof);
+    S.fill(s.x + 18, y + 2, zr - 5, s.x + 22, y + 2, zr - 5, B.kruk);
+    S.set(s.x + 20, y + 4, zr - 5, B.lantaarn);
+    S.fill(s.x + 27, y + 2, zr - 2, s.x + 27, y + 3, zr - 2, P.log); S.set(s.x + 27, y + 4, zr - 2, B.wol_blauw);
+  },
+
+  // ---------- spoorlijnen ----------
+
+  // Is er vanaf dit dorp een spoorlijn naar het oosten (dir 0) of het zuiden (dir 1)?
+  // Geeft de punten van de lijn: { n, x, z, y } of null.
+  railPath(s, dir) {
+    if (s.rail === undefined) s.rail = [undefined, undefined];
+    if (s.rail[dir] !== undefined) return s.rail[dir];
+    let path = null, t = null;
+    if (dir === 0) {
+      t = this.siteAt(s.rx + 1, s.rz);
+      if (!t || t.kind !== 'dorp') {
+        // een vak overslaan mag, als daar niets in de weg staat
+        const m = t;
+        t = this.siteAt(s.rx + 2, s.rz);
+        if (m && Math.abs(m.z - (s.z + J_OFF)) < m.r1 + 8) t = null;
+      }
+    } else t = this.siteAt(s.rx, s.rz + 1);
+    if (t && t.kind === 'dorp') {
+      const ax = s.x + J_OFF, az = s.z + J_OFF, bx = t.x + J_OFF, bz = t.z + J_OFF;
+      const xs = [], zs = [];
+      if (dir === 0) {
+        const xm = t.rx * SITE_CELL;
+        for (let x = ax; x < xm; x++) { xs.push(x); zs.push(az); }
+        for (let z = az; z !== bz; z += bz > az ? 1 : -1) { xs.push(xm); zs.push(z); }
+        for (let x = xm; x <= bx; x++) { xs.push(x); zs.push(bz); }
+      } else {
+        const zm = t.rz * SITE_CELL;
+        for (let z = az; z < zm; z++) { xs.push(ax); zs.push(z); }
+        for (let x = ax; x !== bx; x += bx > ax ? 1 : -1) { xs.push(x); zs.push(zm); }
+        for (let z = zm; z <= bz; z++) { xs.push(bx); zs.push(z); }
+      }
+      const n = xs.length, g = new Float32Array(n), f = new Float32Array(n);
+      const wl = this.world === 'schaduw' ? 38 : SEA + 1;
+      for (let i = 0; i < n; i++) { const c = this.col(xs[i], zs[i]); g[i] = Math.max(c.h, c.liq ? c.ly : 0, wl); }
+      // gladstrijken, en dan zorgen dat het spoor nergens te steil wordt (hooguit 1 omhoog per 2 blokken)
+      for (let i = 0; i < n; i++) {
+        let sum = 0, cnt = 0;
+        for (let k = Math.max(0, i - 7); k <= Math.min(n - 1, i + 7); k++) { sum += g[k]; cnt++; }
+        f[i] = sum / cnt;
+      }
+      f[0] = s.y; f[n - 1] = t.y;
+      for (let i = 1; i < n; i++) f[i] = Math.min(f[i - 1] + 0.5, Math.max(f[i - 1] - 0.5, f[i]));
+      f[n - 1] = t.y;
+      for (let i = n - 2; i >= 0; i--) f[i] = Math.min(f[i + 1] + 0.5, Math.max(f[i + 1] - 0.5, f[i]));
+      const ys = new Int16Array(n);
+      for (let i = 0; i < n; i++) ys[i] = Math.round(f[i]) + 1;
+      // in een bocht ligt het spoor vlak, en kuiltjes van één blok worden opgevuld
+      for (let i = 1; i < n - 1; i++) if (xs[i - 1] !== xs[i + 1] && zs[i - 1] !== zs[i + 1]) { ys[i - 1] = ys[i]; ys[i + 1] = ys[i]; }
+      for (let pass = 0; pass < 2; pass++) for (let i = 1; i < n - 1; i++) if (ys[i - 1] > ys[i] && ys[i + 1] > ys[i]) ys[i]++;
+      path = { n, x: Int32Array.from(xs), z: Int32Array.from(zs), y: ys, g };
+    }
+    s.rail[dir] = path;
+    return path;
+  },
+
+  // Eén stukje spoor: grind eronder, lucht erboven (een tunnel als het door een heuvel gaat)
+  // en een brug met pijlers als de grond te laag ligt. side: 0 = spoor langs x, 1 = langs z, 2 = bocht.
+  railBed(S, x, y, z, side, ground, i) {
+    const wx = side === 0 ? 0 : 1, wz = side === 1 ? 0 : 1;
+    if (!S.hit(x - wx, z - wz, x + wx, z + wz)) return;
+    const bridge = ground < y - 2;
+    for (let dx = -wx; dx <= wx; dx++) for (let dz = -wz; dz <= wz; dz++) {
+      if (dx || dz) { const cur = S.get(x + dx, y, z + dz); if (cur === B.steenblok || cur === B.rails) continue; }      // een perron of een kruisend spoor blijft liggen
+      S.set(x + dx, y - 1, z + dz, bridge ? B.planken : B.grind);
+      S.fill(x + dx, y, z + dz, x + dx, y + 3, z + dz, 0);
+      if (bridge) { if (dx || dz) S.set(x + dx, y, z + dz, B.planken); }           // leuning
+      else if (ground < y - 1) S.fill(x + dx, ground, z + dz, x + dx, y - 2, z + dz, B.aarde);
+    }
+    if (bridge) { if (i % 6 === 0) S.fill(x, Math.max(2, ground - 1), z, x, y - 2, z, B.keisteen); }
+    else if (ground > y + 3 && i % 8 === 0) S.set(x, y + 4, z, B.lantaarn);         // lampje in de tunnel
+    S.set(x, y, z, B.rails);
+  },
+
+  drawRails(S, cx, cz) {
+    const ox = S.ox, oz = S.oz;
+    const done = new Set();
+    for (let rx = Math.floor((ox - 2) / SITE_CELL); rx <= Math.floor((ox + 17) / SITE_CELL); rx++) {
+      for (let rz = Math.floor((oz - 2) / SITE_CELL); rz <= Math.floor((oz + 17) / SITE_CELL); rz++) {
+        for (const [qx, qz] of [[rx, rz], [rx - 1, rz], [rx - 2, rz], [rx, rz - 1]]) {
+          const key = qx + ',' + qz;
+          if (done.has(key)) continue;
+          done.add(key);
+          const s = this.siteAt(qx, qz);
+          if (!s || s.kind !== 'dorp') continue;
+          for (let dir = 0; dir < 2; dir++) {
+            const p = this.railPath(s, dir);
+            if (!p) continue;
+            for (let i = 0; i < p.n; i++) {
+              const x = p.x[i], z = p.z[i];
+              if (x < ox - 1 || x > ox + 16 || z < oz - 1 || z > oz + 16) continue;
+              const a = Math.max(0, i - 1), b = Math.min(p.n - 1, i + 1);
+              const side = p.z[a] === p.z[b] ? 0 : p.x[a] === p.x[b] ? 1 : 2;
+              this.railBed(S, x, p.y[i], z, side, Math.floor(p.g[i]), i);
+            }
+          }
+        }
+      }
+    }
+    void cx; void cz;
   },
 
   // ---------- kasteel ----------
@@ -676,6 +800,7 @@ export const siteMethods = {
         else this.drawCamp(S, s);
       }
     }
+    if (!old) this.drawRails(S, cx, cz);
   },
 };
 

@@ -53,6 +53,7 @@ export const MOBS = {
 
   // ---- wilde draken en de trein ----
   wildedraak: { name: 'Wilde draak', model: 'draak', scale: 1.5, hp: 90, dmg: 5, speed: 7, w: 2.0, h: 1.8, ai: 'wilddragon', fly: true, xp: 90, drops: [[I.drakenschub, 2, 3, 1], [I.munt, 4, 8, 0.8]] },
+  trein: { name: 'Trein', model: 'trein', hp: 1, speed: 0, w: 1.5, h: 1.9, ai: 'none', tap: true, xp: 0, drops: [] },
 };
 
 // De acht drakensoorten uit het ontwerp. Elke soort heeft een eigen kleur, een eigen vorm

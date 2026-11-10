@@ -105,6 +105,8 @@ item(330, 'pannenkoek', 'Pannenkoeken', { icon: ['pancake'], food: 10 });
 item(331, 'stoofpot', 'Stoofpot', { icon: ['bowl', '#b8642c'], food: 14 });
 item(332, 'heldenmaal', 'Heldenmaal', { icon: ['bowl', '#ffd23a'], food: 40, stack: 16 });
 item(333, 'appeltaart', 'Appeltaart', { icon: ['pie'], food: 12 });
+item(334, 'locomotief', 'Locomotief', { icon: ['loco'], stack: 1, train: true });
+item(335, 'wagon', 'Wagon', { icon: ['wagon'], stack: 8 });
 item(336, 'koningszwaard', 'Koningszwaard', { icon: ['sword', '#ffe680', '#3a6cf0'], dmg: 16, stack: 1, weapon: true, dur: 1500 });
 item(337, 'ridderharnas', 'Ridderharnas', { icon: ['armor', '#b8c4d8'], armor: 0.48, stack: 1 });
 item(338, 'spookkroon', 'Kroon van de Skeletkoning', { icon: ['crown', '#cfd6e6'], stack: 1 });
@@ -214,6 +216,9 @@ recipe(B.granietblok, 4, [[B.graniet, 4]], 'werkbank');
 recipe(B.lamp, 2, [[B.zwamhoed_blauw, 1], [B.glas, 1]], 'werkbank');
 
 // ---- recepten voor rails, treinen, boerderij en huizenbouw ----
+recipe(B.rails, 16, [[I.ijzerstaaf, 3], [I.stok, 4]], 'werkbank');
+recipe(I.locomotief, 1, [[I.ijzerstaaf, 8], [I.koperstaaf, 4], [B.oven, 1], [I.steenkool, 4]], 'werkbank');
+recipe(I.wagon, 1, [[I.ijzerstaaf, 4], [B.planken, 6]], 'werkbank');
 recipe(I.emmer, 1, [[I.ijzerstaaf, 3]], 'werkbank');
 recipe(I.brood, 1, [[I.tarwe, 3]], 'oven');
 recipe(I.appeltaart, 1, [[I.appel, 2], [I.tarwe, 2]], 'oven');

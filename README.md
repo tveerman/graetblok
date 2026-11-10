@@ -101,6 +101,8 @@ you left off.
 | Dragon window (feed, name, stay/follow) | "🐉 <name>" button when it is near, or tap the dragon | `G` |
 | Mount / dismount dragon | "🐉 Vliegen" / "Afstappen" | `R` |
 | Talk and trade, shear a sheep, milk a cow | tap the villager or animal | right mouse button or `F` |
+| Board / leave a train | "🚂 Instappen" / "Afstappen", or tap the train | `R` |
+| Drive a train | stick forward = go, back = brake and reverse, sideways = pick a branch at a junction | `W` / `S` / `A` `D`, `Shift` = faster |
 | Hotbar | tap a slot | `1`–`9` or scroll |
 
 While any window is open (backpack, quest log, a dialog or the pause menu) the world stands
@@ -156,6 +158,11 @@ From Jorian's design document (`spel.txt`), following development phases 1–4, 
   you five coins. Two knights guard each village and fight monsters that come near. In the
   green world there is always a village south-east of the spaceship; the compass shows the
   nearest village (🏠) and castle (🏰).
+- **Trains** – rails (straight, curves, slopes and crossings are chosen automatically from
+  the neighbouring rails), a locomotive and wagons, crafted or bought from the station
+  master. Put the locomotive on rails, tap it and drive. Every village has a station, and
+  many villages are linked by a railway with cuttings, tunnels (with lamps) and plank bridges.
+  A train stays where you leave it; hit it with a pickaxe to pick it up again.
 - **Castles** – 76 blocks across: a moat with a bridge, a curtain wall with a wall walk and
   battlements, four round corner towers, a gatehouse, a courtyard with stables and a smithy,
   and a three-storey keep with a throne room, library, armoury, dungeon and a tall tower
@@ -184,9 +191,8 @@ From Jorian's design document (`spel.txt`), following development phases 1–4, 
 - **Story quests** – 18 steps from "chop a tree" to "defeat the Drakenkoning", shown top-left,
   with a compass marker for the early ones.
 
-Not in yet: vehicles and robots you can drive, villages and traders, the economy (question 19
-in the design is still open), hunger/thirst, weather and disasters, the other five worlds, and
-real multiplayer.
+Not in yet: robots and other vehicles you can drive, hunger/thirst, disasters, the other five
+worlds, and real multiplayer.
 
 Worlds that were started before villages existed are upgraded the first time they are loaded:
 no village, castle, camp or railway is placed where the player had already built or dug, so
@@ -222,6 +228,8 @@ talk through messages (plain objects such as `{ t: 'break', x, y, z }`).
   derived from the seed). The same "plan" that draws a site also lists its inhabitants.
 - `src/server/npcs.js` puts those inhabitants in the world when a player comes near, and
   holds trading, guards, herds, wolves, bears, wild dragons, dragon breath, weather and trains.
+- `src/shared/rails.js` has the rules for how rails connect and how a train follows them; the
+  chunk mesher, the player (who drives the train) and the server all use it.
 
 To make it real multiplayer later, the server code can move to another machine largely as-is:
 

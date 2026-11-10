@@ -4,11 +4,13 @@ import { EYE, REACH, CH, clamp } from '../shared/constants.js';
 import { B, BLOCKS, B_SHAPE, SHAPE_LIQUID, PORTAL_TO, TILE_CRACK } from '../shared/blocks.js';
 import { ITEMS, I } from '../shared/items.js';
 import { BREATH } from '../shared/mobs.js';
+import { RAIL_DX, RAIL_DZ, railLinks, railExit, railRamp, railPos, railAt, railDirOf } from '../shared/rails.js';
 import { playerModel, animate } from './models.js';
 import { iconCanvas } from './textures.js';
 
 const HW = 0.3, HH = 1.8;
 const _v = new THREE.Vector3();
+const _L = [0, 0, 0, 0], _P = [0, 0, 0, 0];
 
 export class Player {
   constructor(game) {
@@ -18,6 +20,9 @@ export class Player {
     this.yaw = 0; this.pitch = 0;
     this.onGround = false; this.inWater = false; this.headIn = 0;
     this.mount = 0; this.mountScale = 1;
+    this.mountKind = '';          // 'trein' als je op een trein zit, anders een draak
+    this.rail = null;             // waar de trein op het spoor is: { x, y, z, din, dout, t, v, end }
+    this.railV = 0; this.trainYaw = 0; this.trainPitch = 0; this.rev = false;
     this.cam = 0;
     this.fallPeak = 0; this.softLand = true;
     this.safe = new THREE.Vector3(0, 60, 0);
@@ -73,15 +78,81 @@ export class Player {
     this.dig = null; this.portalT = 0; this.portalLock = 3;
   }
 
-  setMount(id, scale) {
+  setMount(id, scale, kind) {
     if (id) {
-      this.mount = id; this.mountScale = scale || 1;
-      this.pos.y += 1.3 * this.mountScale + 0.4;
+      this.mount = id; this.mountScale = scale || 1; this.mountKind = kind || '';
       this.vel.set(0, 0, 0);
+      if (kind === 'trein') this.startRail(this.g.ents.map.get(id));
+      else this.pos.y += 1.3 * this.mountScale + 0.4;
     } else if (this.mount) {
-      this.mount = 0; this.softLand = true; this.fallPeak = this.pos.y;
+      if (this.mountKind === 'trein') {
+        // uitstappen: naast de trein gaan staan
+        this.pos.x += Math.cos(this.trainYaw) * 1.3; this.pos.z -= Math.sin(this.trainYaw) * 1.3; this.pos.y += 0.25;
+        this.rail = null; this.railV = 0;
+      }
+      this.mount = 0; this.mountKind = ''; this.softLand = true; this.fallPeak = this.pos.y;
     }
     this.g.ents.ridden = this.mount;
+  }
+
+  // ---------- treinrijden ----------
+
+  // Bij het instappen: op welk stuk rails staat de trein, en welke kant kijkt hij op?
+  startRail(e) {
+    const w = this.g.world, get = (x, y, z) => w.getBlock(x, y, z);
+    this.rail = null; this.rev = false; this.railV = 0;
+    if (!e) return;
+    this.trainYaw = e.yaw; this.trainPitch = 0;
+    const x = Math.floor(e.x), z = Math.floor(e.z), y = railAt(get, x, e.y + 0.3, z);
+    this.pos.set(e.x - Math.sin(e.yaw) * 0.67, e.y + 0.9, e.z - Math.cos(e.yaw) * 0.67);
+    if (y < 0) { this.g.ui.toast('Deze trein staat niet op rails.', 'warn'); return; }
+    const d = railDirOf(e.yaw);
+    const out = railExit(railLinks(get, x, y, z, _L), d, 0);
+    this.rail = { x, y, z, din: d, dout: out < 0 ? d : out, t: 0.5, v: 0, end: out < 0 };
+  }
+
+  // De trein volgt het spoor. Stick naar voren = gas, naar achteren = remmen en achteruit,
+  // opzij = kiezen bij een wissel.
+  ride(dt) {
+    const g = this.g, inp = g.input, w = g.world, R = this.rail;
+    this.vel.set(0, 0, 0); this.onGround = false; this.inWater = false; this.fallPeak = this.pos.y; this.softLand = true;
+    if (!R) { this.speedNow = 0; this.railV = 0; return; }
+    const get = (x, y, z) => w.getBlock(x, y, z);
+    const want = inp.fwd > 0.2 ? 1 : inp.fwd < -0.2 ? -1 : 0, sense = this.rev ? -1 : 1;
+    if (want === sense) R.v = Math.min(this.rev ? 6 : (inp.sprint ? 17 : 13), R.v + 4.5 * dt);
+    else if (want === 0) R.v = Math.max(0, R.v - 1.6 * dt);
+    else {
+      R.v = Math.max(0, R.v - 12 * dt);
+      if (R.v <= 0) {
+        // omkeren: de trein rijdt hetzelfde stuk rails terug
+        const din = (R.dout + 2) & 3, dout = (R.din + 2) & 3;
+        R.din = din; R.dout = dout; R.t = 1 - R.t; R.end = false; this.rev = !this.rev;
+      }
+    }
+    const steer = (inp.strafe > 0.35 ? 1 : inp.strafe < -0.35 ? -1 : 0) * (this.rev ? -1 : 1);
+    let dist = R.v * dt, guard = 0;
+    while (dist > 0 && guard++ < 8) {
+      const lim = R.end ? 0.5 : 1, room = lim - R.t;
+      if (dist < room) { R.t += dist; break; }
+      R.t = lim; dist -= room;
+      if (R.end) { R.v = 0; break; }
+      const link = railLinks(get, R.x, R.y, R.z, _L)[R.dout];
+      if (!link) { R.v = 0; break; }                                   // het spoor houdt op
+      R.x += RAIL_DX[R.dout]; R.z += RAIL_DZ[R.dout]; R.y += link === 2 ? 1 : link === 3 ? -1 : 0;
+      R.din = R.dout; R.t = 0;
+      const out = railExit(railLinks(get, R.x, R.y, R.z, _L), R.din, steer);
+      if (out < 0) { R.end = true; R.dout = R.din; } else { R.end = false; R.dout = out; }
+    }
+    const ramp = railRamp(railLinks(get, R.x, R.y, R.z, _L));
+    railPos(R.x, R.y, R.z, R.din, R.dout, R.t, ramp, _P);
+    const yaw = _P[3] + (this.rev ? Math.PI : 0);
+    this.trainYaw = yaw;
+    this.trainPitch = ramp < 0 ? 0 : (ramp === R.din ? 0.785 : ramp === ((R.din + 2) & 3) ? -0.785 : 0) * (this.rev ? -1 : 1);
+    this.pos.set(_P[0] - Math.sin(yaw) * 0.67, _P[1] + 1.0, _P[2] - Math.cos(yaw) * 0.67);
+    this.railV = R.v; this.speedNow = R.v;
+    this.chugT = (this.chugT || 0) - dt * (0.5 + R.v * 0.42);
+    if (this.chugT <= 0 && R.v > 0.3) { this.chugT = 1; g.sound.play('chug', 0.45 + Math.min(0.5, R.v / 22)); }
+    if (get(R.x, R.y, R.z) !== B.rails) { this.rail = null; g.ui.toast('De trein is van de rails!', 'warn'); }
   }
 
   heldItem() { const s = this.g.inv[this.g.sel]; return s ? s[0] : 0; }
@@ -103,7 +174,7 @@ export class Player {
 
     const ready = !this.frozen && !this.dead && w.isLoaded(this.pos.x, this.pos.z);
     if (ready) {
-      if (this.mount) this.fly(dt); else this.walk(dt);
+      if (!this.mount) this.walk(dt); else if (this.mountKind === 'trein') this.ride(dt); else this.fly(dt);
       this.environment(dt);
     } else { this.vel.set(0, 0, 0); this.speedNow = 0; }
 
@@ -114,7 +185,9 @@ export class Player {
     this.sendT += dt;
     if (this.sendT >= 0.1 && !this.frozen) {
       this.sendT = 0;
-      g.net.send({ t: 'move', x: this.pos.x, y: this.pos.y, z: this.pos.z, yaw: this.yaw, pitch: this.pitch });
+      const m = { t: 'move', x: this.pos.x, y: this.pos.y, z: this.pos.z, yaw: this.yaw, pitch: this.pitch };
+      if (this.mountKind === 'trein') m.ry = this.trainYaw;
+      g.net.send(m);
     }
   }
 
@@ -376,7 +449,7 @@ export class Player {
 
     if (!inp.breakHeld || g.ui.modalOpen()) { this.dig = null; this.crack.visible = false; return; }
 
-    if (this.mount) { this.shoot(tgt.dir); return; }
+    if (this.mount) { if (this.mountKind !== 'trein') this.shoot(tgt.dir); return; }
     if (tgt.ent) {
       this.dig = null; this.crack.visible = false;
       if (this.atkCd <= 0 && !tgt.ent.owner) {
@@ -431,7 +504,7 @@ export class Player {
     if (this.frozen || this.dead || this.useCd > 0) return;
     this.useCd = 0.16;
     const tgt = this.aim(ndc);
-    if (this.mount) { this.shoot(tgt.dir); return; }
+    if (this.mount) { if (this.mountKind !== 'trein') this.shoot(tgt.dir); return; }
     const id = this.heldItem();
     const it = ITEMS[id];
     if (tgt.ent) {
@@ -454,6 +527,12 @@ export class Player {
         g.net.send({ t: 'use', x: b.x, y: b.y, z: b.z });
         return;
       }
+    }
+    if (it && it.train) {
+      // een locomotief zet je op rails
+      if (b && b.id === B.rails) { g.net.send({ t: 'placeTrain', x: b.x, y: b.y, z: b.z }); this.swing = 0.25; }
+      else g.ui.toast('Een locomotief moet op rails staan. Leg eerst rails neer.');
+      return;
     }
     if (it && it.food) { g.net.send({ t: 'eat' }); return; }
     if (!b || !id) return;

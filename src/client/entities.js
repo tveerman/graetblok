@@ -1,7 +1,8 @@
 // Wezens en projectielen aan de kant van het spel: modellen laten zien en vloeiend bewegen.
 import * as THREE from '../../vendor/three.module.min.js';
 import { MOBS, PROJ, dragonScale } from '../shared/mobs.js';
-import { buildModel, animate, setDragonGrowth } from './models.js';
+import { buildModel, animate, setDragonGrowth, wagonModel } from './models.js';
+import { railAt, railDirOf, railTrace } from '../shared/rails.js';
 import { glowTex, nameTex } from './textures.js';
 
 const DELAY = 0.12;   // we tonen wezens een klein beetje in het verleden, dat oogt vloeiend
@@ -15,6 +16,7 @@ export class Entities {
     this.world = 'groen';
     this.clock = 0;
     this.ridden = 0;
+    this.blocks = null;            // de blokkenwereld (om te zien waar de rails liggen)
     this.glow = glowTex();
     this.barBg = new THREE.SpriteMaterial({ color: 0x200808, depthTest: false, fog: false });
     this.barFg = new THREE.SpriteMaterial({ color: 0xff3a3a, depthTest: false, fog: false });
@@ -23,7 +25,7 @@ export class Entities {
   }
 
   clear() {
-    for (const e of this.map.values()) this.scene.remove(e.group);
+    for (const e of this.map.values()) { this.scene.remove(e.group); if (e.wagons) for (const w of e.wagons) this.scene.remove(w); }
     this.map.clear();
     for (const p of this.projs.values()) this.scene.remove(p.obj);
     this.projs.clear();
@@ -47,6 +49,7 @@ export class Entities {
     };
     this.resize(e);
     if (e.name) this.setName(e, e.name);
+    if (m.k === 'trein') { group.rotation.order = 'YXZ'; e.wagons = []; e.trail = null; e.pitch = 0; this.setWagons(e, m.wg || 0); }
     this.map.set(m.id, e);
   }
 
@@ -72,13 +75,68 @@ export class Entities {
     if (m.s !== undefined) { e.scale = m.s; e.group.scale.setScalar(m.s); this.resize(e); if (e.tag) e.tag.scale.set(1.6 / e.scale, 0.4 / e.scale, 1); }
     if (m.g !== undefined) { e.growth = m.g; setDragonGrowth(e.group, m.g); }
     if (m.n !== undefined) this.setName(e, m.n);
+    if (m.wg !== undefined) this.setWagons(e, m.wg);
     if (m.o !== undefined) e.owner = m.o;
+  }
+
+  // ---------- treinen: de wagons rijden achter de locomotief aan ----------
+
+  setWagons(e, n) {
+    while (e.wagons.length > n) this.scene.remove(e.wagons.pop());
+    while (e.wagons.length < n) { const w = wagonModel(e.wagons.length); w.rotation.order = 'YXZ'; this.scene.add(w); e.wagons.push(w); }
+    e.trail = null;
+  }
+
+  // Het spoor achter de trein: een rij punten, de nieuwste vooraan. Staat de trein stil (of is
+  // hij net verschenen), dan lopen we het spoor achter hem af om te zien waar de wagons staan.
+  trainTrail(e) {
+    const pts = [[e.x, e.y, e.z]];
+    const get = this.blocks ? (x, y, z) => this.blocks.getBlock(x, y, z) : null;
+    const cx = Math.floor(e.x), cz = Math.floor(e.z);
+    const ry = get ? railAt(get, cx, e.y + 0.3, cz) : -1;
+    if (ry >= 0) {
+      const tr = railTrace(get, cx, ry, cz, railDirOf(e.yaw), 20);
+      for (let i = 1; i < tr.length; i++) pts.push([tr[i][0], tr[i][1] + 0.1, tr[i][2]]);
+    }
+    // geen rails (meer)? dan staan de wagons gewoon in een rechte lijn erachter
+    const last = pts[pts.length - 1], prev = pts.length > 1 ? pts[pts.length - 2] : [e.x + Math.sin(e.yaw), e.y, e.z + Math.cos(e.yaw)];
+    const dx = last[0] - prev[0], dz = last[2] - prev[2], l = Math.hypot(dx, dz) || 1;
+    for (let k = 1; k <= 20; k++) pts.push([last[0] + dx / l * k, last[1], last[2] + dz / l * k]);
+    return pts;
+  }
+
+  updateTrain(e, dt) {
+    if (!e.wagons.length) return;
+    if (!e.trail) e.trail = this.trainTrail(e);
+    const tr = e.trail, h = tr[0];
+    if (Math.hypot(e.x - h[0], e.y - h[1], e.z - h[2]) > 0.2) { tr.unshift([e.x, e.y, e.z]); if (tr.length > 120) tr.length = 120; }
+    // loop langs het spoor terug en zet elke wagon op zijn afstand
+    const at = (dist, out) => {
+      let px = e.x, py = e.y, pz = e.z;
+      for (let i = 0; i < tr.length; i++) {
+        const q = tr[i], seg = Math.hypot(q[0] - px, q[1] - py, q[2] - pz);
+        if (seg >= dist && seg > 0) { const f = dist / seg; out[0] = px + (q[0] - px) * f; out[1] = py + (q[1] - py) * f; out[2] = pz + (q[2] - pz) * f; return; }
+        dist -= seg; px = q[0]; py = q[1]; pz = q[2];
+      }
+      out[0] = px; out[1] = py; out[2] = pz;
+    };
+    const a = [0, 0, 0], b = [0, 0, 0];
+    for (let k = 0; k < e.wagons.length; k++) {
+      const d = 2.35 + k * 2.15;
+      at(d - 0.6, a); at(d + 0.6, b);
+      const w = e.wagons[k];
+      w.position.set((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2);
+      w.rotation.y = Math.atan2(a[0] - b[0], a[2] - b[2]);
+      w.rotation.x = -Math.atan2(a[1] - b[1], Math.hypot(a[0] - b[0], a[2] - b[2]));
+    }
+    void dt;
   }
 
   despawn(id) {
     const e = this.map.get(id);
     if (!e) return;
     this.scene.remove(e.group);
+    if (e.wagons) for (const w of e.wagons) this.scene.remove(w);
     this.map.delete(id);
   }
 
@@ -117,7 +175,21 @@ export class Entities {
     this.clock += dt;
     const t = this.clock;
     for (const e of this.map.values()) {
-      if (e.id === this.ridden) {
+      if (e.id === this.ridden && e.kind === 'trein') {
+        // de trein die je bestuurt: jij zit in het huisje achterop
+        e.yaw = player.trainYaw;
+        e.x = player.pos.x + Math.sin(e.yaw) * 0.67; e.z = player.pos.z + Math.cos(e.yaw) * 0.67; e.y = player.pos.y - 0.9;
+        e.speed = Math.abs(player.railV); e.flags = 0;
+        e.pitch += (player.trainPitch - e.pitch) * Math.min(1, dt * 10);
+        e.group.rotation.x = -e.pitch;
+        // stoom uit de schoorsteen
+        e.puff = (e.puff || 0) - dt * (0.6 + e.speed * 0.5);
+        if (e.puff <= 0) {
+          e.puff = 1;
+          const px = e.x + Math.sin(e.yaw) * 0.84, pz = e.z + Math.cos(e.yaw) * 0.84;
+          for (let i = 0; i < 3; i++) this.particles.add(px, e.y + 2.05, pz, (Math.random() - 0.5) * 0.5, 1.6 + Math.random(), (Math.random() - 0.5) * 0.5, 0.92, 0.92, 0.94, 0.5 + Math.random() * 0.3, 1.4, -0.6);
+        }
+      } else if (e.id === this.ridden) {
         // de draak waar je op zit volgt jou precies
         e.x = player.pos.x; e.z = player.pos.z; e.y = player.pos.y - 0.2 - 1.15 * e.scale; e.yaw = player.yaw + Math.PI;
         e.speed = 5; e.flags = 2;
@@ -145,6 +217,7 @@ export class Entities {
       const s = e.scale * (hurt ? 1.08 : 1);
       if (e.group.scale.x !== s) e.group.scale.setScalar(s);
       animate(e.group, time, e.speed, e.flags, dt);
+      if (e.wagons) this.updateTrain(e, dt);
       // bevroren (blauwe glinsters) of vergiftigd (groene belletjes)
       if ((e.flags & 48) && Math.random() < dt * 9) {
         const ice = e.flags & 16;

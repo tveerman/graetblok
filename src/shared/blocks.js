@@ -166,6 +166,9 @@ def(116, 'koperblok', 'Koperblok', { hard: 5, tool: 'pick', tier: 2, snd: 'metal
 def(117, 'zilverblok', 'Zilverblok', { hard: 5, tool: 'pick', tier: 2, snd: 'metal' });
 
 // ---- dorpen, kastelen en spoorwegen ----
+// Rails zijn een "klein ding": de mesher kiest zelf het goede stuk (recht, bocht, helling,
+// kruising) aan de hand van de rails ernaast. Zie src/shared/rails.js.
+def(59, 'rails', 'Rails', { shape: SHAPE_CROSS, pass: 1, solid: false, opaque: false, hard: 0.5, snd: 'metal', support: true });
 def(118, 'stro', 'Strodak', { hard: 0.6, snd: 'grass' });
 def(119, 'dakpan', 'Dakpannen', { hard: 3, tool: 'pick' });
 def(143, 'vakwerk', 'Vakwerkmuur', { hard: 2, tool: 'axe', snd: 'wood' });
@@ -233,7 +236,7 @@ export const TILE_CRACK = [tile('crack0'), tile('crack1'), tile('crack2'), tile(
 // als icoontje in de rugzak.
 export const MODEL_TILES = ['gras_spriet', 'plant_steel', 'plant_blad', 'bloemblad_rood', 'bloemblad_geel', 'bloemblad_blauw',
   'bloemhart', 'bes', 'tak', 'stok_hout', 'vlam', 'lichtblad', 'zwamhoed_turkoois', 'zwamlamellen_turkoois',
-  'tarwe_halm', 'tarwe_aar', 'web'];
+  'rail_staal', 'biels', 'tarwe_halm', 'tarwe_aar', 'web'];
 MODEL_TILES.forEach(tile);
 
 export const NUM_BLOCKS = 256;
