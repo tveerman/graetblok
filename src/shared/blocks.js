@@ -1,8 +1,10 @@
 // Alle blokken van Graet Blok.
 // shape: 0 = lucht, 1 = kubus, 2 = kruis (plantje/fakkel), 3 = vloeistof
+//        4 = laag blok (lager dan een heel blok, zoals een bed)
+//        5 = ei (een rond 3D-ei; in de rugzak is het een plaatje)
 // pass:  0 = dicht, 1 = met gaatjes (bladeren), 2 = doorzichtig (water, glas)
 
-export const SHAPE_AIR = 0, SHAPE_CUBE = 1, SHAPE_CROSS = 2, SHAPE_LIQUID = 3;
+export const SHAPE_AIR = 0, SHAPE_CUBE = 1, SHAPE_CROSS = 2, SHAPE_LIQUID = 3, SHAPE_LOW = 4, SHAPE_EGG = 5;
 
 export const BLOCKS = [];      // id -> definitie
 export const B = {};           // sleutel -> id
@@ -37,6 +39,7 @@ function def(id, key, name, p = {}) {
     replace: !!p.replace,                        // mag je er zomaar een blok overheen zetten?
     support: !!p.support,                        // valt om als het blok eronder weg is
     climb: !!p.climb,
+    height: p.height || 1,                       // hoe hoog het blok is (1 = heel blok)
   };
   BLOCKS[id] = blk;
   B[key] = id;
@@ -106,15 +109,15 @@ def(55, 'levensblad_vuur', 'Blad van de Vuurboom', { pass: 1, opaque: false, har
 def(56, 'levensblad_schaduw', 'Blad van de Schaduwboom', { pass: 1, opaque: false, hard: Infinity, snd: 'leaf' });
 def(57, 'levensblad_hemel', 'Blad van de Hemelboom', { pass: 1, opaque: false, hard: Infinity, snd: 'leaf' });
 def(58, 'levenshart', 'Levenshart', { hard: Infinity, interact: true, light: 15, snd: 'glass' });
-const EGG = { ...CROSS, hard: 0.8, support: false, interact: true, light: 5, snd: 'stone' };
-def(60, 'ei_vuur', 'Vuurdrakenei', { ...EGG });
-def(61, 'ei_ijs', 'IJsdrakenei', { ...EGG });
-def(62, 'ei_natuur', 'Natuurdrakenei', { ...EGG });
-def(63, 'ei_bliksem', 'Bliksemdrakenei', { ...EGG });
-def(64, 'ei_schaduw', 'Schaduwdrakenei', { ...EGG });
-def(65, 'ei_robot', 'Robotdrakenei', { ...EGG });
-def(66, 'ei_goud', 'Gouden drakenei', { ...EGG });
-def(67, 'ei_kristal', 'Kristaldrakenei', { ...EGG });
+const EGG = { ...CROSS, shape: SHAPE_EGG, hard: 0.8, support: false, interact: true, light: 5, snd: 'stone' };
+def(60, 'ei_vuur', 'Vuurdrakenei', { ...EGG, tiles: ['ei_vuur_schil', 'ei_vuur', 'ei_vuur_schil'] });
+def(61, 'ei_ijs', 'IJsdrakenei', { ...EGG, tiles: ['ei_ijs_schil', 'ei_ijs', 'ei_ijs_schil'] });
+def(62, 'ei_natuur', 'Natuurdrakenei', { ...EGG, tiles: ['ei_natuur_schil', 'ei_natuur', 'ei_natuur_schil'] });
+def(63, 'ei_bliksem', 'Bliksemdrakenei', { ...EGG, tiles: ['ei_bliksem_schil', 'ei_bliksem', 'ei_bliksem_schil'] });
+def(64, 'ei_schaduw', 'Schaduwdrakenei', { ...EGG, tiles: ['ei_schaduw_schil', 'ei_schaduw', 'ei_schaduw_schil'] });
+def(65, 'ei_robot', 'Robotdrakenei', { ...EGG, tiles: ['ei_robot_schil', 'ei_robot', 'ei_robot_schil'] });
+def(66, 'ei_goud', 'Gouden drakenei', { ...EGG, tiles: ['ei_goud_schil', 'ei_goud', 'ei_goud_schil'] });
+def(67, 'ei_kristal', 'Kristaldrakenei', { ...EGG, tiles: ['ei_kristal_schil', 'ei_kristal', 'ei_kristal_schil'] });
 def(68, 'hoog_gras', 'Hoog gras', { ...CROSS, replace: true });
 def(69, 'bloem_rood', 'Rode bloem', { ...CROSS });
 def(70, 'bloem_geel', 'Gele bloem', { ...CROSS });
@@ -137,6 +140,22 @@ def(86, 'blad_goud', 'Gouden blad', { ...LEAF });
 def(87, 'stam_hemel', 'Hemelstam', { ...LOG, tiles: ['stam_hemel_top', 'stam_hemel', 'stam_hemel_top'] });
 def(88, 'krat_leeg', 'Lege krat', { hard: 3, tool: 'pick', snd: 'metal' });
 
+// Een bed is twee blokken lang: een voeteneind en een hoofdeind. Er zijn vier richtingen
+// (waar het hoofdeind ligt, gezien vanaf het voeteneind): 0 = +x, 1 = +z, 2 = -x, 3 = -z.
+// Blok 36 ('bed') is het voorwerp in je rugzak (en een oud, enkel bed in oudere werelden).
+export const BED_DIRS = [[1, 0], [0, 1], [-1, 0], [0, -1]];
+const BEDPART = { shape: SHAPE_LOW, solid: true, opaque: false, hard: 0.8, snd: 'wood', interact: true, drop: [36, 1, 1], height: 0.5625 };
+for (let d = 0; d < 4; d++) def(89 + d, 'bed_voet_' + d, 'Bed', { ...BEDPART, tiles: ['bed_voet_top', 'bed_side', 'planken'] });
+for (let d = 0; d < 4; d++) def(93 + d, 'bed_hoofd_' + d, 'Bed', { ...BEDPART, tiles: ['bed_hoofd_top', 'bed_hoofd_side', 'planken'] });
+export const bedFoot = (d) => 89 + d, bedHead = (d) => 93 + d;
+// geeft { head, d } voor een bed-helft, anders null
+export function bedPart(id) {
+  if (id >= 89 && id <= 92) return { head: false, d: id - 89 };
+  if (id >= 93 && id <= 96) return { head: true, d: id - 93 };
+  return null;
+}
+export const isBed = (id) => id === 36 || (id >= 89 && id <= 96);
+
 // Verdorde bladeren van een levensboom die nog niet hersteld is.
 export const TILE_DOR = tile('levensblad_dor');
 // Scheurtjes als je een blok aan het hakken bent.
@@ -152,12 +171,17 @@ export const B_LIGHT = new Uint8Array(NUM_BLOCKS);
 export const B_TOP = new Uint8Array(NUM_BLOCKS);
 export const B_SIDE = new Uint8Array(NUM_BLOCKS);
 export const B_BOTTOM = new Uint8Array(NUM_BLOCKS);
+export const B_HEIGHT = new Float32Array(NUM_BLOCKS).fill(1);
+export const B_BED = new Uint8Array(NUM_BLOCKS);      // 0 = geen bed-helft, 1..4 = voeteneind, 5..8 = hoofdeind (richting erbij)
 for (const b of BLOCKS) {
   if (!b) continue;
   B_SHAPE[b.id] = b.shape; B_PASS[b.id] = b.pass;
   B_OPAQUE[b.id] = b.opaque ? 1 : 0; B_SOLID[b.id] = b.solid ? 1 : 0;
   B_LIGHT[b.id] = b.light;
   B_TOP[b.id] = b.tTop; B_SIDE[b.id] = b.tSide; B_BOTTOM[b.id] = b.tBottom;
+  B_HEIGHT[b.id] = b.height;
+  const bp = bedPart(b.id);
+  if (bp) B_BED[b.id] = 1 + bp.d + (bp.head ? 4 : 0);
 }
 
 export const LIFE_LEAVES = { groen: B.levensblad_groot, ijs: B.levensblad_ijs, vuur: B.levensblad_vuur, schaduw: B.levensblad_schaduw, wolken: B.levensblad_hemel };

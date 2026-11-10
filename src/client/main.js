@@ -17,7 +17,7 @@ import { connect } from './net.js';
 import { setupOffline } from './offline.js';
 
 const $ = (id) => document.getElementById(id);
-const DEFAULTS = { view: 5, volume: 0.8, sens: 1, music: true, autoJump: true, dynRes: true };
+const DEFAULTS = { view: 5, volume: 0.8, sens: 1, music: true, sfx: true, autoJump: true, dynRes: true };
 
 class Game {
   constructor() {
@@ -58,9 +58,10 @@ class Game {
     this.fpsText = '';
 
     document.addEventListener('visibilitychange', () => {
-      if (!document.hidden || !this.net) return;
+      if (!document.hidden) { this.sound.unlock(); return; }      // terug bij het spel: geluid weer wakker maken
+      if (!this.net) return;
       // de tablet wordt weggelegd of er wordt naar een andere app gegaan: pauzeren en opslaan
-      if (this.state === 'play' && !this.ui.modalOpen()) this.ui.openPause();
+      if (this.state === 'play' && !this.ui.modalOpen() && !this.noAutoPause) this.ui.openPause();
       this.syncPause();
       this.net.send({ t: 'save' });
     });
@@ -110,6 +111,15 @@ class Game {
     this.net.send({ t: 'hello', name: 'speler', view: this.settings.view, look: this.look, reset: !!reset, debug: this.debug });
   }
 
+  // Eén regel over het geluid, voor in het pauzemenu. Handig als het ergens stil blijft.
+  audioText() {
+    const d = this.sound.diag();
+    if (!d) return 'Geluid: nog niet gestart (tik ergens op het scherm)';
+    const run = d.state === 'running' ? 'aan' : 'staat stil (' + d.state + ')';
+    const mus = !this.settings.music ? 'uit' : d.notes + ' noten gespeeld, sterkte ' + Math.round(d.level * 100) + '%';
+    return 'Geluid: ' + run + ' · muziek: ' + mus + ' · effecten: ' + (this.settings.sfx ? 'aan' : 'uit');
+  }
+
   // Staat er een venster open (rugzak, opdrachten, pauze...)? Dan staat het spel stil.
   isPaused() { return this.state === 'play' && this.ui.modalOpen(); }
 
@@ -153,6 +163,7 @@ class Game {
     this.R.setView(S.view);
     this.sound.setVolume(S.volume);
     this.sound.musicOn = S.music;
+    this.sound.setSfx(S.sfx);
     this.input.sens = S.sens;
     this.player.autoJump = S.autoJump;
     if (!S.dynRes) this.R.setScale(1);
@@ -277,25 +288,37 @@ class Game {
     return false;
   }
 
-  // de dichtstbijzijnde eigen volwassen draak
-  nearDragon() {
-    let best = null, bd = 7;
+  // de dichtstbijzijnde eigen draak (elke leeftijd) binnen bereik
+  nearDragon(maxD = 9) {
+    let best = null, bd = maxD;
     for (const e of this.ents.map.values()) {
       if (e.kind !== 'draak' || !e.owner || e.def.boss) continue;
-      if (dragonStage(e.growth) < 2) continue;
       const d = Math.hypot(e.x - this.player.pos.x, e.y - this.player.pos.y, e.z - this.player.pos.z);
       if (d < bd) { bd = d; best = e; }
     }
     return best;
   }
 
-  rideNearest() {
+  // De knop "🐉": bij een volwassen draak stap je op, bij een jongere open je zijn venster
+  // (voeren, naam geven...). Zo hoef je de draak zelf niet aan te tikken.
+  dragonButton() {
     if (this.player.mount) { this.net.send({ t: 'dismount' }); return; }
     const e = this.nearDragon();
     if (!e) return;
     const d = this.dragons.find((q) => q.eid === e.id);
-    if (d) this.net.send({ t: 'dragon', uid: d.uid, cmd: 'mount' });
+    if (!d) return;
+    if (dragonStage(d.growth) >= 2) this.net.send({ t: 'dragon', uid: d.uid, cmd: 'mount' });
+    else this.ui.openDragon(d.uid);
   }
+
+  // het venster van je dichtstbijzijnde draak openen (toets G)
+  dragonMenu() {
+    const e = this.nearDragon(14);
+    const d = e && this.dragons.find((q) => q.eid === e.id);
+    if (d) this.ui.openDragon(d.uid);
+  }
+
+  rideNearest() { this.dragonButton(); }
 
   tileColor(t) {
     let c = this.tileCol.get(t);
@@ -323,6 +346,7 @@ class Game {
     if (code === 'KeyV') this.toggleCam();
     else if (code === 'KeyF') this.player.use(null);
     else if (code === 'KeyR') this.rideNearest();
+    else if (code === 'KeyG') this.dragonMenu();
   }
 
   // ---------- elke frame ----------
@@ -391,7 +415,8 @@ class Game {
       // het kompas en de sfeergeluiden hoeven niet elke frame
       const hd = this.hudT; this.hudT = 0;
       this.ui.frame(p.yaw, p.pos, this.worldId);
-      this.ui.setRide(!p.mount && !!this.nearDragon());
+      const own = p.mount ? null : this.nearDragon();
+      this.ui.setRide(!own ? '' : (dragonStage(own.growth) >= 2 ? '🐉 Vliegen' : '🐉 ' + (own.name || 'Draak')));
       const surf = this.world.get(Math.floor(p.pos.x) >> 4, Math.floor(p.pos.z) >> 4);
       const under = surf ? p.pos.y < surf.hm[(Math.floor(p.pos.x) & 15) * 16 + (Math.floor(p.pos.z) & 15)] - 6 : false;
       this.sound.ambience(hd, { world: this.worldId, under, day: this.R.dayF, flying: !!p.mount && p.speedNow > 4 });

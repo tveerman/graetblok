@@ -159,6 +159,18 @@ const bevel = (base, seed) => (x, y, u, v) => {
   return c;
 };
 
+// De schil van een 3D-ei: boven lichter, onder donkerder, met spikkels die naar onderen toe
+// talrijker worden. extra: 'band' (naad, robot-ei) of 'glitter' (gouden ei).
+const eggSkin = (dark, light, spot, seed, extra) => (x, y, u, v) => {
+  let c = mix(light, dark, 0.2 + 0.55 * v + (fbm(u, v, 4, 4, 3, seed) - 0.5) * 0.25);
+  cell(u, v, 9, seed + 1);
+  const size = 0.1 + 0.2 * v + CID * 0.08;
+  if (F1 < size && CID > 0.25) c = mix(c, spot, 0.55 + 0.4 * (1 - F1 / size));
+  if (extra === 'band' && Math.abs(v - 0.56) < 0.035) c = Math.abs(v - 0.56) < 0.012 ? [20, 26, 34] : mul(c, 0.7);
+  if (extra === 'glitter' && hash2(x, y, seed + 2) > 0.985) c = [255, 255, 245];
+  return c;
+};
+
 const GRAS = grassTop([58, 112, 38], [104, 160, 60], [150, 172, 72], 11);
 const SGRAS = grassTop([58, 32, 92], [104, 62, 150], [196, 130, 255], 12);
 const HGRAS = grassTop([62, 170, 150], [120, 220, 180], [240, 226, 130], 13);
@@ -294,6 +306,45 @@ const PX = {
     if (v > 0.62) return mul(PLANK(x, y, u, v), 0.8);
     return mul([176, 40, 48], 0.85 + fbm(u, v, 4, 4, 3, 143) * 0.25);
   },
+  ei_vuur_schil: eggSkin([150, 24, 8], [255, 140, 44], [255, 224, 90], 230),
+  ei_ijs_schil: eggSkin([70, 140, 196], [220, 244, 255], [255, 255, 255], 231),
+  ei_natuur_schil: eggSkin([40, 104, 44], [158, 212, 98], [70, 50, 26], 232),
+  ei_bliksem_schil: eggSkin([170, 134, 16], [255, 242, 130], [90, 110, 230], 233),
+  ei_schaduw_schil: eggSkin([28, 18, 48], [110, 76, 160], [196, 130, 255], 234),
+  ei_robot_schil: eggSkin([86, 96, 108], [204, 214, 224], [74, 224, 255], 235, 'band'),
+  ei_goud_schil: eggSkin([176, 116, 20], [255, 232, 130], [255, 250, 210], 236, 'glitter'),
+  ei_kristal_schil: eggSkin([42, 160, 180], [206, 255, 255], [190, 110, 240], 237),
+  // het lange bed: bovenkant van het voeteneind (v = 0 is de kant van het hoofdeind)
+  bed_voet_top: (x, y, u, v) => {
+    let c = mul([186, 44, 52], 0.85 + fbm(u, v, 4, 4, 3, 142) * 0.25);
+    if ((x + y) % 16 < 1 || (x - y + 64) % 16 < 1) c = mul(c, 0.78);
+    if (v > 0.9) c = mul(c, 0.7);                              // omgeslagen rand aan het voeteneind
+    if (Math.min(u, 1 - u) < 0.03) c = mul(c, 0.8);
+    return c;
+  },
+  // bovenkant van het hoofdeind: laken met een kussen, onderaan begint de deken
+  bed_hoofd_top: (x, y, u, v) => {
+    if (v > 0.74) {
+      if (v < 0.84) return mul([244, 242, 236], 0.92 + fbm(u, v, 8, 8, 2, 144) * 0.1);   // omgeslagen laken
+      let c = mul([186, 44, 52], 0.85 + fbm(u, v, 4, 4, 3, 142) * 0.25);
+      if ((x + y) % 16 < 1 || (x - y + 64) % 16 < 1) c = mul(c, 0.78);
+      return c;
+    }
+    const sheet = mul([226, 224, 216], 0.92 + fbm(u, v, 6, 6, 2, 145) * 0.1);
+    // kussen met ronde hoeken
+    const px = Math.max(0, Math.abs(u - 0.5) - 0.26), py = Math.max(0, Math.abs(v - 0.36) - 0.14);
+    const d = Math.hypot(px, py);
+    if (d < 0.1) {
+      const edge = d / 0.1;
+      const c = mul([252, 252, 250], 1 - edge * edge * 0.16 + fbm(u, v, 8, 8, 2, 146) * 0.04);
+      return c;
+    }
+    return d < 0.125 ? mul(sheet, 0.8) : sheet;
+  },
+  bed_hoofd_side: (x, y, u, v) => {
+    if (v > 0.62) return mul(PLANK(x, y, u, v), 0.8);
+    return mul([232, 230, 222], 0.9 + fbm(u, v, 4, 4, 3, 147) * 0.14);
+  },
   glas: (x, y, u, v) => {
     const b = Math.min(u, v, 1 - u, 1 - v);
     if (b < 0.05) return [206, 228, 238, 255];
@@ -399,27 +450,67 @@ const PX = {
 
 // ---------- sprites die we met de teken-functies van de browser maken ----------
 
-function eggDraw(c1, c2, spot, seed) {
+// De omtrek van een ei: smal en rond van boven, bol van onder.
+function eggPath(g, cx, cy, hh, w) {
+  g.beginPath();
+  for (let i = 0; i <= 56; i++) {
+    const th = (i / 56) * Math.PI * 2;
+    const x = Math.sin(th) * (1 - 0.17 * Math.cos(th)), y = -Math.cos(th);
+    if (i === 0) g.moveTo(cx + x * w, cy + y * hh); else g.lineTo(cx + x * w, cy + y * hh);
+  }
+  g.closePath();
+}
+
+// Een drakenei. c1 = donkere kleur, c2 = lichte kleur, spot = kleur van de spikkels.
+// extra: 'band' (naad met klinknagels, voor het robot-ei) of 'glitter' (sterretjes, voor het gouden ei)
+function eggDraw(c1, c2, spot, seed, extra) {
   return (g) => {
-    const cx = 32, cy = 36;
-    g.save();
-    g.beginPath();
-    g.moveTo(cx, 8);
-    g.bezierCurveTo(cx + 22, 8, cx + 24, 50, cx, 60);
-    g.bezierCurveTo(cx - 24, 50, cx - 22, 8, cx, 8);
-    g.closePath();
-    const gr = g.createRadialGradient(cx - 7, cy - 12, 3, cx, cy, 30);
-    gr.addColorStop(0, '#ffffff'); gr.addColorStop(0.25, c2); gr.addColorStop(1, c1);
+    const cx = 32, cy = 33, hh = 26, w = 19.5;
+    // de bolle vorm: licht van linksboven, donker naar rechtsonder
+    eggPath(g, cx, cy, hh, w);
+    const gr = g.createRadialGradient(cx - 6, cy - 8, 2, cx + 1, cy + 3, 32);
+    gr.addColorStop(0, shadeHex(c2, 1.25)); gr.addColorStop(0.32, c2); gr.addColorStop(0.78, c1); gr.addColorStop(1, shadeHex(c1, 0.6));
     g.fillStyle = gr; g.fill();
+    g.save();
+    eggPath(g, cx, cy, hh, w);
     g.clip();
+    // spikkels: klein, en de meeste aan de bolle onderkant, zoals bij een echt ei
     g.fillStyle = spot;
-    for (let i = 0; i < 9; i++) {
-      const x = 12 + hash2(i, 1, seed) * 40, y = 12 + hash2(i, 2, seed) * 46, r = 2 + hash2(i, 3, seed) * 4;
-      g.beginPath(); g.ellipse(x, y, r, r * 0.8, hash2(i, 4, seed) * 3, 0, 6.3); g.fill();
+    for (let i = 0; i < 46; i++) {
+      const fy = Math.pow(hash2(i, 2, seed), 0.6);
+      const y = cy - hh + fy * 2 * hh, x = cx + (hash2(i, 1, seed) - 0.5) * 2 * w;
+      const r = 0.6 + hash2(i, 3, seed) * (i < 7 ? 3.2 : 1.5);
+      g.globalAlpha = 0.45 + hash2(i, 5, seed) * 0.55;
+      g.beginPath(); g.ellipse(x, y, r, r * (0.6 + hash2(i, 6, seed) * 0.4), hash2(i, 4, seed) * 3, 0, 6.3); g.fill();
+    }
+    g.globalAlpha = 1;
+    if (extra === 'band') {
+      // robot-ei: een naad rond het midden met klinknagels
+      g.strokeStyle = 'rgba(20,26,34,0.75)'; g.lineWidth = 2.2;
+      g.beginPath(); g.ellipse(cx, cy + 4, w + 2, 5, 0, 0, Math.PI); g.stroke();
+      g.fillStyle = 'rgba(235,245,255,0.9)';
+      for (let k = -2; k <= 2; k++) { g.beginPath(); g.arc(cx + k * 7.2, cy + 4 + Math.sqrt(Math.max(0, 1 - (k * 7.2 / (w + 2)) ** 2)) * 5 - 3.4, 1.1, 0, 6.3); g.fill(); }
+    }
+    // schaduw aan de rand, zodat het ei rond lijkt
+    const sh = g.createRadialGradient(cx - 5, cy - 6, 9, cx, cy + 2, 31);
+    sh.addColorStop(0, 'rgba(0,0,0,0)'); sh.addColorStop(0.7, 'rgba(0,0,0,0.12)'); sh.addColorStop(1, 'rgba(0,0,0,0.42)');
+    g.fillStyle = sh; g.fillRect(0, 0, 64, 64);
+    // glans
+    g.fillStyle = 'rgba(255,255,255,0.22)';
+    g.beginPath(); g.ellipse(cx - 6, cy - 9, 6.5, 11, 0.42, 0, 6.3); g.fill();
+    g.fillStyle = 'rgba(255,255,255,0.62)';
+    g.beginPath(); g.ellipse(cx - 8, cy - 13, 2.6, 5.2, 0.42, 0, 6.3); g.fill();
+    if (extra === 'glitter') {
+      g.fillStyle = 'rgba(255,255,255,0.95)';
+      for (const [x, y, r] of [[40, 24, 3.2], [27, 44, 2.4], [38, 48, 1.8]]) {
+        g.beginPath(); g.moveTo(x, y - r); g.lineTo(x + r * 0.3, y - r * 0.3); g.lineTo(x + r, y); g.lineTo(x + r * 0.3, y + r * 0.3);
+        g.lineTo(x, y + r); g.lineTo(x - r * 0.3, y + r * 0.3); g.lineTo(x - r, y); g.lineTo(x - r * 0.3, y - r * 0.3); g.closePath(); g.fill();
+      }
     }
     g.restore();
-    g.strokeStyle = 'rgba(0,0,0,0.45)'; g.lineWidth = 1.5;
-    g.beginPath(); g.moveTo(cx, 8); g.bezierCurveTo(cx + 22, 8, cx + 24, 50, cx, 60); g.bezierCurveTo(cx - 24, 50, cx - 22, 8, cx, 8); g.stroke();
+    // dun randje
+    eggPath(g, cx, cy, hh, w);
+    g.strokeStyle = 'rgba(0,0,0,0.5)'; g.lineWidth = 1.2; g.stroke();
   };
 }
 function flowerDraw(petal, center) {
@@ -504,8 +595,8 @@ const DRAW = {
   ei_natuur: eggDraw('#2a6a2c', '#9ad060', 'rgba(60,40,20,0.5)', 212),
   ei_bliksem: eggDraw('#b08a10', '#fff080', 'rgba(90,110,230,0.8)', 213),
   ei_schaduw: eggDraw('#1c1230', '#6a4a9a', 'rgba(190,120,255,0.8)', 214),
-  ei_robot: eggDraw('#56606c', '#c8d2dc', 'rgba(74,224,255,0.9)', 215),
-  ei_goud: eggDraw('#b87a14', '#ffe680', 'rgba(255,255,255,0.8)', 216),
+  ei_robot: eggDraw('#56606c', '#c8d2dc', 'rgba(74,224,255,0.9)', 215, 'band'),
+  ei_goud: eggDraw('#b87a14', '#ffe680', 'rgba(255,255,255,0.8)', 216, 'glitter'),
   ei_kristal: eggDraw('#2aa8b8', '#c8ffff', 'rgba(190,110,240,0.8)', 217),
 };
 for (let k = 0; k < 4; k++) {

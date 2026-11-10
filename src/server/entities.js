@@ -282,7 +282,12 @@ export const entityMethods = {
     const d = e.dragon;
     if (!o || o.world !== w.id || d.mode === 'stay') {
       e.vx = 0; e.vz = 0;
-      if (e.fly) e.vy = this.hits(w, e.x, e.y - 0.25, e.z, e.w / 2, e.h) ? 0 : -3;
+      if (e.fly) {
+        const onGround = this.hits(w, e.x, e.y - 0.25, e.z, e.w / 2, e.h);
+        e.vy = onGround ? 0 : -3;
+        e.landed = onGround;
+      }
+      e.gx = undefined;
       return;
     }
     const stage = dragonStage(d.growth);
@@ -290,6 +295,7 @@ export const entityMethods = {
     if (dist > (stage ? 46 : 26) || d.far || (e.t > 1 && this.hits(w, e.x, e.y + 0.1, e.z, 0.2, 0.5))) {
       d.far = 0;
       e.x = o.x + 1.5; e.y = o.y + (stage ? 2 : 0.3); e.z = o.z + 1.5; e.vy = 0;
+      e.gx = undefined; e.landed = false;
       return;
     }
     if (!e.fly) {
@@ -298,17 +304,36 @@ export const entityMethods = {
       else { e.vx = 0; e.vz = 0; }
       return;
     }
-    // schuin achter de speler zweven, zodat de draak niet voor je neus hangt
-    const side = ((e.id % 3) - 1) * 1.8 + 1.4;
-    const rad = 2.2 + e.scale * 1.8;
-    const sy = Math.sin(o.yaw), cy = Math.cos(o.yaw);
-    const ex = o.x + sy * rad + cy * side - e.x, ey = o.y + 1.0 + e.scale + Math.sin(e.t * 1.3) * 0.3 - e.y, ez = o.z + cy * rad - sy * side - e.z;
+    // Vliegend volgen. De draak kiest een plek schuin achter de speler en blijft daar, tot de
+    // speler een paar blokken verder is gelopen. Draai je je om, dan blijft hij dus rustig op
+    // zijn plek en kun je hem aantikken. Sta je even stil, dan landt hij naast je.
+    const moved = e.gx === undefined ? 99 : Math.hypot(o.x - e.ax, o.y - e.ay, o.z - e.az);
+    if (moved > 3) {
+      const side = ((e.id % 3) - 1) * 1.4 + 1.0, rad = 1.7 + e.scale * 1.3;
+      const sy = Math.sin(o.yaw), cy = Math.cos(o.yaw);
+      e.gx = o.x + sy * rad + cy * side; e.gz = o.z + cy * rad - sy * side;
+      e.ax = o.x; e.ay = o.y; e.az = o.z;
+      e.still = 0; e.landed = false;
+    }
+    e.still = (e.still || 0) + dt;
+    let gy = o.y + 0.7 + e.scale * 0.5 + Math.sin(e.t * 1.3) * 0.1;      // zweven op ooghoogte
+    let landing = false;
+    if (e.still > 2.5) {
+      const gxi = Math.floor(e.gx), gzi = Math.floor(e.gz);
+      const top = w.topY(gxi, gzi, Math.min(CH - 1, Math.floor(o.y) + 3));
+      if (top > 0 && top + 1 > o.y - 5 && !w.liquid(gxi, top + 1, gzi)) { gy = top + 1; landing = true; }
+    }
+    const ex = e.gx - e.x, ey = gy - e.y, ez = e.gz - e.z;
     const l = Math.hypot(ex, ey, ez);
-    if (l > 0.25) {
+    if (l > 0.2) {
       const sp = Math.min(12, l * 2.4);
       e.vx = ex / l * sp; e.vy = ey / l * sp; e.vz = ez / l * sp;
       if (Math.hypot(ex, ez) > 1) e.yaw = Math.atan2(ex, ez);
-    } else { e.vx = 0; e.vy = 0; e.vz = 0; }
+      if (!landing) e.landed = false;
+    } else {
+      e.vx = 0; e.vy = 0; e.vz = 0;
+      if (landing) { e.landed = true; e.y = gy; e.yaw = Math.atan2(o.x - e.x, o.z - e.z); }     // geland: op de grond staan en naar de speler kijken
+    }
     // helpen in het gevecht
     if (e.cd <= 0) {
       e.cd = 0.5;
@@ -320,6 +345,7 @@ export const entityMethods = {
       }
       if (best) {
         e.cd = 1.9; e.atk = 0.4;
+        e.still = 0; e.landed = false;                  // in een gevecht blijft hij in de lucht
         e.yaw = Math.atan2(best.x - e.x, best.z - e.z);
         this.shootAt(w, e, best.x, best.y + best.h * 0.5, best.z, DRAGONS[d.type].proj, 4 + stage * 4 + (d.level || 1), 20, 'p', o.id, 0, d.uid);
       }

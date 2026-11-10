@@ -93,7 +93,7 @@ async function download(urls) {
       if (res.status === 404) return;                    // bestand bestaat niet (meer): overslaan
       if (!res.ok) throw new Error(url + ' gaf ' + res.status);
       const buf = await res.arrayBuffer();
-      files.push({ url, buf, type: typeFor(url, res.headers.get('Content-Type')), sig: hash(new Uint8Array(buf)) });
+      files.push({ url, buf, type: typeFor(url, res.headers.get('Content-Type')), sig: hash(new Uint8Array(buf)), lm: Date.parse(res.headers.get('Last-Modified') || '') || 0 });
     }));
   } finally { t.done(); }
   if (!files.some((f) => f.url === BASE + 'index.html')) throw new Error('index.html ontbreekt');
@@ -108,6 +108,10 @@ async function store(name, files) {
   return sigs;
 }
 
+// De "versie" van een generatie: de datum van het laatst gewijzigde bestand.
+const stampOf = (files) => files.reduce((m, f) => Math.max(m, f.lm), 0);
+const versionOf = (meta) => (meta && (meta.stamp || Number(String(meta.active).slice(GEN_PREFIX.length)))) || 0;
+
 async function notify(msg) {
   const list = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
   for (const c of list) c.postMessage(msg);
@@ -121,7 +125,7 @@ async function ensureFirst() {
   const files = await download(await fileList());
   const name = GEN_PREFIX + Date.now();
   const sigs = await store(name, files);
-  await writeMeta({ active: name, sigs, pending: null, pendingSigs: null });
+  await writeMeta({ active: name, sigs, stamp: stampOf(files), pending: null, pendingSigs: null, pendingStamp: null });
 }
 
 // ---------- is de server er, en heeft die iets nieuws? ----------
@@ -171,7 +175,7 @@ async function runCheck() {
   const sigs = await store(name, files);
   const m = (await getMeta(true)) || meta;
   const oldPending = m.pending;
-  m.pending = name; m.pendingSigs = sigs;
+  m.pending = name; m.pendingSigs = sigs; m.pendingStamp = stampOf(files);
   await writeMeta(m);
   if (oldPending && oldPending !== name) await caches.delete(oldPending);
   await notify({ t: 'sw-update' });
@@ -188,8 +192,8 @@ async function cleanup(meta) {
 // de klaargezette generatie in gebruik nemen (alleen bij het laden van een pagina)
 async function promote(meta) {
   if (!(await caches.has(meta.pending))) { meta.pending = null; meta.pendingSigs = null; await writeMeta(meta); return meta; }
-  meta.active = meta.pending; meta.sigs = meta.pendingSigs;
-  meta.pending = null; meta.pendingSigs = null;
+  meta.active = meta.pending; meta.sigs = meta.pendingSigs; meta.stamp = meta.pendingStamp || 0;
+  meta.pending = null; meta.pendingSigs = null; meta.pendingStamp = null;
   await writeMeta(meta);
   await cleanup(meta);
   return meta;
@@ -260,13 +264,13 @@ self.addEventListener('message', (event) => {
       const meta = await getMeta(true);
       let files = 0;
       if (meta && meta.active && await caches.has(meta.active)) files = (await (await caches.open(meta.active)).keys()).length;
-      src.postMessage({ t: 'sw-status', files, pending: !!(meta && meta.pending) });
+      src.postMessage({ t: 'sw-status', files, pending: !!(meta && meta.pending), version: versionOf(meta) });
     })());
   } else if (m.t === 'sw-check') {
     event.waitUntil((async () => {
       const r = await checkForUpdate(!!m.force);
       const meta = await getMeta(true);
-      src.postMessage({ t: 'sw-checked', reachable: r.reachable, pending: !!(meta && meta.pending) });
+      src.postMessage({ t: 'sw-checked', reachable: r.reachable, pending: !!(meta && meta.pending), version: versionOf(meta) });
     })());
   }
 });

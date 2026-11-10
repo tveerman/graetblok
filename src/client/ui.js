@@ -166,7 +166,14 @@ export class UI {
     if (this._coord !== txt) { this._coord = txt; $('coords').textContent = txt; }
   }
 
-  setRide(show) { if (show === this._ride) return; this._ride = show; $('btnRide').classList.toggle('hidden', !show); }
+  // de knop voor je draak: label is de tekst op de knop, of '' om hem te verbergen
+  setRide(label) {
+    if (label === this._ride) return;
+    this._ride = label;
+    const b = $('btnRide');
+    b.classList.toggle('hidden', !label);
+    if (label) b.textContent = label;
+  }
 
   // ---------- vensters ----------
 
@@ -312,15 +319,22 @@ export class UI {
     for (const d of g.dragons) {
       const row = el('div', 'drow');
       row.appendChild(el('span', '', '🐉 <b>' + d.name + '</b> – ' + DRAGONS[d.type].name + ', ' + STAGE_NAMES[dragonStage(d.growth)].toLowerCase() + (d.world !== g.worldId ? ' (in de ' + WORLDS[d.world].name + ')' : '')));
+      const btns = el('span', 'drowbtns');
+      if (d.world === g.worldId && d.eid) {
+        const menu = el('button', 'btn small', 'Voeren / menu');
+        tap(menu, () => this.openDragon(d.uid));
+        btns.appendChild(menu);
+      }
       const call = el('button', 'btn small', 'Roep');
       tap(call, () => { g.net.send({ t: 'dragon', uid: d.uid, cmd: 'call' }); this.close(); });
-      row.appendChild(call);
+      btns.appendChild(call);
+      row.appendChild(btns);
       ds.appendChild(row);
     }
     b.appendChild(ds);
     b.appendChild(el('div', 'qsec help', g.input.touch
-      ? '<h4>Besturing</h4><p>Linkerduim: lopen. Rechterduim: rondkijken. <b>Tik</b> = neerzetten of gebruiken. <b>Vinger ingedrukt houden</b> = hakken of slaan. Knoppen rechtsonder: ⛏ hakken, ✋ gebruiken, ⬆ springen.</p>'
-      : '<h4>Besturing</h4><p><b>WASD</b> lopen · <b>muis</b> kijken (of pijltjestoetsen) · <b>linkermuisknop</b> hakken/slaan · <b>rechtermuisknop</b> of <b>F</b> neerzetten/gebruiken · <b>spatie</b> springen · <b>shift</b> rennen · <b>1-9</b> of scrollen: snelbalk · <b>E</b> rugzak · <b>Q</b> opdrachten · <b>V</b> camera · <b>R</b> op/van je draak · <b>Esc</b> menu</p>'));
+      ? '<h4>Besturing</h4><p>Linkerduim: lopen. Rechterduim: rondkijken. <b>Tik</b> = neerzetten of gebruiken. <b>Vinger ingedrukt houden</b> = hakken of slaan. Knoppen rechtsonder: ⛏ hakken, ✋ gebruiken, ⬆ springen. Is je draak in de buurt, dan staat er onderin een knop 🐉 om hem te voeren of op hem te vliegen.</p>'
+      : '<h4>Besturing</h4><p><b>WASD</b> lopen · <b>muis</b> kijken (of pijltjestoetsen) · <b>linkermuisknop</b> hakken/slaan · <b>rechtermuisknop</b> of <b>F</b> neerzetten/gebruiken · <b>spatie</b> springen · <b>shift</b> rennen · <b>1-9</b> of scrollen: snelbalk · <b>E</b> rugzak · <b>Q</b> opdrachten · <b>V</b> camera · <b>R</b> op/van je draak · <b>G</b> venster van je draak · <b>Esc</b> menu</p>'));
     this.open('quest', 'Opdrachten en avontuur', b, true);
   }
 
@@ -392,6 +406,7 @@ export class UI {
     slider('Kijksnelheid', 'sens', 0.4, 2.5, 0.1, (v) => v.toFixed(1) + '×');
     const row = el('div', 'btnrow');
     row.appendChild(toggle('Muziek', 'music'));
+    row.appendChild(toggle('Geluidseffecten', 'sfx'));
     row.appendChild(toggle('Vanzelf springen', 'autoJump'));
     row.appendChild(toggle('Scherpte aanpassen', 'dynRes'));
     b.appendChild(row);
@@ -404,6 +419,15 @@ export class UI {
     row2.appendChild(nw);
     b.appendChild(row2);
     b.appendChild(el('p', 'hint', 'Het spel slaat vanzelf op. ' + (g.fpsText || '')));
+    // een regel over het geluid, die zichzelf bijwerkt zolang dit venster open staat
+    const diag = el('p', 'hint', g.audioText());
+    b.appendChild(diag);
+    const tick = () => {
+      if (this.modal !== 'pause' || !diag.isConnected) return;
+      diag.textContent = g.audioText();
+      setTimeout(tick, 500);
+    };
+    setTimeout(tick, 500);
     this.open('pause', 'Pauze', b, false);
   }
 }

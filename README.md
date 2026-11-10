@@ -97,12 +97,20 @@ you left off.
 | Quest log | 📜 | `Q` |
 | Pause menu (settings, back to the home screen) | ⚙️ | `Esc` |
 | Camera (first / third person) | 📷 | `V` |
+| Dragon window (feed, name, stay/follow) | "🐉 <name>" button when it is near, or tap the dragon | `G` |
 | Mount / dismount dragon | "🐉 Vliegen" / "Afstappen" | `R` |
 | Hotbar | tap a slot | `1`–`9` or scroll |
 
 While any window is open (backpack, quest log, a dialog or the pause menu) the world stands
 still: no time passes and nothing attacks. The game also opens the pause menu by itself when
 the tablet is put away or the tab is hidden.
+
+The pause menu has separate switches for music ("Muziek") and sound effects
+("Geluidseffecten"). Its last line reports what the audio is doing on that device, for example
+"Geluid: aan · muziek: 262 noten gespeeld, sterkte 9% · effecten: aan" — useful when a device
+stays silent. The landing screen shows which version is running ("versie van 10 nov, 18:40",
+the date of the most recently changed game file), so you can tell whether a device is still
+running an older copy.
 
 ## What is in this first version
 

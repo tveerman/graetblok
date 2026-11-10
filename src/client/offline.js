@@ -31,6 +31,12 @@ export function setupOffline(game) {
     el.dataset.state = state;
   };
   const sayOffline = (text) => { const el = $('offlineStatus'); if (el) el.textContent = text; };
+  // welke versie draait hier? (de datum van het laatst gewijzigde bestand van het spel)
+  const sayVersion = (ms) => {
+    const el = $('versionText');
+    if (!el || !ms) return;
+    el.textContent = ' · versie van ' + new Date(ms).toLocaleString('nl-NL', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  };
   const showUpdate = () => {
     if (!box) return;
     txt.textContent = NEW_TEXT;
@@ -72,6 +78,9 @@ export function setupOffline(game) {
         if (now && loaded[f] && now !== loaded[f]) changed = true;
       }));
       sayServer('up');
+      let newest = 0;
+      for (const f in loaded) { const t = Date.parse(loaded[f]); if (t > newest) newest = t; }
+      sayVersion(newest);
       if (changed) showUpdate();
     } catch (e) {
       sayServer('down');
@@ -151,6 +160,7 @@ export function setupOffline(game) {
       clearTimeout(waitTimer);
       busy = false;
       sayServer(m.reachable ? 'up' : 'down');
+      sayVersion(m.version);
       if (m.pending) showUpdate();
     } else if (m.t === 'sw-update') {
       // er is net een nieuwe versie klaargezet
@@ -158,6 +168,7 @@ export function setupOffline(game) {
       if (!onMenu()) game.ui.toast('Er is een nieuwe versie van het spel. Die start de volgende keer.', 'good');
     } else if (m.t === 'sw-status') {
       sayOffline(m.files ? 'Zonder server spelen: klaar ✔' : 'Zonder server spelen: nog niet klaar');
+      sayVersion(m.version);
       if (m.pending) showUpdate();
     }
   });

@@ -10,7 +10,7 @@
 //   storage = { get, set, del, entries, clear }         (zie storage.js)
 
 import { CH, TICK_MS, INV_SIZE, HOTBAR, DAY_LENGTH, DAY_FRAC, RANKS, SECRET_RANK, chunkKey, clamp, dayPhase, isNight, xpNeed } from '../shared/constants.js';
-import { B, BLOCKS, B_SHAPE, EGG_TYPE, PORTAL_TO, PORTAL_BLOCK, SHAPE_LIQUID } from '../shared/blocks.js';
+import { B, BLOCKS, B_SHAPE, EGG_TYPE, PORTAL_TO, PORTAL_BLOCK, SHAPE_LIQUID, BED_DIRS, bedFoot, bedHead, bedPart, isBed } from '../shared/blocks.js';
 import { I, ITEMS, RECIPES, matches, maxStack, itemName } from '../shared/items.js';
 import { WORLDS, WORLD_ORDER, SPAWN } from '../shared/worlds.js';
 import { hash3, mulberry32 } from '../shared/noise.js';
@@ -290,6 +290,14 @@ export class GameServer {
     }
     this.setBlock(w, x, y, z, fill);
 
+    const part = bedPart(id);
+    if (part) {
+      // de andere helft van het bed verdwijnt mee (je krijgt één bed terug)
+      const dx = BED_DIRS[part.d][0], dz = BED_DIRS[part.d][1];
+      const ox = part.head ? x - dx : x + dx, oz = part.head ? z - dz : z + dz;
+      const other = bedPart(w.get(ox, y, oz));
+      if (other && other.head !== part.head && other.d === part.d) this.setBlock(w, ox, y, oz, 0);
+    }
     if (EGG_TYPE[id]) delete this.meta.eggs[p.world + ':' + x + ',' + y + ',' + z];
     if (can) this.dropFor(p, def);
     else if (def.tier > 0) this.toast(p, 'Hiervoor heb je een beter houweel nodig.', 'warn');
@@ -351,7 +359,13 @@ export class GameServer {
         if (q.x + 0.3 > x && q.x - 0.3 < x + 1 && q.z + 0.3 > z && q.z - 0.3 < z + 1 && q.y + 1.8 > y && q.y < y + 1) return reject();
       }
     }
-    this.setBlock(w, x, y, z, s.id);
+    if (s.id === B.bed) {
+      // een bed is twee blokken lang: het voeteneind komt waar je tikt, het hoofdeind erachter
+      const spot = this.bedSpot(p, w, x, y, z);
+      if (!spot) { this.toast(p, 'Hier past het bed niet. Het is twee blokken lang en moet op de grond staan.', 'warn'); return reject(); }
+      this.setBlock(w, x, y, z, bedFoot(spot.d));
+      this.setBlock(w, spot.x, y, spot.z, bedHead(spot.d));
+    } else this.setBlock(w, x, y, z, s.id);
     if (EGG_TYPE[s.id]) {
       this.meta.eggs[p.world + ':' + x + ',' + y + ',' + z] = { type: EGG_TYPE[s.id], prog: 0, owner: p.name, w: p.world, x, y, z };
       this.toast(p, 'Het ei ligt er. Houd het warm met een kampvuur vlak ernaast!');
@@ -360,6 +374,25 @@ export class GameServer {
     s.n--; if (s.n <= 0) p.inv[p.sel] = null;
     this.sendInv(p);
     this.checkQuests(p);
+  }
+
+  // Waar kan het hoofdeind van een bed komen? Het liefst in de richting waarin de speler kijkt.
+  bedSpot(p, w, x, y, z) {
+    if (!w.solid(x, y - 1, z)) return null;
+    const fx = -Math.sin(p.yaw), fz = -Math.cos(p.yaw);
+    const first = Math.abs(fx) > Math.abs(fz) ? (fx > 0 ? 0 : 2) : (fz > 0 ? 1 : 3);
+    for (const turn of [0, 1, 3, 2]) {
+      const d = (first + turn) % 4;
+      const hx = x + BED_DIRS[d][0], hz = z + BED_DIRS[d][1];
+      const cur = w.get(hx, y, hz);
+      if (!BLOCKS[cur] || !BLOCKS[cur].replace || !w.solid(hx, y - 1, hz)) continue;
+      let free = true;
+      for (const q of this.players.values()) {
+        if (q.world === w.id && q.x + 0.3 > hx && q.x - 0.3 < hx + 1 && q.z + 0.3 > hz && q.z - 0.3 < hz + 1 && q.y + 1.8 > y && q.y < y + 1) { free = false; break; }
+      }
+      if (free) return { x: hx, z: hz, d };
+    }
+    return null;
   }
 
   on_use(p, m) {
@@ -384,7 +417,7 @@ export class GameServer {
     } else if (id === B.scheepscomputer) {
       p.flags.computer = 1;
       this.send(p, { t: 'dialog', title: 'Scheepscomputer', lines: computerLines(p, this) });
-    } else if (id === B.bed) {
+    } else if (isBed(id)) {
       p.spawn = { w: p.world, x: x + 0.5, y: y + 1, z: z + 0.5 };
       const ph = dayPhase(this.meta.time);
       if (WORLDS[p.world].cycle && ph > DAY_FRAC - 0.04) {
@@ -542,7 +575,7 @@ export class GameServer {
     p.dead = false;
     p.hp = this.maxHp(p);
     let s = p.spawn;
-    if (s && this.worlds[s.w].get(Math.floor(s.x), Math.floor(s.y) - 1, Math.floor(s.z)) !== B.bed) { s = null; p.spawn = null; }
+    if (s && !isBed(this.worlds[s.w].get(Math.floor(s.x), Math.floor(s.y) - 1, Math.floor(s.z)))) { s = null; p.spawn = null; }
     if (!s) s = { w: 'groen', x: SPAWN.x, y: -1, z: SPAWN.z };
     if (s.w !== p.world || true) {
       // altijd via moveToWorld zodat draken en chunks goed meekomen

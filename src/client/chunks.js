@@ -3,8 +3,8 @@
 import * as THREE from '../../vendor/three.module.min.js';
 import { CS, CH, idx, chunkKey } from '../shared/constants.js';
 import {
-  B, B_SHAPE, B_PASS, B_OPAQUE, B_SOLID, B_LIGHT, B_TOP, B_SIDE, B_BOTTOM, NUM_BLOCKS,
-  SHAPE_CUBE, SHAPE_CROSS, SHAPE_LIQUID, LIFE_LEAVES, LEAVES, TILE_DOR,
+  B, B_SHAPE, B_PASS, B_OPAQUE, B_SOLID, B_LIGHT, B_TOP, B_SIDE, B_BOTTOM, B_HEIGHT, B_BED, NUM_BLOCKS,
+  SHAPE_CUBE, SHAPE_CROSS, SHAPE_LIQUID, SHAPE_LOW, SHAPE_EGG, LIFE_LEAVES, LEAVES, TILE_DOR, tileId,
 } from '../shared/blocks.js';
 
 const PW = CS + 2, PH = CH + 2;
@@ -54,6 +54,25 @@ FACES.forEach((f, fi) => {
   });
 });
 const AO_F = [0.42, 0.62, 0.82, 1.0];
+
+// Het ei: een ronde vorm, opgebouwd uit ringen. Smal en rond van boven, bol van onder.
+// Per ring: hoogte, straal en hoe het oppervlak staat (voor het licht en donker).
+const EGG_SEG = 10, EGG_RINGS = 9;
+const EGG_Y = new Float32Array(EGG_RINGS), EGG_R = new Float32Array(EGG_RINGS), EGG_NR = new Float32Array(EGG_RINGS), EGG_NY = new Float32Array(EGG_RINGS);
+for (let j = 0; j < EGG_RINGS; j++) {
+  const th = Math.PI * (1 - j / (EGG_RINGS - 1));              // j = 0 is de onderkant
+  EGG_Y[j] = 0.42 * (1 + Math.cos(th));
+  EGG_R[j] = 0.31 * Math.sin(th) * (1 - 0.17 * Math.cos(th));
+  const dr = 0.31 * (Math.cos(th) * (1 - 0.17 * Math.cos(th)) + 0.17 * Math.sin(th) * Math.sin(th)), dy = -0.42 * Math.sin(th);
+  const l = Math.hypot(dy, dr) || 1;
+  EGG_NR[j] = -dy / l; EGG_NY[j] = dr / l;
+}
+const EGG_COS = new Float32Array(EGG_SEG + 1), EGG_SIN = new Float32Array(EGG_SEG + 1);
+for (let i = 0; i <= EGG_SEG; i++) { EGG_COS[i] = Math.cos((i / EGG_SEG) * Math.PI * 2); EGG_SIN[i] = Math.sin((i / EGG_SEG) * Math.PI * 2); }
+const EGG_LX = -0.45, EGG_LY = 0.8, EGG_LZ = -0.4;             // waar het licht vandaan komt
+// bed: welke kant van het blok bij welke richting hoort, en het hout van het hoofdeinde
+const DIR_FACE = [0, 4, 1, 5];
+const T_BED_END = tileId('planken');
 const SKY_LUT = new Float32Array(16), BLK_LUT = new Float32Array(16);
 for (let i = 0; i < 16; i++) { SKY_LUT[i] = 0.03 + 0.97 * Math.pow(i / 15, 1.7); BLK_LUT[i] = Math.pow(i / 15, 1.3); }
 
@@ -356,6 +375,106 @@ export class ChunkWorld {
             buf.nv += 4; buf.ni += 6;
           }
           if (y < loY) loY = y; if (y > hiY) hiY = y;
+        } else if (shape === SHAPE_LOW) {
+          // laag blok (bed): lager dan een heel blok; het hoofdeind krijgt een plank die omhoog steekt
+          const buf = bufs[0];
+          const h = B_HEIGHT[id];
+          const bed = B_BED[id];
+          const dir = bed ? (bed - 1) & 3 : 3;
+          const endFace = bed > 4 ? DIR_FACE[dir] : -1;
+          const ownE = (x + 5) * 26 + z + 5;
+          for (let f = 0; f < 6; f++) {
+            const np = p + NSTR[f];
+            const nid = pad[np];
+            if (f !== 2) {
+              if (B_OPAQUE[nid]) continue;
+              if (f !== 3 && B_SHAPE[nid] === SHAPE_LOW) continue;      // twee helften sluiten op elkaar aan
+            }
+            let sl, bl;
+            if (f === 2) { sl = 15 - (E[ownE] - y); bl = hasBL ? BL[p] : 0; }
+            else {
+              const ncol = col + CSTR[f];
+              sl = 15 - (E[(((ncol / PW) | 0) + 4) * 26 + (ncol % PW) + 4] - (y + YOFF[f]));
+              bl = hasBL ? BL[np] : 0;
+            }
+            if (sl > 15) sl = 15; else if (sl < 0) sl = 0;
+            const sh = SHADE[f];
+            const sky = SKY_LUT[sl] * sh * 255, blk = BLK_LUT[bl] * sh * 255, amb = sh * 255;
+            const fh = f === endFace ? 1 : h;
+            const tile = f === 2 ? T_TOP[id] : (f === 3 ? T_BOTTOM[id] : (f === endFace ? T_BED_END : T_SIDE[id]));
+            const u0 = uvT[tile * 4], v0 = uvT[tile * 4 + 1], du = uvT[tile * 4 + 2] - u0, dv = uvT[tile * 4 + 3] - v0;
+            buf.need(4);
+            const nv = buf.nv;
+            for (let k = 0; k < 4; k++) {
+              const fk = f * 4 + k, vi = nv + k;
+              const cx = FC[fk * 3], cy = FC[fk * 3 + 1], cz = FC[fk * 3 + 2];
+              let uu = FUV[fk * 2], vv = FUV[fk * 2 + 1];
+              if (f === 2) {
+                // bovenkant draaien: de bovenrand van het plaatje ligt aan de kant van het hoofdeind
+                if (dir === 3) { uu = cx; vv = cz; } else if (dir === 1) { uu = 1 - cx; vv = 1 - cz; }
+                else if (dir === 0) { uu = cz; vv = 1 - cx; } else { uu = 1 - cz; vv = cx; }
+              }
+              buf.pos[vi * 3] = x + cx; buf.pos[vi * 3 + 1] = y + cy * fh; buf.pos[vi * 3 + 2] = z + cz;
+              buf.uv[vi * 2] = u0 + uu * du; buf.uv[vi * 2 + 1] = v0 + vv * dv;
+              buf.light[vi * 4] = sky; buf.light[vi * 4 + 1] = blk; buf.light[vi * 4 + 2] = amb; buf.light[vi * 4 + 3] = 0;
+            }
+            const ni = buf.ni;
+            buf.idx[ni] = nv; buf.idx[ni + 1] = nv + 1; buf.idx[ni + 2] = nv + 2; buf.idx[ni + 3] = nv; buf.idx[ni + 4] = nv + 2; buf.idx[ni + 5] = nv + 3;
+            buf.nv += 4; buf.ni += 6;
+          }
+          if (endFace >= 0) {
+            // de binnenkant van het hoofdeinde: het stuk plank boven het matras
+            const f = endFace;
+            let sl = 15 - (E[ownE] - y);
+            if (sl > 15) sl = 15; else if (sl < 0) sl = 0;
+            const bl = hasBL ? BL[p] : 0;
+            const sky = SKY_LUT[sl] * 0.8 * 255, blk = BLK_LUT[bl] * 0.8 * 255;
+            const u0 = uvT[T_BED_END * 4], v0 = uvT[T_BED_END * 4 + 1], du = uvT[T_BED_END * 4 + 2] - u0, dv = uvT[T_BED_END * 4 + 3] - v0;
+            buf.need(4);
+            const nv = buf.nv;
+            for (let k = 0; k < 4; k++) {
+              const fk = f * 4 + (3 - k), vi = nv + k;             // omgekeerde volgorde: het vlak kijkt naar binnen
+              buf.pos[vi * 3] = x + FC[fk * 3]; buf.pos[vi * 3 + 1] = y + h + FC[fk * 3 + 1] * (1 - h); buf.pos[vi * 3 + 2] = z + FC[fk * 3 + 2];
+              buf.uv[vi * 2] = u0 + FUV[fk * 2] * du; buf.uv[vi * 2 + 1] = v0 + FUV[fk * 2 + 1] * (1 - h) * dv;
+              buf.light[vi * 4] = sky; buf.light[vi * 4 + 1] = blk; buf.light[vi * 4 + 2] = 204; buf.light[vi * 4 + 3] = 0;
+            }
+            const ni = buf.ni;
+            buf.idx[ni] = nv; buf.idx[ni + 1] = nv + 1; buf.idx[ni + 2] = nv + 2; buf.idx[ni + 3] = nv; buf.idx[ni + 4] = nv + 2; buf.idx[ni + 5] = nv + 3;
+            buf.nv += 4; buf.ni += 6;
+          }
+          if (y < loY) loY = y; if (y > hiY) hiY = y;
+        } else if (shape === SHAPE_EGG) {
+          // een rond 3D-ei
+          const buf = bufs[0];
+          const ecol = (x + 5) * 26 + z + 5;
+          let sl = 15 - (E[ecol] - y);
+          if (sl > 15) sl = 15; else if (sl < 0) sl = 0;
+          let bl = hasBL ? BL[p] : 0;
+          if (B_LIGHT[id] > bl) bl = B_LIGHT[id];
+          const skyL = SKY_LUT[sl] * 255, blkL = BLK_LUT[bl] * 255;
+          const tile = T_TOP[id];
+          const u0 = uvT[tile * 4], v0 = uvT[tile * 4 + 1], du = uvT[tile * 4 + 2] - u0, dv = uvT[tile * 4 + 3] - v0;
+          buf.need(EGG_SEG * (EGG_RINGS - 1) * 4);
+          for (let j = 0; j < EGG_RINGS - 1; j++) {
+            for (let i = 0; i < EGG_SEG; i++) {
+              const nv = buf.nv;
+              // vier hoeken: (ring, segment), tegen de klok in van buitenaf gezien
+              for (let k = 0; k < 4; k++) {
+                const rj = k < 2 ? j : j + 1, si = (k === 0 || k === 3) ? i + 1 : i;
+                const cs = EGG_COS[si], sn = EGG_SIN[si], r = EGG_R[rj];
+                const dot = cs * EGG_NR[rj] * EGG_LX + EGG_NY[rj] * EGG_LY + sn * EGG_NR[rj] * EGG_LZ;
+                const sh = 0.5 + 0.5 * (dot > 0 ? dot : 0);
+                const vi = nv + k;
+                buf.pos[vi * 3] = x + 0.5 + cs * r; buf.pos[vi * 3 + 1] = y + EGG_Y[rj]; buf.pos[vi * 3 + 2] = z + 0.5 + sn * r;
+                buf.uv[vi * 2] = u0 + (si / EGG_SEG) * du; buf.uv[vi * 2 + 1] = v0 + (1 - rj / (EGG_RINGS - 1)) * dv;
+                buf.light[vi * 4] = skyL * sh; buf.light[vi * 4 + 1] = blkL * sh; buf.light[vi * 4 + 2] = 255 * sh; buf.light[vi * 4 + 3] = 0;
+              }
+              const ni = buf.ni;
+              buf.idx[ni] = nv; buf.idx[ni + 1] = nv + 1; buf.idx[ni + 2] = nv + 2; buf.idx[ni + 3] = nv; buf.idx[ni + 4] = nv + 2; buf.idx[ni + 5] = nv + 3;
+              buf.nv += 4; buf.ni += 6;
+            }
+          }
+          if (y < loY) loY = y; if (y > hiY) hiY = y;
         } else if (shape === SHAPE_CROSS) {
           const buf = bufs[1];
           const ecol = (x + 5) * 26 + z + 5;
@@ -458,9 +577,21 @@ export class ChunkWorld {
     const z0 = Math.floor(z - hw), z1 = Math.floor(z + hw);
     for (let bx = x0; bx <= x1; bx++) for (let bz = z0; bz <= z1; bz++) for (let by = y0; by <= y1; by++) {
       const id = this.getBlock(bx, by, bz);
-      if (id > 0 && B_SOLID[id]) return true;
+      if (id > 0 && B_SOLID[id] && y < by + B_HEIGHT[id]) return true;    // lage blokken (bed) zijn minder hoog
     }
     return false;
+  }
+
+  // de bovenkant van het hoogste blok waar deze doos tegenaan zit (om netjes op te landen)
+  boxTop(x, y, z, hw, h) {
+    const x0 = Math.floor(x - hw), x1 = Math.floor(x + hw), y0 = Math.floor(y), y1 = Math.floor(y + h - 0.001);
+    const z0 = Math.floor(z - hw), z1 = Math.floor(z + hw);
+    let top = -1e9;
+    for (let bx = x0; bx <= x1; bx++) for (let bz = z0; bz <= z1; bz++) for (let by = y0; by <= y1; by++) {
+      const id = this.getBlock(bx, by, bz);
+      if (id > 0 && B_SOLID[id] && y < by + B_HEIGHT[id] && by + B_HEIGHT[id] > top) top = by + B_HEIGHT[id];
+    }
+    return top;
   }
 
   // Loop langs een straal en geef het eerste blok dat je kunt aanraken.

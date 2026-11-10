@@ -247,7 +247,7 @@ export class Player {
     const w = this.g.world, ny = this.pos.y + d;
     if (!w.boxHits(this.pos.x, ny - below, this.pos.z, hw, hh)) { this.pos.y = ny; this.onGround = false; return; }
     if (d < 0) {
-      const sy = Math.floor(ny - below) + 1 + below;
+      const sy = w.boxTop(this.pos.x, ny - below, this.pos.z, hw, hh) + below;
       if (sy <= this.pos.y + 0.0001 && !w.boxHits(this.pos.x, sy - below, this.pos.z, hw, hh)) this.pos.y = sy;
       this.onGround = true;
     } else {
@@ -450,7 +450,7 @@ export class Player {
       const def = BLOCKS[id];
       if (def.solid && this.pos.x + HW > x && this.pos.x - HW < x + 1 && this.pos.z + HW > z && this.pos.z - HW < z + 1 && this.pos.y + HH > y && this.pos.y < y + 1) return;
       if (def.support && !g.world.solid(x, y - 1, z)) { g.ui.toast('Dit moet op de grond staan.'); return; }
-      g.world.setBlock(x, y, z, id);
+      if (id !== B.bed) g.world.setBlock(x, y, z, id);      // een bed is twee blokken: de server zet het neer
       g.sound.play('place', 1, def.snd);
     }
     this.swing = 0.25;

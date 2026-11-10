@@ -14,7 +14,7 @@ const SONGS = {
 const CHORDS_MAJ = [[0, 4, 7], [7, 11, 14], [9, 12, 16], [5, 9, 12]];
 const CHORDS_MIN = [[0, 3, 7], [8, 12, 15], [3, 7, 10], [10, 14, 17]];
 const PENTA_MAJ = [0, 2, 4, 7, 9], PENTA_MIN = [0, 3, 5, 7, 10];
-const MUSIC_VOL = 0.7;      // de muziek blijft op de achtergrond, onder de geluidseffecten
+const MUSIC_VOL = 0.8;      // de muziek blijft op de achtergrond, onder de geluidseffecten
 
 export class Sound {
   constructor() {
@@ -25,6 +25,8 @@ export class Sound {
     this.amb = null;
     this.ambT = 0;
     this.kicked = false;
+    this.sfxOn = true;
+    this.notes = 0;          // hoeveel muzieknoten er zijn ingepland (voor de controle in het pauzemenu)
     this.mus = { world: '', next: 0, step: 0, phrase: null, idx: 5, on: true };
   }
 
@@ -42,18 +44,29 @@ export class Sound {
       this.noiseBuf = c.createBuffer(1, len, len);
       const d = this.noiseBuf.getChannelData(0);
       for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+      // geluidseffecten hebben een eigen knop, zodat je ze los van de muziek uit kunt zetten
+      this.sfxGain = c.createGain(); this.sfxGain.gain.value = this.sfxOn ? 1 : 0; this.sfxGain.connect(this.master);
       // wind die altijd zachtjes waait
       const src = c.createBufferSource(); src.buffer = this.noiseBuf; src.loop = true;
       const f = c.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 380;
       const g = c.createGain(); g.gain.value = 0.0;
-      src.connect(f); f.connect(g); g.connect(this.master); src.start();
+      src.connect(f); f.connect(g); g.connect(this.sfxGain); src.start();
       this.amb = { f, g };
-      // muziek: eigen volumeknop en een zachte echo
-      this.musicGain = c.createGain(); this.musicGain.gain.value = MUSIC_VOL; this.musicGain.connect(this.master);
-      this.echo = c.createDelay(1); this.echo.delayTime.value = 0.34;
-      const fb = c.createGain(); fb.gain.value = 0.3;
-      const wet = c.createGain(); wet.gain.value = 0.35;
-      this.echo.connect(fb); fb.connect(this.echo); this.echo.connect(wet); wet.connect(this.musicGain);
+      // muziek: eigen volumeknop, een meter (voor de controle) en een zachte echo
+      this.musicGain = c.createGain(); this.musicGain.gain.value = this.musicOn ? MUSIC_VOL : 0; this.musicGain.connect(this.master);
+      this.mus.on = this.musicOn;
+      try {
+        this.meter = c.createAnalyser(); this.meter.fftSize = 1024; this.musicGain.connect(this.meter);
+        this.meterBuf = new Uint8Array(this.meter.fftSize);
+      } catch (e) { this.meter = null; }
+      this.echo = this.musicGain;
+      try {
+        const echo = c.createDelay(1); echo.delayTime.value = 0.34;
+        const fb = c.createGain(); fb.gain.value = 0.3;
+        const wet = c.createGain(); wet.gain.value = 0.35;
+        echo.connect(fb); fb.connect(echo); echo.connect(wet); wet.connect(this.musicGain);
+        this.echo = echo;
+      } catch (e) { /* dan maar zonder echo */ }
     }
     const c = this.ctx;
     if (c.state !== 'running') {
@@ -71,6 +84,28 @@ export class Sound {
 
   setVolume(v) { this.vol = v; if (this.master) this.master.gain.value = v; }
 
+  // geluidseffecten aan of uit (de muziek heeft zijn eigen knop)
+  setSfx(on) {
+    this.sfxOn = !!on;
+    if (this.sfxGain) this.sfxGain.gain.setTargetAtTime(this.sfxOn ? 1 : 0, this.ctx.currentTime, 0.05);
+  }
+
+  // Hoe gaat het met het geluid? Voor de regel in het pauzemenu (handig als het ergens stil blijft).
+  diag() {
+    if (!this.ctx) return null;
+    this.measure();
+    return { state: this.ctx.state, rate: this.ctx.sampleRate, notes: this.notes, level: this.level || 0 };
+  }
+
+  // hoe sterk is het muzieksignaal op dit moment? (de hoogste waarde van de laatste paar seconden)
+  measure() {
+    if (!this.meter) return;
+    let peak = 0;
+    this.meter.getByteTimeDomainData(this.meterBuf);
+    for (let i = 0; i < this.meterBuf.length; i++) { const v = Math.abs(this.meterBuf[i] - 128) / 128; if (v > peak) peak = v; }
+    this.level = Math.max(peak, (this.level || 0) * 0.96);
+  }
+
   // stil worden (bijv. in het hoofdmenu)
   quiet() { if (this.ctx && this.amb) this.amb.g.gain.setTargetAtTime(0, this.ctx.currentTime, 0.3); }
 
@@ -83,7 +118,7 @@ export class Sound {
     g.gain.setValueAtTime(0.0001, t);
     g.gain.linearRampToValueAtTime(vol, t + attack);
     g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    o.connect(g); g.connect(this.master);
+    o.connect(g); g.connect(this.sfxGain);
     o.start(t); o.stop(t + dur + 0.02);
   }
 
@@ -96,13 +131,13 @@ export class Sound {
     const g = c.createGain();
     g.gain.setValueAtTime(vol, t);
     g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    s.connect(f); f.connect(g); g.connect(this.master);
+    s.connect(f); f.connect(g); g.connect(this.sfxGain);
     s.start(t, Math.random() * 0.5); s.stop(t + dur + 0.02);
   }
 
   // v = hoe hard (0..1), bijvoorbeeld zachter als het ver weg is
   play(name, v = 1, mat = 'stone') {
-    if (!this.ctx || v <= 0.02) return;
+    if (!this.ctx || !this.sfxOn || v <= 0.02) return;
     const r = 0.92 + Math.random() * 0.16;
     switch (name) {
       case 'step':
@@ -165,7 +200,7 @@ export class Sound {
     lfo.frequency.value = 26; lg.gain.value = vol * 0.6;
     g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(vol, t + 0.06); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
     lfo.connect(lg); lg.connect(g.gain);
-    o.connect(f); f.connect(g); g.connect(this.master);
+    o.connect(f); f.connect(g); g.connect(this.sfxGain);
     o.start(t); lfo.start(t); o.stop(t + dur + 0.05); lfo.stop(t + dur + 0.05);
   }
 
@@ -175,10 +210,10 @@ export class Sound {
     const w = env.world;
     const a = this.amb;
     const windVol = env.under ? 0.01 : (w === 'ijs' ? 0.09 : w === 'wolken' ? 0.08 : w === 'vuur' ? 0.05 : 0.035) * (0.6 + 0.4 * Math.sin(this.ctx.currentTime * 0.3));
-    a.g.gain.setTargetAtTime(windVol + (env.flying ? 0.08 : 0), this.ctx.currentTime, 0.5);
+    a.g.gain.setTargetAtTime(this.sfxOn ? windVol + (env.flying ? 0.08 : 0) : 0, this.ctx.currentTime, 0.5);
     a.f.frequency.setTargetAtTime(env.flying ? 900 : (w === 'ijs' ? 600 : 380), this.ctx.currentTime, 0.5);
     this.ambT -= dt;
-    if (this.ambT <= 0) {
+    if (this.ambT <= 0 && this.sfxOn) {
       this.ambT = 2 + Math.random() * 5;
       if (env.under) { this.tone(1300 + Math.random() * 600, 0.08, 'sine', 0.05, 700); }
       else if (w === 'groen' || w === 'wolken') { if (env.day > 0.5) this.play('chirp', 0.5); else { for (let i = 0; i < 4; i++) this.tone(4200, 0.03, 'sine', 0.025, 0, i * 0.07); } }
@@ -195,11 +230,11 @@ export class Sound {
     o.type = type; o.frequency.setValueAtTime(freq, when);
     g.gain.setValueAtTime(0.0001, when);
     g.gain.linearRampToValueAtTime(vol, when + attack);
-    g.gain.setValueAtTime(vol, when + Math.max(attack, dur * 0.55));
     g.gain.exponentialRampToValueAtTime(0.0001, when + dur);
     o.connect(g); g.connect(this.musicGain);
-    if (echo) g.connect(this.echo);
+    if (echo && this.echo !== this.musicGain) g.connect(this.echo);
     o.start(when); o.stop(when + dur + 0.05);
+    this.notes++;
   }
 
   // een nieuw melodietje van vier maten (32 achtste noten); -1 = rust
@@ -239,6 +274,7 @@ export class Sound {
   // Zet steeds een klein stukje muziek vooruit klaar. Wordt een paar keer per seconde aangeroepen.
   music(env) {
     const c = this.ctx, m = this.mus, now = c.currentTime;
+    this.measure();
     if (m.on !== this.musicOn) { m.on = this.musicOn; this.musicGain.gain.setTargetAtTime(m.on ? MUSIC_VOL : 0, now, 0.15); }
     if (!this.musicOn) { m.next = 0; return; }
     const song = SONGS[env.world] || SONGS.groen;
@@ -252,17 +288,19 @@ export class Sound {
       const t = m.next, st = m.step % 8, bar = Math.floor(m.step / 8) % 4, chord = chords[bar];
       if (!m.phrase) m.phrase = this.makePhrase(song.minor);
       if (st === 0) {
-        this.note(hz(chord[0] - 12), t, stepDur * 7.6, 'triangle', 0.11 * v, 0.03, false);                 // bas
-        for (const n of chord) this.note(hz(n), t, stepDur * 8.2, 'sine', 0.03 * v, 0.5, false);           // akkoord
+        this.note(hz(chord[0] - 12), t, stepDur * 7.6, 'triangle', 0.1 * v, 0.03, false);                  // bas
+        this.note(hz(chord[0]), t, stepDur * 7.6, 'sine', 0.05 * v, 0.03, false);                           // dezelfde toon hoger: kleine speakers geven lage tonen slecht weer
+        for (const n of chord) this.note(hz(n + 12), t, stepDur * 8.2, 'triangle', 0.035 * v, 0.4, false);  // akkoord
       } else if (st === 4) {
-        this.note(hz(chord[0] - 12), t, stepDur * 3.6, 'triangle', 0.075 * v, 0.03, false);
+        this.note(hz(chord[0] - 12), t, stepDur * 3.6, 'triangle', 0.07 * v, 0.03, false);
+        this.note(hz(chord[0]), t, stepDur * 3.6, 'sine', 0.035 * v, 0.03, false);
       } else if (st === 6) {
         this.note(hz(chord[2] - 12), t, stepDur * 1.8, 'triangle', 0.05 * v, 0.03, false);
       }
       const n = m.phrase[m.step % 32];
       if (n >= 0 && !env.under) {
         const rest = m.phrase[(m.step + 1) % 32] < 0;
-        this.note(hz(n), t, stepDur * (rest ? 1.9 : 1.05), song.lead, 0.085 * v, 0.012, true);              // melodie
+        this.note(hz(n), t, stepDur * (rest ? 1.9 : 1.05), song.lead, 0.13 * v, 0.012, true);               // melodie
       }
       m.step++;
       if (m.step % 64 === 0) m.phrase = null;              // na twee keer spelen: een nieuw melodietje

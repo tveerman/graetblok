@@ -184,8 +184,10 @@ export class Entities {
     let best = null, bt = maxD;
     for (const e of this.map.values()) {
       if (e.id === this.ridden) continue;
-      const hw = e.w / 2 + 0.12;
-      const t = rayBox(ox, oy, oz, dx, dy, dz, e.x - hw, e.y - 0.05, e.z - hw, e.x + hw, e.y + e.h + 0.1, e.z + hw);
+      // je eigen dieren en draken zijn wat ruimer aan te tikken
+      const m = e.owner ? 0.4 : 0.12;
+      const hw = e.w / 2 + m;
+      const t = rayBox(ox, oy, oz, dx, dy, dz, e.x - hw, e.y - 0.05 - (e.owner ? 0.2 : 0), e.z - hw, e.x + hw, e.y + e.h + 0.1 + (e.owner ? 0.3 : 0), e.z + hw);
       if (t !== null && t < bt) { bt = t; best = e; }
     }
     return best ? { e: best, t: bt } : null;
