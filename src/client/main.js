@@ -14,6 +14,7 @@ import { Input } from './input.js';
 import { Player } from './player.js';
 import { UI } from './ui.js';
 import { connect } from './net.js';
+import { setupOffline } from './offline.js';
 
 const $ = (id) => document.getElementById(id);
 const DEFAULTS = { view: 5, volume: 0.8, sens: 1, music: true, autoJump: true, dynRes: true };
@@ -61,6 +62,7 @@ class Game {
     for (const ev of ['touchend', 'mousedown', 'keydown']) window.addEventListener(ev, () => this.sound.unlock(), { passive: true });
 
     this.buildMenu();
+    setupOffline(this);
     requestAnimationFrame((t) => this.frame(t));
   }
 

@@ -23,6 +23,42 @@ module workers).
 
 `sprites.html` shows every generated sprite and icon on one page — fun to look at together.
 
+## Playing while the server is off
+
+The game has no real backend (its "server" runs inside the browser and saves live on the
+device), so once the files are on the iPad it can start without the machine that served them.
+`sw.js` is a service worker that makes this work:
+
+- On the first visit it stores all game files on the device. From then on every load is
+  answered from that copy, so a reload works even when the server is unreachable.
+- Each time the page loads it quietly asks the server whether anything changed. If so it
+  downloads a complete new set and switches to it on the next load — on the main menu the page
+  reloads itself straight away; during play a small message appears and the new version
+  starts next time. Old and new files are never mixed.
+- The main menu shows the state at the bottom: "Zonder server spelen: klaar ✔" means the
+  copy is complete.
+
+**Browsers only allow a service worker over `https://` (or on `localhost`).** Opened as
+`http://192.168.x.x:8123` the game still works, but the menu says
+"Zonder server spelen: uit (kan alleen via https)". Ways to get there:
+
+- put the folder on any static host with HTTPS (it is only static files), or
+- serve HTTPS from the VM with a certificate the iPad trusts — for example a local CA made
+  with `mkcert` whose root certificate is installed and trusted on the iPad, or a tunnel/VPN
+  product that hands out real certificates.
+
+Practical notes for the iPad:
+
+- Keep the address the same. Saved worlds and the offline copy belong to one exact address
+  (scheme, host and port); a different IP looks like a different, empty game.
+- Use "Add to Home Screen" **before** starting a world, and open the game once from that icon
+  while the server is up. Safari may clear data of sites that have not been visited for a
+  while; Home Screen apps are treated more kindly, but they keep their own separate storage.
+- When you add a file to the game, also add it to the `PRECACHE` list at the top of `sw.js`.
+  (Files that are missing from the list are still stored the first time they are loaded.)
+- Add `?nosw` (or `?debug`) to the address to switch the service worker off and always load
+  straight from the server — useful while changing code.
+
 ## Controls
 
 | | Touch (iPad) | Keyboard + mouse |
@@ -68,6 +104,7 @@ real multiplayer.
 
 ```
 index.html, css/          the page and HUD styling
+sw.js                     service worker: offline copy of the game (see above)
 vendor/                   three.js (unmodified)
 src/shared/               game data used by both sides: blocks, items, recipes, creatures, worlds
 src/server/               the game server: world generation, block edits, inventory, crafting,
