@@ -6,13 +6,15 @@ export function connect(onMessage) {
   return new Promise((resolve) => {
     let settled = false;
     const api = { send: null, mode: '' };
+    // ?save=naam in het adres: een aparte wereld om dingen in uit te proberen
+    const save = (new URLSearchParams(location.search).get('save') || '').replace(/[^a-z0-9]/gi, '').slice(0, 20);
 
     const startLocal = async () => {
       if (settled) return;
       settled = true;
       console.warn('Web Worker werkt niet; de server draait nu in de pagina zelf.');
       const [{ GameServer }, { openStorage }] = await Promise.all([import('../server/server.js'), import('../server/storage.js')]);
-      const storage = await openStorage('graet-blok');
+      const storage = await openStorage('graet-blok' + (save ? '-' + save : ''));
       const server = new GameServer(storage);
       await server.init();
       const conn = { send: (m) => setTimeout(() => onMessage(m), 0), onmessage: null };
@@ -23,7 +25,7 @@ export function connect(onMessage) {
     };
 
     try {
-      const worker = new Worker(new URL('../server/worker.js', import.meta.url), { type: 'module' });
+      const worker = new Worker(new URL('../server/worker.js' + (save ? '?save=' + save : ''), import.meta.url), { type: 'module' });
       const timer = setTimeout(() => { if (!settled) { worker.terminate(); startLocal(); } }, 12000);
       worker.onerror = (e) => {
         if (!settled) { clearTimeout(timer); worker.terminate(); startLocal(); }

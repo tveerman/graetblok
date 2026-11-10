@@ -253,4 +253,7 @@ game.net.send({ t: 'debug', c: 'god', v: 1 })              // cannot be hurt
 game.net.send({ t: 'debug', c: 'grow' })                   // all your dragons become adults
 ```
 
+Add `&save=test` (any short name) to play in a separate world that does not touch the real
+one: `index.html?debug&save=test`.
+
 Block and item ids are in `src/shared/blocks.js` and `src/shared/items.js`.

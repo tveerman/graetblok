@@ -18,7 +18,10 @@ self.onmessage = (ev) => {
 };
 
 (async () => {
-  const storage = await openStorage('graet-blok');
+  // Met ?save=naam in het adres van het spel speel je in een aparte, losse wereld (handig om
+  // iets uit te proberen zonder je echte wereld te veranderen).
+  const save = (new URLSearchParams(self.location.search).get('save') || '').replace(/[^a-z0-9]/gi, '').slice(0, 20);
+  const storage = await openStorage('graet-blok' + (save ? '-' + save : ''));
   const s = new GameServer(storage);
   await s.init();
   s.connect(conn);
