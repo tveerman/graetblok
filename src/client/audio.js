@@ -16,6 +16,29 @@ const CHORDS_MIN = [[0, 3, 7], [8, 12, 15], [3, 7, 10], [10, 14, 17]];
 const PENTA_MAJ = [0, 2, 4, 7, 9], PENTA_MIN = [0, 3, 5, 7, 10];
 const MUSIC_VOL = 0.8;      // de muziek blijft op de achtergrond, onder de geluidseffecten
 
+// iPad en iPhone: Web Audio (waar al ons geluid mee wordt gemaakt) telt daar als "belgeluid".
+// Staat het apparaat op stil (het belletje in het Bedieningspaneel, of het schuifje op de
+// zijkant van oudere iPads), dan loopt alles gewoon door maar hoor je niets. Een gewone
+// <audio>-speler telt wel als "afspelen". Daarom laten we zo'n speler onhoorbare stilte
+// herhalen: dan zet iOS al het geluid van de pagina op het afspeel-kanaal en klinkt het
+// spel ook in de stille stand. (Nieuwere versies van iOS kennen navigator.audioSession,
+// waar je dat gewoon aan kunt vragen.)
+const UA = typeof navigator !== 'undefined' ? navigator.userAgent || '' : '';
+const IS_IOS = /iP(hone|ad|od)/.test(UA) || (/Macintosh/.test(UA) && typeof navigator !== 'undefined' && navigator.maxTouchPoints > 1);
+
+// een kwart seconde stilte als WAV-bestandje (44,1 kHz, 16 bits) in een data-adres
+function silentWav() {
+  const rate = 44100, n = rate >> 2, bytes = new Uint8Array(44 + n * 2), v = new DataView(bytes.buffer);
+  const str = (o, t) => { for (let i = 0; i < t.length; i++) bytes[o + i] = t.charCodeAt(i); };
+  str(0, 'RIFF'); v.setUint32(4, 36 + n * 2, true); str(8, 'WAVEfmt ');
+  v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+  v.setUint32(24, rate, true); v.setUint32(28, rate * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true);
+  str(36, 'data'); v.setUint32(40, n * 2, true);
+  let bin = '';
+  for (let i = 0; i < bytes.length; i += 8192) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 8192));
+  return 'data:audio/wav;base64,' + btoa(bin);
+}
+
 export class Sound {
   constructor() {
     this.ctx = null;
@@ -28,13 +51,43 @@ export class Sound {
     this.sfxOn = true;
     this.notes = 0;          // hoeveel muzieknoten er zijn ingepland (voor de controle in het pauzemenu)
     this.mus = { world: '', next: 0, step: 0, phrase: null, idx: 5, on: true };
+    this.tag = null;         // de stille <audio>-speler voor iPad en iPhone (zie bovenaan)
+    this.channelMode = '';   // hoe we het geluid op het afspeel-kanaal hebben gezet (voor het pauzemenu)
   }
+
+  // Zet het geluid op het afspeel-kanaal, zodat de stille stand van iPad of iPhone het niet dempt.
+  // Moet binnen een tik worden aangeroepen.
+  channel() {
+    try {
+      const as = navigator.audioSession;
+      if (as) { if (as.type !== 'playback') as.type = 'playback'; this.channelMode = 'sessie'; }
+    } catch (e) { /* bestaat hier niet */ }
+    if (!IS_IOS) return;
+    try {
+      if (!this.tag) {
+        const a = this.tag = document.createElement('audio');
+        a.setAttribute('x-webkit-airplay', 'deny');
+        a.setAttribute('playsinline', '');
+        a.controls = false; a.disableRemotePlayback = true; a.preload = 'auto'; a.loop = true;
+        a.src = silentWav();
+        a.load();
+      }
+      if (this.tag.paused && !document.hidden) {
+        const pr = this.tag.play();
+        if (pr && pr.then) pr.then(() => { this.channelMode = 'speler'; }, () => {});
+      }
+    } catch (e) { /* dan blijft het zoals het was */ }
+  }
+
+  // het spel verdwijnt naar de achtergrond: de stille speler hoeft dan niet door te lopen
+  sleep() { try { if (this.tag && !this.tag.paused) this.tag.pause(); } catch (e) { /* geeft niet */ } }
 
   // Moet na een tik of toets worden aangeroepen: browsers laten pas daarna geluid toe.
   // We proberen het bij elke tik opnieuw tot het geluid echt loopt (nodig op iPad en in Safari).
   unlock() {
     const AC = window.AudioContext || window.webkitAudioContext;
     if (!AC) return;
+    this.channel();
     if (!this.ctx) {
       const c = this.ctx = new AC();
       this.master = c.createGain();
@@ -94,7 +147,7 @@ export class Sound {
   diag() {
     if (!this.ctx) return null;
     this.measure();
-    return { state: this.ctx.state, rate: this.ctx.sampleRate, notes: this.notes, level: this.level || 0 };
+    return { state: this.ctx.state, rate: this.ctx.sampleRate, notes: this.notes, level: this.level || 0, ios: IS_IOS, channel: this.channelMode };
   }
 
   // hoe sterk is het muzieksignaal op dit moment? (de hoogste waarde van de laatste paar seconden)
@@ -179,6 +232,11 @@ export class Sound {
       case 'oer': this.tone(220, 0.5, 'sawtooth', 0.12 * v, 880); this.tone(440, 0.5, 'sine', 0.14 * v, 1760); break;
       case 'vuurbal': case 'breath': this.noise(0.4, 'lowpass', 350, 0.3 * v, 1500); this.tone(110, 0.3, 'sawtooth', 0.08 * v, 60); break;
       case 'boom': this.noise(0.35, 'lowpass', 900, 0.3 * v, 90); this.tone(80, 0.25, 'sine', 0.25 * v, 40); break;
+      case 'fuse': this.noise(1.2, 'highpass', 5200, 0.07 * v, 7000); break;
+      case 'explode':
+        this.noise(0.9, 'lowpass', 1400, 0.5 * v, 60); this.noise(0.25, 'highpass', 1800, 0.22 * v);
+        this.tone(70, 0.6, 'sine', 0.45 * v, 28); this.tone(46, 0.9, 'triangle', 0.3 * v, 24, 0.05);
+        break;
       case 'portal': [220, 277, 330, 440].forEach((f, i) => this.tone(f, 1.4, 'sine', 0.09 * v, f * 2, i * 0.08, 0.3)); this.noise(1.2, 'bandpass', 600, 0.1 * v, 3000, 0, 3); break;
       case 'splash': this.noise(0.3, 'bandpass', 1300, 0.22 * v, 500, 0, 0.8); break;
       case 'chest': this.tone(110, 0.25, 'sawtooth', 0.08 * v, 170); this.tone(1320, 0.3, 'sine', 0.12 * v, 0, 0.2); this.tone(1760, 0.4, 'sine', 0.1 * v, 0, 0.3); break;

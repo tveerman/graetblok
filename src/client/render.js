@@ -10,6 +10,7 @@ uniform float time;
 varying vec2 vUv;
 varying vec3 vLight;
 varying float vDepth;
+varying float vGlow;
 void main() {
   vUv = uv;
   vLight = light.xyz;
@@ -17,6 +18,13 @@ void main() {
   #ifdef WAVES
     vec4 wp = modelMatrix * vec4(p, 1.0);
     p.y += light.w * (sin(time * 1.6 + wp.x * 1.3 + wp.z * 0.9) * 0.05 - 0.03);
+    vGlow = 0.0;
+  #else
+    // light.w = gloed (0..60) + 64 voor plantjes + 128 voor bewegen in de wind
+    float w = light.w * 255.0 + 0.5;
+    w -= step(128.0, w) * 128.0;
+    w -= step(64.0, w) * 64.0;
+    vGlow = floor(w) / 60.0;
   #endif
   vec4 mv = modelViewMatrix * vec4(p, 1.0);
   vDepth = -mv.z;
@@ -35,6 +43,7 @@ uniform float time;
 varying vec2 vUv;
 varying vec3 vLight;
 varying float vDepth;
+varying float vGlow;
 void main() {
   vec4 c = texture2D(map, vUv);
   #ifdef CUTOUT
@@ -42,12 +51,150 @@ void main() {
   #endif
   vec3 l = max(skyLight * vLight.x, blockLight * vLight.y);
   l = max(l, vec3(minLight * vLight.z));
+  l = max(l, vec3(vGlow));                 // fluorescerende blokken lichten zelf op, in hun eigen kleur
   vec3 col = c.rgb * l;
   float f = clamp((vDepth - fogNear) / (fogFar - fogNear), 0.0, 1.0);
   f = f * f;
   col = mix(col, fogColor, f);
   #ifdef WAVES
     gl_FragColor = vec4(col, mix(c.a, 1.0, f));
+  #else
+    gl_FragColor = vec4(col, 1.0);
+  #endif
+  #include <colorspace_fragment>
+}`;
+
+// ---------- de mooie weergave (instelling "Mooie graphics") ----------
+// Zelfde blokken, maar het licht wordt per pixel uitgerekend: zonlicht dat over het reliëf
+// van de plaatjes strijkt, glans op water, ijs, metaal en edelstenen, gloed per pixel,
+// blaadjes en gras die bewegen in de wind, golvend water dat de lucht weerspiegelt,
+// en zachtere, vollere kleuren.
+const HQ_VERT = `
+attribute vec4 light;
+uniform float time;
+varying vec2 vUv;
+varying vec3 vLight;
+varying float vDepth;
+varying float vGlow;
+varying float vPlant;
+varying vec3 vRel;
+void main() {
+  vUv = uv;
+  vLight = light.xyz;
+  vec3 p = position;
+  vec4 wp = modelMatrix * vec4(p, 1.0);
+  #ifdef WAVES
+    p.y += light.w * (sin(time * 1.6 + wp.x * 1.3 + wp.z * 0.9) * 0.05 - 0.03);
+    vGlow = 0.0;
+    vPlant = 0.0;
+  #else
+    float w = light.w * 255.0 + 0.5;
+    float sway = step(128.0, w);
+    w -= sway * 128.0;
+    vPlant = step(64.0, w);
+    w -= vPlant * 64.0;
+    vGlow = floor(w) / 60.0;
+    // wind: alles wat kan bewegen wiegt mee, afhankelijk van de plek (zodat buren aansluiten)
+    float ph = time * 1.4 + wp.x * 0.7 + wp.z * 0.9 + wp.y * 0.4;
+    float amp = sway * (0.035 + 0.035 * vPlant);
+    p.x += amp * (sin(ph) + 0.5 * sin(ph * 2.3 + 1.7));
+    p.z += amp * cos(ph * 0.9 + 0.6);
+  #endif
+  vec4 wp2 = modelMatrix * vec4(p, 1.0);
+  vRel = wp2.xyz - cameraPosition;
+  vec4 mv = viewMatrix * wp2;
+  vDepth = -mv.z;
+  gl_Position = projectionMatrix * mv;
+}`;
+
+const HQ_FRAG = `
+uniform sampler2D map;
+uniform sampler2D nmap;
+uniform vec3 skyLight;
+uniform vec3 blockLight;
+uniform float minLight;
+uniform vec3 fogColor;
+uniform float fogNear;
+uniform float fogFar;
+uniform float time;
+uniform vec3 sunDir;
+uniform vec3 sunCol;
+uniform vec3 skyTop;
+varying vec2 vUv;
+varying vec3 vLight;
+varying float vDepth;
+varying float vGlow;
+varying float vPlant;
+varying vec3 vRel;
+void main() {
+  vec4 c = texture2D(map, vUv);
+  #ifdef CUTOUT
+    if (c.a < 0.4) discard;
+  #endif
+  vec4 nm = texture2D(nmap, vUv);
+  vec3 V = normalize(-vRel);
+  // de kant waar het vlak naartoe kijkt, uitgerekend uit de vorm zelf
+  vec3 dpx = dFdx(vRel), dpy = dFdy(vRel);
+  vec3 N = normalize(cross(dpx, dpy));
+  // reliëf uit het plaatje, gedraaid naar de stand van het vlak
+  vec2 dux = dFdx(vUv), duy = dFdy(vUv);
+  vec3 q2 = cross(dpy, N), q1 = cross(N, dpx);
+  vec3 T = q2 * dux.x + q1 * duy.x;
+  vec3 B = q2 * dux.y + q1 * duy.y;
+  float inv = inversesqrt(max(max(dot(T, T), dot(B, B)), 1e-12));
+  vec2 nxy = nm.xy * 2.0 - 1.0;
+  vec3 n = normalize(T * (nxy.x * inv) + B * (nxy.y * inv) + N * sqrt(max(1.0 - dot(nxy, nxy), 0.05)));
+  float sky = vLight.x;
+  float open = smoothstep(0.25, 0.85, sky);              // ligt dit in de open lucht? (anders geen zon)
+  #ifdef WAVES
+    float water = step(0.95, nm.a);
+    float up = step(0.5, N.y) * water;
+    // rimpelingen op het water
+    vec2 wxz = vRel.xz + cameraPosition.xz;
+    vec2 rip = vec2(
+      sin(wxz.x * 1.7 + time * 1.5) + 0.6 * sin(wxz.x * 3.9 - wxz.y * 2.3 + time * 2.1) + 0.3 * sin(wxz.y * 7.3 + time * 3.3),
+      sin(wxz.y * 1.9 - time * 1.2) + 0.6 * sin(wxz.y * 4.3 + wxz.x * 2.7 - time * 1.8) + 0.3 * sin(wxz.x * 6.7 - time * 2.9));
+    n = normalize(mix(n, vec3(rip.x * 0.11, 1.0, rip.y * 0.11), up));
+    vec3 l = skyLight * sky * 0.85 + sunCol * (max(dot(n, sunDir), 0.0) * open * 0.4) + blockLight * vLight.y;
+    l = max(l, vec3(minLight * vLight.z));
+    vec3 col = c.rgb * l;
+    // weerspiegeling van de lucht, sterker naarmate je schuiner over het water kijkt
+    float fres = 0.04 + 0.96 * pow(1.0 - max(dot(V, n), 0.0), 4.0);
+    vec3 R = reflect(-V, n);
+    vec3 refl = mix(fogColor, skyTop, clamp(R.y * 1.6, 0.0, 1.0)) * (0.35 + 0.65 * open);
+    col = mix(col, refl, fres * water * 0.85);
+    float glint = pow(max(dot(R, sunDir), 0.0), 220.0);
+    col += sunCol * (glint * 2.5 * open * water);
+    float alpha = mix(c.a, 1.0, clamp(fres * water * 0.9 + glint, 0.0, 1.0));
+    // glas en portalen: een beetje glans
+    col += sunCol * ((1.0 - water) * nm.b * open * 0.5 * pow(max(dot(n, normalize(sunDir + V)), 0.0), 40.0));
+    col = max(col, c.rgb * ((1.0 - water) * nm.a));
+  #else
+    n = normalize(mix(n, vec3(0.0, 1.0, 0.0), vPlant * 0.8));
+    float ndl = max(dot(n, sunDir), 0.0);
+    // licht van de hemel (van boven meer dan van opzij), zon of maan, en fakkels
+    vec3 l = skyLight * (sky * (0.5 + 0.16 * n.y + 0.13 * dot(n, sunDir))) + sunCol * (ndl * open) + blockLight * (vLight.y * (0.72 + 0.28 * max(dot(n, N), 0.0)));
+    l = max(l, vec3(minLight * vLight.z * (0.75 + 0.25 * n.y)));
+    vec3 col = c.rgb * l;
+    // glans
+    vec3 Hv = normalize(sunDir + V);
+    col += sunCol * (nm.b * open * pow(max(dot(n, Hv), 0.0), 36.0) * 0.9);
+    col += blockLight * (nm.b * vLight.y * 0.35 * pow(max(dot(n, V), 0.0), 12.0));
+    // gloed: blokken met een eigen gloed gebruiken het plaatje als masker; anders gloeit alleen wat het plaatje aangeeft
+    float glow = max(vGlow * (0.3 + 0.7 * nm.a), nm.a * (1.0 - step(0.001, vGlow)));
+    col = max(col, c.rgb * (glow * 1.25));
+  #endif
+  float f = clamp((vDepth - fogNear) / (fogFar - fogNear), 0.0, 1.0);
+  f = f * f;
+  // mist kleurt mee met de zon als je ertegenin kijkt
+  vec3 fc = fogColor + sunCol * (0.35 * pow(max(dot(-V, sunDir), 0.0), 8.0));
+  col = mix(col, fc, f);
+  // zachte overgang naar wit in plaats van hard afkappen, en iets vollere kleuren
+  col = 1.0 - exp(-col * 1.25);
+  float g = dot(col, vec3(0.299, 0.587, 0.114));
+  col = max(mix(vec3(g), col, 1.1), 0.0);
+  #ifdef WAVES
+    gl_FragColor = vec4(col, mix(alpha, 1.0, f));
   #else
     gl_FragColor = vec4(col, 1.0);
   #endif
@@ -66,6 +213,8 @@ uniform vec3 hor;
 uniform vec3 glow;
 uniform vec3 sunDir;
 uniform float glowAmt;
+uniform float hq;
+uniform vec3 sunCol;
 varying vec3 vDir;
 void main() {
   vec3 d = normalize(vDir);
@@ -73,6 +222,9 @@ void main() {
   vec3 c = mix(hor, top, pow(t, 0.55));
   float s = max(dot(d, sunDir), 0.0);
   c += glow * (pow(s, 5.0) * glowAmt);
+  // mooie weergave: nevel aan de horizon en een zachte krans om de zon of de maan
+  c = mix(c, hor * 1.08 + 0.03, hq * 0.55 * pow(1.0 - t, 9.0));
+  c += sunCol * (hq * (0.22 * pow(s, 24.0) + 0.5 * pow(s, 300.0)));
   gl_FragColor = vec4(c, 1.0);
   #include <colorspace_fragment>
 }`;
@@ -104,11 +256,21 @@ export class Renderer {
       time: { value: 0 },
     };
     const mk = (defines, extra) => new THREE.ShaderMaterial(Object.assign({ uniforms: this.U, vertexShader: CHUNK_VERT, fragmentShader: CHUNK_FRAG, defines }, extra));
-    this.chunkMats = [
+    this.stdMats = [
       mk({}, {}),
       mk({ CUTOUT: 1 }, { side: THREE.DoubleSide }),
       mk({ WAVES: 1 }, { transparent: true, depthWrite: false, side: THREE.DoubleSide }),
     ];
+    this.chunkMats = this.stdMats;
+    // de mooie weergave krijgt zijn eigen materialen en plaatjes (pas gemaakt als je hem aanzet)
+    this.hq = false;
+    this.touch = touch;
+    this.stdTex = atlasTex;
+    this.UH = Object.assign({}, this.U, {
+      map: { value: atlasTex }, nmap: { value: null },
+      sunDir: { value: new THREE.Vector3(0, 1, 0) }, sunCol: { value: new THREE.Color(1, 1, 1) }, skyTop: { value: new THREE.Color(0.3, 0.5, 0.9) },
+    });
+    this.hqMats = null;
 
     // licht voor wezens
     this.hemi = new THREE.HemisphereLight(0xffffff, 0x554433, 2);
@@ -116,7 +278,7 @@ export class Renderer {
     this.scene.add(this.hemi, this.sun, this.sun.target);
 
     // luchtkoepel
-    this.skyU = { top: { value: new THREE.Color() }, hor: { value: new THREE.Color() }, glow: { value: new THREE.Color(1, 0.6, 0.3) }, sunDir: { value: new THREE.Vector3(0, 1, 0) }, glowAmt: { value: 0 } };
+    this.skyU = { top: { value: new THREE.Color() }, hor: { value: new THREE.Color() }, glow: { value: new THREE.Color(1, 0.6, 0.3) }, sunDir: { value: new THREE.Vector3(0, 1, 0) }, glowAmt: { value: 0 }, hq: { value: 0 }, sunCol: this.UH.sunCol };
     this.dome = new THREE.Mesh(new THREE.SphereGeometry(100, 20, 12), new THREE.ShaderMaterial({ uniforms: this.skyU, vertexShader: SKY_VERT, fragmentShader: SKY_FRAG, side: THREE.BackSide, depthWrite: false, depthTest: false, fog: false }));
     this.dome.renderOrder = -100; this.dome.frustumCulled = false;
     this.scene.add(this.dome);
@@ -167,6 +329,32 @@ export class Renderer {
     this.r.setSize(w, h, false);
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
+  }
+
+  // Mooie weergave aan of uit. atlas = { tex, nrm } van buildAtlasHQ. Geeft de materialen terug
+  // waarmee de chunks getekend moeten worden.
+  setHQ(on, atlas) {
+    this.hq = !!on && !!atlas;
+    if (this.hq) {
+      this.UH.map.value = atlas.tex; this.UH.nmap.value = atlas.nrm;
+      const aniso = Math.min(4, this.r.capabilities.getMaxAnisotropy());
+      atlas.tex.anisotropy = aniso; atlas.nrm.anisotropy = aniso;
+      if (!this.hqMats) {
+        const mk = (defines, extra) => new THREE.ShaderMaterial(Object.assign({ uniforms: this.UH, vertexShader: HQ_VERT, fragmentShader: HQ_FRAG, defines, extensions: { derivatives: true } }, extra));
+        this.hqMats = [
+          mk({}, {}),
+          mk({ CUTOUT: 1 }, { side: THREE.DoubleSide }),
+          mk({ WAVES: 1 }, { transparent: true, depthWrite: false, side: THREE.DoubleSide }),
+        ];
+      }
+    }
+    this.chunkMats = this.hq ? this.hqMats : this.stdMats;
+    this.skyU.hq.value = this.hq ? 1 : 0;
+    // scherper beeld in de mooie weergave (het spel schaalt vanzelf terug als het te zwaar wordt)
+    this.basePR = Math.min(window.devicePixelRatio || 1, this.hq ? (this.touch ? 1.5 : 2) : (this.touch ? 1 : 1.5));
+    this.r.setPixelRatio(this.basePR * this.scale);
+    this.r.setSize(window.innerWidth, window.innerHeight, false);
+    return this.chunkMats;
   }
 
   setScale(s) {
@@ -229,6 +417,28 @@ export class Renderer {
     if (id_vuur(this.world)) sl.setRGB(nl * 1.25, nl * 0.8, nl * 0.62);
     if (this.world === 'schaduw') sl.setRGB(nl * 0.85, nl * 0.7, nl * 1.2);
     this.U.minLight.value = def.minLight + (env.nightEyes ? 0.1 : 0);
+
+    // mooie weergave: van welke kant komt het licht, en welke kleur heeft het?
+    if (this.hq) {
+      const sd = this.UH.sunDir.value, sc = this.UH.sunCol.value;
+      if (!def.cycle) {
+        // werelden zonder dag en nacht: een vaste, zwakke gloed
+        if (this.world === 'vuur') { sd.set(0.35, 0.55, 0.45).normalize(); sc.setRGB(0.5, 0.2, 0.08); }
+        else { sd.set(-0.3, 0.8, 0.4).normalize(); sc.setRGB(0.16, 0.1, 0.3); }
+      } else if (el > -0.06) {
+        // de zon: warm wit overdag, oranje bij zonsopkomst en zonsondergang
+        const k = smoothstep(-0.06, 0.12, el);
+        sd.copy(this.sunDir); if (sd.y < 0.06) { sd.y = 0.06; sd.normalize(); }
+        sc.setRGB(0.95, 0.9 - dusk * 0.3, 0.8 - dusk * 0.5).multiplyScalar(0.62 * k);
+      } else {
+        // de maan: koel en zwak
+        const k = smoothstep(0.06, 0.3, -el);
+        sd.copy(this.sunDir).multiplyScalar(-1); if (sd.y < 0.06) { sd.y = 0.06; sd.normalize(); }
+        sc.setRGB(0.16, 0.2, 0.32).multiplyScalar(k * (env.nightEyes ? 1.5 : 1));
+      }
+      if (env.water) sc.multiplyScalar(0.5);
+      this.UH.skyTop.value.copy(this.skyU.top.value);
+    }
 
     // licht op wezens
     const amb = Math.max(sl.r, sl.g, sl.b);

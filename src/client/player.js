@@ -145,7 +145,8 @@ export class Player {
       this.fallPeak = this.pos.y;
     } else {
       this.vel.y -= 27 * dt;
-      if (inp.jump && this.onGround) { this.vel.y = g.trees.wolken ? 10.6 : 8.6; this.onGround = false; }
+      // springlaarzen in je rugzak: je springt twee blokken hoog
+      if (inp.jump && this.onGround) { this.vel.y = (g.trees.wolken ? 10.6 : 8.6) + (g.boots ? (g.trees.wolken ? 1.4 : 2) : 0); this.onGround = false; }
       if (this.vel.y < -48) this.vel.y = -48;
     }
 
@@ -306,6 +307,17 @@ export class Player {
       }
       cam.position.set(this.pos.x + bx * d, oy + by * d, this.pos.z + bz * d);
     }
+    // trillen na een ontploffing
+    if (this.shake > 0) {
+      const k = this.shake * 0.45;
+      cam.position.x += (Math.random() - 0.5) * k; cam.position.y += (Math.random() - 0.5) * k; cam.position.z += (Math.random() - 0.5) * k;
+      this.shake -= dt * 1.2;
+    }
+    // verrekijker: zolang je hem vasthoudt en hebt aangetikt, kijk je ver weg
+    const held = ITEMS[this.heldItem()];
+    if (this.zoom && !(held && held.zoom)) this.zoom = false;
+    const fov = this.zoom ? 16 : 72;
+    if (Math.abs(cam.fov - fov) > 0.05) { cam.fov += (fov - cam.fov) * Math.min(1, dt * 10); cam.updateProjectionMatrix(); }
     cam.rotation.set(this.pitch, this.yaw, 0);
     cam.updateMatrixWorld();
     const eb = w.getBlock(Math.floor(cam.position.x), Math.floor(cam.position.y), Math.floor(cam.position.z));
@@ -429,6 +441,7 @@ export class Player {
       return;
     }
     if (it && it.ranged) { this.shoot(tgt.dir); return; }
+    if (it && it.zoom) { this.zoom = !this.zoom; g.sound.play('click'); return; }      // verrekijker: dichtbij halen
     const b = tgt.blk;
     if (b) {
       const def = BLOCKS[b.id];

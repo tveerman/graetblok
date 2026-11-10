@@ -2,7 +2,7 @@
 // Alles hangt af van het zaadje (seed), dus dezelfde plek ziet er altijd hetzelfde uit.
 import { CS, CH, CHUNK_VOL, SEA, idx, clamp, lerp, smoothstep } from '../shared/constants.js';
 import { Simplex, hash2, hash3, mulberry32 } from '../shared/noise.js';
-import { B, LIFE_LEAVES } from '../shared/blocks.js';
+import { B, LIFE_LEAVES, LIFE_VINES, LIFE_FRUIT, ZWAMMEN, ZWAMHOEDEN } from '../shared/blocks.js';
 import { WORLDS, CRASH, NEST_PEAK } from '../shared/worlds.js';
 
 const M = 4;                 // rand om de chunk heen (voor bomen die over de grens hangen)
@@ -88,7 +88,7 @@ export class WorldGen {
       const ring = 36 * Math.exp(-Math.pow((dt - 54) / 12, 2)) * gate;
       const hv = T.y + ring + hills * 2 * smoothstep(30, 45, dt);
       h = lerp(hv, h, smoothstep(66, 90, dt));
-      if (dt < 42) { c.nc = 1; if (dt < 22) special = 1; }
+      if (dt < 42) { c.nc = 1; if (dt < 37) special = 1; }      // geen gewone bomen onder de kruin van de levensboom
     }
 
     c.h = h;
@@ -118,7 +118,7 @@ export class WorldGen {
     let special = 0;
     const dt = Math.hypot(x - T.x, z - T.z);
     if (dt < 70) {
-      const hb = dt < 13 ? T.y : lerp(T.y, SEA - 4, smoothstep(13, 19, dt));
+      const hb = dt < 22 ? T.y : lerp(T.y, SEA - 4, smoothstep(22, 29, dt));
       h = lerp(hb, h, smoothstep(44, 70, dt));
       if (dt < 46) { c.nc = 1; special = 1; }
     }
@@ -196,7 +196,7 @@ export class WorldGen {
     const dt = Math.hypot(x - T.x, z - T.z);
     if (dt < 50) {
       h = lerp(T.y, h, smoothstep(24, 46, dt));
-      if (dt < 30) { c.nc = 1; special = 1; }
+      if (dt < 38) { c.nc = 1; special = 1; }
     }
     c.h = h;
     c.base = B.schaduwsteen;
@@ -288,6 +288,7 @@ export class WorldGen {
       }
       this.carve(blocks, ox, oz);
       this.ores(blocks, cx, cz);
+      this.moreOres(blocks, cx, cz);
     }
 
     // bomen (ook die net buiten de chunk staan)
@@ -342,6 +343,11 @@ export class WorldGen {
           for (let y = bot; y <= top; y++) blocks[p + y] = y === top ? B.hemelgras : B.hemelsteen;
           // hemelkristal in de hoge eilanden
           if (top - bot > 4 && hash2(x, z, this.seed + 41) < 0.03) blocks[p + bot + 1 + Math.floor(hash2(x, z, this.seed + 42) * (top - bot - 2))] = B.hemelkristal_erts;
+          const hz = hash2(x, z, this.seed + 45);
+          if (top - bot > 4 && hz < 0.014) {
+            const q = p + bot + 1 + Math.floor(hash2(x, z, this.seed + 46) * (top - bot - 2));
+            if (blocks[q] === B.hemelsteen) blocks[q] = hz < 0.004 ? B.saffier_erts : B.zilver_erts;
+          }
         }
         if (h > 0 && h - LY[i] > 5 && hash2(x, z, this.seed + 43) < 0.02) blocks[p + LY[i] + 1 + Math.floor(hash2(x, z, this.seed + 44) * (h - LY[i] - 3))] = B.hemelkristal_erts;
         // wolken
@@ -407,6 +413,59 @@ export class WorldGen {
         }
       }
     }
+  }
+
+  // Later toegevoegd: koper, zilver, edelstenen, zwavel, marmer en graniet. Ze hebben hun eigen
+  // toevalsgetallen en vervangen alleen gewoon gesteente, zodat alles wat er al was (ook in
+  // werelden die al bestaan) precies op zijn plek blijft.
+  moreOres(blocks, cx, cz) {
+    const w = this.world;
+    const stone = w === 'vuur' ? B.basalt : w === 'schaduw' ? B.schaduwsteen : B.steen;
+    if (w === 'groen' || w === 'ijs') {
+      // grote klompen marmer en graniet; ook klompen uit de buur-chunks steken hier naar binnen
+      const ox = cx * 16, oz = cz * 16;
+      for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) {
+        const r = mulberry32((hash2(cx + dx, cz + dz, this.seed + 771) * 4294967296) >>> 0);
+        for (let n = 0; n < 2; n++) {
+          const has = r() < 0.32;
+          const bx = (cx + dx) * 16 + r() * 16, bz = (cz + dz) * 16 + r() * 16, by = n === 0 ? 26 + r() * 44 : 6 + r() * 34;
+          const rx = 3.5 + r() * 4.5, ry = 2.5 + r() * 2.5, rz = 3.5 + r() * 4.5;
+          if (!has) continue;
+          const id = n === 0 ? B.marmer : B.graniet;
+          const x0 = Math.max(0, Math.floor(bx - rx - ox)), x1 = Math.min(15, Math.ceil(bx + rx - ox));
+          const z0 = Math.max(0, Math.floor(bz - rz - oz)), z1 = Math.min(15, Math.ceil(bz + rz - oz));
+          const y0 = Math.max(1, Math.floor(by - ry)), y1 = Math.min(CH - 1, Math.ceil(by + ry));
+          for (let x = x0; x <= x1; x++) for (let z = z0; z <= z1; z++) for (let y = y0; y <= y1; y++) {
+            const ex = (ox + x - bx) / rx, ey = (y - by) / ry, ez = (oz + z - bz) / rz;
+            if (ex * ex + ey * ey + ez * ez > 1 - hash3(ox + x, y, oz + z, this.seed + 772) * 0.3) continue;
+            const p = idx(x, y, z);
+            if (blocks[p] === stone) blocks[p] = id;
+          }
+        }
+      }
+    }
+    const rnd = mulberry32((hash2(cx, cz, this.seed + 779) * 4294967296) >>> 0);
+    const vein = (id, count, y0, y1, size) => {
+      for (let n = 0; n < count; n++) {
+        let x = Math.floor(rnd() * 16), z = Math.floor(rnd() * 16), y = Math.floor(y0 + rnd() * (y1 - y0));
+        for (let s = 0; s < size; s++) {
+          if (x >= 0 && x < 16 && z >= 0 && z < 16 && y > 0 && y < CH) {
+            const p = idx(x, y, z);
+            if (blocks[p] === stone) blocks[p] = id;
+          }
+          const d = Math.floor(rnd() * 6);
+          if (d === 0) x++; else if (d === 1) x--; else if (d === 2) z++; else if (d === 3) z--; else if (d === 4) y++; else y--;
+        }
+      }
+    };
+    const vuur = w === 'vuur', ijs = w === 'ijs', schaduw = w === 'schaduw';
+    vein(B.koper_erts, vuur ? 9 : 7, 12, 78, 6);
+    vein(B.zilver_erts, ijs ? 7 : schaduw ? 5 : 3, 5, 46, 5);
+    vein(B.amethist_erts, schaduw ? 6 : 2, 5, 40, 4);
+    vein(B.zwavel_erts, vuur ? 9 : 1, vuur ? 6 : 3, vuur ? 80 : 20, 6);
+    vein(B.robijn_erts, vuur ? 3 : 1, 3, vuur ? 42 : 22, 3);
+    vein(B.saffier_erts, ijs ? 3 : 1, 3, ijs ? 42 : 22, 3);
+    vein(B.smaragd_erts, 1, 3, 26, 3);
   }
 
   ores(blocks, cx, cz) {
@@ -561,7 +620,7 @@ export class WorldGen {
     const w = this.world, T = this.tree;
     const near = (x, z, r) => x + r >= ox && x - r <= ox + 15 && z + r >= oz && z - r <= oz + 15;
 
-    if (near(T.x, T.z, 20)) this.lifeTree(put, soft, ox, oz);
+    if (near(T.x, T.z, 40)) this.lifeTree(put, soft, ox, oz);
 
     if (w === 'groen') {
       if (near(CRASH.x, CRASH.z, 18)) this.crashSite(put, ox, oz);
@@ -666,54 +725,204 @@ export class WorldGen {
     for (const [dx, dz] of junk) { put(cx + dx, CRASH.y + 1, cz + dz, B.scheepswand); if ((dx + dz) & 1) put(cx + dx, CRASH.y + 2, cz + dz, B.scheepswand); }
   }
 
+  // Hoe hoog ligt de grond bij de levensboom? (-1 als daar water, lava of niets is)
+  treeGround(x, z) {
+    const c = this.col(x, z);
+    if (this.world === 'wolken') { const isl = this.islandB(x, z); return isl ? isl[0] : (c.h > 2 ? c.h : -1); }
+    if (c.liq && c.ly > c.h) return -1;
+    return c.h;
+  }
+
+  // Het plan van de levensboom: waar de wortels, takken, bladerwolken en reuzenzwammen komen.
+  // Eén keer uitgerekend met het zaadje, zodat elke chunk precies dezelfde boom ziet.
+  treePlan() {
+    if (this._plan) return this._plan;
+    const T = this.tree, w = this.world;
+    const rnd = mulberry32((this.seed * 31 + 977) >>> 0);
+    const TH = w === 'wolken' ? 27 : 34;
+    // welke kleuren zwammen er bij deze boom groeien (0 blauw, 1 roze, 2 groen, 3 oranje, 4 paars)
+    const pal = { groen: [0, 1, 2, 4, 0, 3], ijs: [0, 4, 0, 1], vuur: [3, 1, 3, 4], schaduw: [4, 1, 0, 4, 2], wolken: [3, 1, 0, 2] }[w];
+    const P = { TH, pal, roots: [], limbs: [], clusters: [], shrooms: [] };
+    // wortels: grote vinnen rondom. Aan de kant van het hart (+z) blijft het vrij.
+    // Wortel 3 (aan de achterkant) is precies 6 hoog: daar begint de trap van zwammen.
+    for (let k = 0; k < 7; k++) {
+      const a = Math.PI / 2 + (k + 0.5) / 7 * Math.PI * 2 + (rnd() - 0.5) * 0.16;
+      P.roots.push({ a, len: 11 + rnd() * 6, h: k === 3 ? 6 : 3.5 + rnd() * 2.5, wob: rnd() * 6.28 });
+    }
+    // takken: lopen naar buiten en omhoog en buigen aan het eind weer wat naar beneden
+    const NL = 8;
+    for (let k = 0; k < NL; k++) {
+      const a = k / NL * Math.PI * 2 + 0.2 + rnd() * 0.45;
+      const y0 = Math.round(TH * (0.52 + 0.36 * (((k * 3) % NL) / (NL - 1))));
+      const len = 12 + rnd() * 8, rise = 2 + rnd() * 7, bend = (rnd() - 0.5) * 0.7;
+      const pts = [];
+      for (let s = 0; s <= len; s += 0.5) {
+        const f = s / len, ang = a + bend * f;
+        pts.push([T.x + Math.cos(ang) * (2 + s), T.y + y0 + rise * Math.sin(f * 2.2), T.z + Math.sin(ang) * (2 + s), f < 0.55 ? 1 : 0]);
+      }
+      P.limbs.push(pts);
+      const end = pts[pts.length - 1], mid = pts[Math.floor(pts.length * 0.55)];
+      P.clusters.push({ x: end[0], y: end[1] + 1, z: end[2], rx: 6 + rnd() * 2.5, ry: 4 + rnd() * 1.5 });
+      P.clusters.push({ x: mid[0], y: mid[1] + 2, z: mid[2], rx: 4.5 + rnd() * 2, ry: 3.2 + rnd() });
+    }
+    // de kroon
+    P.clusters.push({ x: T.x, y: T.y + TH + 1, z: T.z, rx: 10, ry: 6.5 });
+    for (let k = 0; k < 5; k++) {
+      const a = k * 1.257 + rnd(), r = 7 + rnd() * 4;
+      P.clusters.push({ x: T.x + Math.cos(a) * r, y: T.y + TH - 3 + rnd() * 4, z: T.z + Math.sin(a) * r, rx: 6 + rnd() * 2, ry: 4 + rnd() });
+    }
+    // reuzenzwammen rondom (niet voor het hart: daar wordt met de bewaker gevochten)
+    for (let k = 0; k < 16; k++) {
+      for (let tries = 0; tries < 24; tries++) {
+        const a = rnd() * 6.283, r = 10 + rnd() * 22;
+        const x = Math.round(T.x + Math.cos(a) * r), z = Math.round(T.z + Math.sin(a) * r);
+        if (Math.abs(x - T.x) < 8 && z > T.z) continue;
+        if (P.shrooms.some((q) => Math.hypot(q.x - x, q.z - z) < 8)) continue;
+        P.shrooms.push({ x, z, h: 3 + Math.floor(rnd() * 7), r: 2 + Math.floor(rnd() * 3), c: pal[k % pal.length] });
+        break;
+      }
+    }
+    this._plan = P;
+    return P;
+  }
+
+  // De levensboom: een reusachtige boom met brede wortels, lange takken, bladerwolken waar
+  // lichtranken en lichtvruchten uit hangen, lichtgevend mos en zwammen in felle kleuren.
   lifeTree(put, soft, ox, oz) {
+    const P = this.treePlan(), TH = P.TH, seed = this.seed;
     const T = this.tree, w = this.world;
     const tx = T.x, ty = T.y, tz = T.z;
-    const leaf = LIFE_LEAVES[w];
-    const TH = w === 'wolken' ? 25 : 30;
-    const x0 = Math.max(tx - 17, ox), x1 = Math.min(tx + 17, ox + 15);
-    const z0 = Math.max(tz - 17, oz), z1 = Math.min(tz + 17, oz + 15);
-    // kruin
-    const cy = ty + TH - 2;
-    for (let x = x0; x <= x1; x++) for (let z = z0; z <= z1; z++) {
-      const dx = x - tx, dz = z - tz;
-      const hd = (dx * dx + dz * dz) / 225;
-      if (hd > 1.15) continue;
-      for (let dy = -7; dy <= 9; dy++) {
-        const v = hd + (dy * dy) / (dy > 0 ? 64 : 36);
-        const j = hash3(x, cy + dy, z, this.seed + 3) * 0.3;
-        if (v <= 0.85 + j && v > 0.12) soft(x, cy + dy, z, leaf);
+    const leaf = LIFE_LEAVES[w], vine = LIFE_VINES[w], fruit = LIFE_FRUIT[w];
+    const rT = (dy) => 2.6 + (1 - dy / TH) * 1.6 + 3.2 * Math.exp(-Math.max(0, dy) / 3.5);    // dikte van de stam
+
+    // 1. de grond: gloeimos, kleine zwammen en lichtbloemen
+    for (let x = ox; x <= ox + 15; x++) for (let z = oz; z <= oz + 15; z++) {
+      const d = Math.hypot(x - tx, z - tz);
+      if (d > 38) continue;
+      const g = this.treeGround(x, z);
+      if (g < 0 || Math.abs(g - ty) > 7) continue;
+      if (d < 10 || this.n9.n2(x / 7, z / 7) > lerp(-0.35, 0.8, d / 38)) put(x, g, z, B.gloeimos);
+      const p = d < 14 ? 0.085 : lerp(0.07, 0.01, (d - 14) / 24);
+      if (d > 3 && hash2(x, z, seed + 911) < p) {
+        const pick = Math.floor(hash2(x, z, seed + 912) * 100);
+        soft(x, g + 1, z, pick < 22 ? B.lichtbloem : ZWAMMEN[P.pal[pick % P.pal.length]]);
       }
     }
-    // takken
-    for (let b = 0; b < 7; b++) {
-      const ang = b * 0.9 + 0.3, len = 9 + (b % 3) * 2;
-      const by = ty + 14 + (b * 5) % 9;
-      for (let s = 0; s <= len; s++) {
-        const x = Math.round(tx + Math.cos(ang) * (2 + s)), z = Math.round(tz + Math.sin(ang) * (2 + s));
-        const y = by + Math.round(s * 0.6);
-        put(x, y, z, B.levenshout); put(x, y + 1, z, B.levenshout);
+
+    // 2. wortels
+    for (const R of P.roots) {
+      for (let s = 0; s <= R.len; s += 0.5) {
+        const f = s / R.len;
+        const ang = R.a + 0.22 * Math.sin(s * 0.4 + R.wob) * f;
+        const xi = Math.round(tx + Math.cos(ang) * (3 + s)), zi = Math.round(tz + Math.sin(ang) * (3 + s));
+        if (xi < ox - 2 || xi > ox + 16 || zi < oz - 2 || zi > oz + 16) continue;
+        const top = ty + Math.round(R.h * Math.pow(1 - f, 1.6));
+        const th = f < 0.45 ? 1 : 0;
+        for (let ax = 0; ax <= th; ax++) for (let az = 0; az <= th; az++) {
+          const X = xi + ax, Z = zi + az;
+          if (Math.abs(X - tx) <= 2 && Z > tz) continue;              // vrije doorgang naar het hart
+          for (let y = ty - 2; y <= top; y++) put(X, y, Z, B.levenshout);
+        }
       }
     }
-    // stam met brede wortels
-    for (let y = ty - 3; y <= ty + TH; y++) {
-      const t = (y - ty) / TH;
-      const r = 2.2 + (1 - t) + 2.6 * Math.exp(-Math.max(0, y - ty) / 3);
-      const ri = Math.ceil(r);
-      for (let dx = -ri; dx <= ri; dx++) for (let dz = -ri; dz <= ri; dz++) {
-        if (dx * dx + dz * dz <= r * r) put(tx + dx, y, tz + dz, B.levenshout);
+
+    // 3. een wenteltrap van zwammen om de stam, vanaf de hoge wortel aan de achterkant
+    //    tot een rondgang bij de onderste takken
+    const y1 = ty + Math.round(TH * 0.52);
+    let sa = P.roots[3].a + 0.4;
+    for (let k = 0, y = ty + 7; k < 60; k++, sa += 0.55) {
+      const rr = rT(y - ty) + 1.2;
+      const cx = tx + Math.cos(sa) * rr, cz = tz + Math.sin(sa) * rr;
+      if (cx > ox - 4 && cx < ox + 20 && cz > oz - 4 && cz < oz + 20) {
+        const id = ZWAMHOEDEN[P.pal[k % P.pal.length]];
+        const xi = Math.round(cx), zi = Math.round(cz);
+        for (let dx = -3; dx <= 3; dx++) for (let dz = -3; dz <= 3; dz++) {
+          if (Math.hypot(xi + dx - cx, zi + dz - cz) <= 2.2) put(xi + dx, y, zi + dz, id);
+        }
+      }
+      if (y < y1) y++;
+      else if (k > (y1 - ty - 7) + 12) break;                        // boven: nog één rondje op dezelfde hoogte
+    }
+
+    // 4. takken
+    for (const pts of P.limbs) for (const q of pts) {
+      const xi = Math.round(q[0]), yi = Math.round(q[1]), zi = Math.round(q[2]);
+      if (xi < ox - 2 || xi > ox + 16 || zi < oz - 2 || zi > oz + 16) continue;
+      for (let ax = 0; ax <= q[3]; ax++) for (let az = 0; az <= q[3]; az++) { put(xi + ax, yi, zi + az, B.levenshout); put(xi + ax, yi + 1, zi + az, B.levenshout); }
+    }
+
+    // 5. bladerwolken, en daarna de lichtranken en lichtvruchten die eronder hangen
+    for (let pass = 0; pass < 2; pass++) {
+      P.clusters.forEach((C, ci) => {
+        const x0 = Math.max(ox, Math.ceil(C.x - C.rx - 1)), x1 = Math.min(ox + 15, Math.floor(C.x + C.rx + 1));
+        const z0 = Math.max(oz, Math.ceil(C.z - C.rx - 1)), z1 = Math.min(oz + 15, Math.floor(C.z + C.rx + 1));
+        const ryd = C.ry * 0.72, cy = Math.round(C.y);              // de onderkant is platter dan de bovenkant
+        for (let x = x0; x <= x1; x++) for (let z = z0; z <= z1; z++) {
+          const dx = x - C.x, dz = z - C.z, hd = (dx * dx + dz * dz) / (C.rx * C.rx);
+          if (hd > 1.2) continue;
+          if (pass === 0) {
+            for (let dy = -Math.ceil(ryd) - 1; dy <= Math.ceil(C.ry) + 1; dy++) {
+              const v = hd + (dy * dy) / (dy > 0 ? C.ry * C.ry : ryd * ryd);
+              if (v <= 0.8 + hash3(x, cy + dy, z, seed + 3) * 0.3) soft(x, cy + dy, z, leaf);
+            }
+          } else if (hd < 0.9 && hash2(x, z, seed + 920 + ci) < 0.075) {
+            const bottom = Math.floor(C.y - ryd * Math.sqrt(1 - hd));
+            const hl = hash2(x, z, seed + 940 + ci);
+            const end = Math.max(ty + 4, bottom - 3 - Math.floor(hl * hl * 13));
+            for (let y = bottom + 1; y > end; y--) soft(x, y, z, vine);
+            soft(x, end, z, hash2(x, z, seed + 960 + ci) < 0.3 ? fruit : vine);
+          }
+        }
+      });
+    }
+
+    // 6. de stam: dik onderaan, met ribbels, en naar boven toe een beetje kronkelend
+    for (let y = ty - 3; y <= ty + TH + 2; y++) {
+      const dy = y - ty, r = rT(dy), ri = Math.ceil(r + 0.5);
+      const sw = smoothstep(8, TH, dy) * 1.3;
+      const cx = tx + Math.sin(dy * 0.21) * sw, cz = tz + Math.cos(dy * 0.17) * sw;
+      for (let dx = -ri - 2; dx <= ri + 2; dx++) for (let dz = -ri - 2; dz <= ri + 2; dz++) {
+        const X = tx + dx, Z = tz + dz;
+        if (X < ox || X > ox + 15 || Z < oz || Z > oz + 15) continue;
+        const ex = X - cx, ez = Z - cz;
+        const rib = 0.45 * Math.sin(Math.atan2(ez, ex) * 6 + dy * 0.25);
+        if (ex * ex + ez * ez <= (r + rib) * (r + rib)) put(X, y, Z, B.levenshout);
       }
     }
-    // het levenshart, aan de zuidkant (+z)
+
+    // 7. het levenshart in een nis aan de zuidkant (+z)
     put(tx, ty + 2, tz + 4, B.levenshart);
-    for (let dy = 1; dy <= 3; dy++) for (let dx = -1; dx <= 1; dx++) { put(tx + dx, ty + dy, tz + 5, 0); put(tx + dx, ty + dy, tz + 6, 0); }
     put(tx - 1, ty + 2, tz + 4, B.gloeikristal); put(tx + 1, ty + 2, tz + 4, B.gloeikristal);
-    // kring van kristallen
+    for (let dy = 1; dy <= 3; dy++) for (let dx = -1; dx <= 1; dx++) for (let dz = 5; dz <= 9; dz++) put(tx + dx, ty + dy, tz + dz, 0);
+
+    // 8. kring van zuilen met een kristal erop
+    const deco = w === 'ijs' ? B.ijs : w === 'vuur' ? B.magmasteen : w === 'schaduw' ? B.schaduwsteen : w === 'wolken' ? B.hemelsteen : B.steenblok;
     for (let k = 0; k < 8; k++) {
-      const x = Math.round(tx + Math.cos(k * Math.PI / 4) * 11), z = Math.round(tz + Math.sin(k * Math.PI / 4) * 11);
-      const deco = w === 'ijs' ? B.ijs : w === 'vuur' ? B.magmasteen : w === 'schaduw' ? B.schaduwsteen : w === 'wolken' ? B.hemelsteen : B.steenblok;
-      put(x, ty + 1, z, deco); put(x, ty + 2, z, deco); put(x, ty + 3, z, B.gloeikristal);
+      const x = Math.round(tx + Math.cos((k + 0.5) * Math.PI / 4) * 19), z = Math.round(tz + Math.sin((k + 0.5) * Math.PI / 4) * 19);
+      if (x < ox || x > ox + 15 || z < oz || z > oz + 15) continue;
+      const g = this.treeGround(x, z);
+      if (g < 0) continue;
+      put(x, g + 1, z, deco); put(x, g + 2, z, deco); put(x, g + 3, z, B.gloeikristal);
     }
+
+    // 9. reuzenzwammen
+    for (const S of P.shrooms) {
+      if (S.x + 5 < ox || S.x - 5 > ox + 15 || S.z + 5 < oz || S.z - 5 > oz + 15) continue;
+      const g = this.treeGround(S.x, S.z);
+      if (g < 0 || Math.abs(g - ty) > 6) continue;
+      const cap = ZWAMHOEDEN[S.c], top = g + S.h;
+      for (let y = g + 1; y <= top; y++) put(S.x, y, S.z, B.zwamsteel);
+      const disc = (y, r, rin) => {
+        for (let dx = -5; dx <= 5; dx++) for (let dz = -5; dz <= 5; dz++) {
+          const d = Math.hypot(dx, dz);
+          if (d <= r && d > rin) put(S.x + dx, y, S.z + dz, cap);
+        }
+      };
+      if (S.r === 2) { disc(top + 1, 2.3, -1); disc(top + 2, 1.5, -1); }
+      else if (S.r === 3) { disc(top, 3.4, 2.4); disc(top + 1, 3.4, -1); disc(top + 2, 2.3, -1); }
+      else { disc(top, 4.4, 3.4); disc(top + 1, 4.4, -1); disc(top + 2, 3.3, -1); disc(top + 3, 1.8, -1); }
+    }
+
     if (w === 'groen') {
       // geheime kluis diep onder de boom
       for (let dx = -2; dx <= 2; dx++) for (let dz = -2; dz <= 2; dz++) for (let y = 2; y <= 6; y++) {

@@ -36,7 +36,7 @@ export const WORLDS = {
     sky: { dayTop: 0x06030d, dayHor: 0x2a1445, nightTop: 0x06030d, nightHor: 0x2a1445, duskHor: 0x2a1445 },
     minLight: 0.13, nightLight: 0.3,
     water: 0x241a4a,
-    tree: { key: 'schaduw', name: 'De Schaduwboom', x: 160, z: 200, y: 32, guardian: 'schaduwheer', beam: 0xb46bff },
+    tree: { key: 'schaduw', name: 'De Schaduwboom', x: 160, z: 200, y: 38, guardian: 'schaduwheer', beam: 0xb46bff },
     power: 'Nachtogen: je ziet beter in het donker.',
   },
   wolken: {

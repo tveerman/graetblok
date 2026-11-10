@@ -2,11 +2,12 @@
 import * as THREE from '../../vendor/three.module.min.js';
 import { HOTBAR, INV_SIZE, clamp } from '../shared/constants.js';
 import { B, BLOCKS } from '../shared/blocks.js';
+import { ITEMS } from '../shared/items.js';
 import { WORLDS } from '../shared/worlds.js';
 import { dragonStage } from '../shared/mobs.js';
-import { buildAtlas, setIconAtlas } from './textures.js';
+import { buildAtlas, buildAtlasHQ, setIconAtlas } from './textures.js';
 import { Renderer } from './render.js';
-import { ChunkWorld, setTreeTiles } from './chunks.js';
+import { ChunkWorld, setTreeTiles, setMeshHQ } from './chunks.js';
 import { Particles } from './particles.js';
 import { Entities } from './entities.js';
 import { Sound } from './audio.js';
@@ -17,7 +18,7 @@ import { connect } from './net.js';
 import { setupOffline } from './offline.js';
 
 const $ = (id) => document.getElementById(id);
-const DEFAULTS = { view: 5, volume: 0.8, sens: 1, music: true, sfx: true, autoJump: true, dynRes: true };
+const DEFAULTS = { view: 5, volume: 0.8, sens: 1, music: true, sfx: true, autoJump: true, dynRes: true, hq: false };
 
 class Game {
   constructor() {
@@ -59,6 +60,7 @@ class Game {
 
     document.addEventListener('visibilitychange', () => {
       if (!document.hidden) { this.sound.unlock(); return; }      // terug bij het spel: geluid weer wakker maken
+      this.sound.sleep();
       if (!this.net) return;
       // de tablet wordt weggelegd of er wordt naar een andere app gegaan: pauzeren en opslaan
       if (this.state === 'play' && !this.ui.modalOpen() && !this.noAutoPause) this.ui.openPause();
@@ -68,6 +70,17 @@ class Game {
     window.addEventListener('pagehide', () => { if (this.net) this.net.send({ t: 'save' }); });
     // geluid mag pas na een tik of toets; in de "capture"-fase zodat geen enkele knop dit tegenhoudt
     for (const ev of ['touchend', 'click', 'mousedown', 'pointerup', 'keydown']) document.addEventListener(ev, () => this.sound.unlock(), { passive: true, capture: true });
+
+    // knop voor volledig scherm: het pictogram wisselt, en het beeld past zich aan
+    const onFull = () => {
+      const on = !!(document.fullscreenElement || document.webkitFullscreenElement);
+      const icon = $('fullIcon');
+      if (icon) icon.setAttribute('d', on ? 'M9 4v5H4M15 4v5h5M20 15h-5v5M4 15h5v5' : 'M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5');
+      setTimeout(() => this.R.resize(), 60);
+    };
+    document.addEventListener('fullscreenchange', onFull);
+    document.addEventListener('webkitfullscreenchange', onFull);
+    if (!(document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen)) $('btnFull').style.display = 'none';
 
     this.buildMenu();
     setupOffline(this);
@@ -117,7 +130,14 @@ class Game {
     if (!d) return 'Geluid: nog niet gestart (tik ergens op het scherm)';
     const run = d.state === 'running' ? 'aan' : 'staat stil (' + d.state + ')';
     const mus = !this.settings.music ? 'uit' : d.notes + ' noten gespeeld, sterkte ' + Math.round(d.level * 100) + '%';
-    return 'Geluid: ' + run + ' · muziek: ' + mus + ' · effecten: ' + (this.settings.sfx ? 'aan' : 'uit');
+    return 'Geluid: ' + run + ' · muziek: ' + mus + ' · effecten: ' + (this.settings.sfx ? 'aan' : 'uit') + (d.ios ? ' · stille stand omzeild: ' + (d.channel ? 'ja' : 'nee') : '');
+  }
+
+  // Tip voor als het stil blijft (alleen op iPad en iPhone, daar ligt het bijna altijd aan de stille stand).
+  audioTip() {
+    const d = this.sound.diag();
+    if (!d || !d.ios) return '';
+    return 'Hoor je niets? Zet het geluid van de iPad harder met de knoppen op de zijkant en kijk in het Bedieningspaneel of het belletje (stille stand) uit staat.';
   }
 
   // Staat er een venster open (rugzak, opdrachten, pauze...)? Dan staat het spel stil.
@@ -167,10 +187,43 @@ class Game {
     this.input.sens = S.sens;
     this.player.autoJump = S.autoJump;
     if (!S.dynRes) this.R.setScale(1);
+    this.setHQ(!!S.hq);
     if (!first) {
       try { localStorage.setItem('graetblok.settings', JSON.stringify(S)); } catch (e) { /* */ }
       if (this.net && this.sentView !== S.view) { this.sentView = S.view; this.net.send({ t: 'view', r: S.view }); }
     }
+  }
+
+  // De mooie weergave ("Mooie graphics" in het pauzemenu): plaatjes met twee keer zoveel detail,
+  // reliëf, glans en gloed, en licht dat per pixel wordt uitgerekend. De plaatjes worden pas
+  // gemaakt als je het aanzet; dat duurt een paar tellen en gebeurt op de achtergrond.
+  async setHQ(on) {
+    if (on === !!this.hqOn || this.hqBusy) return;
+    if (!on) {
+      this.hqOn = false;
+      setMeshHQ(false);
+      this.world.setLook(this.R.setHQ(false), this.atlas.uv);
+      return;
+    }
+    this.hqBusy = true;
+    try {
+      if (!this.atlasHQ) {
+        if (this.state === 'play') this.ui.toast('Mooie plaatjes maken... een paar tellen geduld.', 'good');
+        this.atlasHQ = await buildAtlasHQ();
+      }
+      if (this.settings.hq) {
+        this.hqOn = true;
+        setMeshHQ(true);
+        this.world.setLook(this.R.setHQ(true, this.atlasHQ), this.atlasHQ.uv);
+        if (this.state === 'play') this.ui.toast('Mooie graphics staan aan.', 'good');
+      }
+    } catch (e) {
+      console.warn('mooie graphics lukken niet', e);
+      this.settings.hq = false;
+      this.ui.toast('Mooie graphics lukken niet op dit apparaat.', 'warn');
+    }
+    this.hqBusy = false;
+    if (!!this.settings.hq !== !!this.hqOn) this.setHQ(!!this.settings.hq);      // intussen weer omgezet
   }
 
   // ---------- berichten van de server ----------
@@ -206,7 +259,7 @@ class Game {
       case 'chunk': if (m.w === this.worldId) this.world.addChunk(m.cx, m.cz, m.b); break;
       case 'unload': this.world.removeChunk(m.cx, m.cz); break;
       case 'block': this.world.setBlock(m.x, m.y, m.z, m.id); break;
-      case 'inv': this.inv = m.s; ui.setInv(); break;
+      case 'inv': this.inv = m.s; this.boots = m.s.some((q) => q && ITEMS[q[0]] && ITEMS[q[0]].jump); ui.setInv(); break;
       case 'stats': this.setTrees(m.trees); ui.setStats(m); break;
       case 'trees': this.setTrees(m.trees); break;
       case 'quest': ui.setQuest(m); break;
@@ -216,6 +269,7 @@ class Game {
       case 'got': ui.got(m.id, m.n); this.sound.play('got'); break;
       case 'crafted': this.sound.play('craft'); break;
       case 'ate': this.sound.play('eat'); break;
+      case 'toolBroke': this.sound.play('break', 1, 'wood'); this.sound.play('hit'); ui.toast('Je ' + m.name.toLowerCase() + ' is kapot!', 'warn'); break;
       case 'shot': this.sound.play(m.k === 'pijl' ? 'pijl' : m.k === 'laser' ? 'laser' : m.k === 'oer' ? 'oer' : 'magie'); break;
       case 'hurt': ui.flashHurt(); this.sound.play('hurt'); p.knock(m.kx, m.kz); break;
       case 'dead': p.dead = true; this.sound.play('death'); ui.close(); ui.openDeath(); break;
@@ -238,7 +292,7 @@ class Game {
     if (!t) return;
     const a = JSON.stringify(t), b = JSON.stringify(this.trees);
     this.trees = t;
-    if (a !== b) { setTreeTiles(t); this.world.remeshAll(); this.R.setTrees(t); }
+    if (a !== b) { setTreeTiles(t); this.world.rescanAll(); this.R.setTrees(t); }
   }
 
   vol(x, y, z) {
@@ -265,6 +319,16 @@ class Game {
       case 'slam': P.burst(x, y + 0.3, z, 26, [0.6, 0.5, 0.4], { speed: 5, size: 0.4, life: 0.8, grav: 6, spread: 2 }); s.play('boom', v); break;
       case 'roar': s.play('roar', Math.max(0.3, v)); break;
       case 'breath': s.play('breath', Math.max(0.4, v)); break;
+      case 'fuse': P.burst(x, y, z, 10, [1, 0.8, 0.3], { speed: 1.6, size: 0.14, life: 0.5, grav: -1 }); s.play('fuse', Math.max(0.3, v)); break;
+      case 'explode': {
+        P.burst(x, y, z, 60, [1, 0.6, 0.15], { speed: 9, size: 0.6, life: 0.7, grav: 1, spread: 1.5 });
+        P.burst(x, y, z, 50, [0.35, 0.33, 0.32], { speed: 5, size: 0.9, life: 1.6, grav: -1.5, spread: 2.5 });
+        P.burst(x, y, z, 30, [1, 0.95, 0.7], { speed: 14, size: 0.25, life: 0.5, grav: 6 });
+        s.play('explode', Math.max(0.25, this.vol(x, y, z) * 1.3));
+        const d = Math.hypot(x - this.player.pos.x, y - this.player.pos.y, z - this.player.pos.z);
+        if (d < 24) this.player.shake = Math.max(this.player.shake || 0, 0.6 * (1 - d / 24));
+        break;
+      }
     }
   }
 
@@ -278,6 +342,22 @@ class Game {
   }
 
   toggleCam() { this.player.cam = this.player.cam ? 0 : 1; }
+
+  // Volledig scherm aan of uit (op de iPad werkt dat met de oudere "webkit"-namen).
+  toggleFullscreen() {
+    const d = document, root = d.documentElement;
+    if (d.fullscreenElement || d.webkitFullscreenElement) {
+      const exit = d.exitFullscreen || d.webkitExitFullscreen;
+      if (exit) exit.call(d);
+      return;
+    }
+    const req = root.requestFullscreen || root.webkitRequestFullscreen;
+    if (!req) { this.ui.toast('Volledig scherm kan hier niet. Tip: zet het spel op je beginscherm.', 'warn'); return; }
+    try {
+      const pr = req.call(root);
+      if (pr && pr.catch) pr.catch(() => this.ui.toast('Volledig scherm lukt hier niet.', 'warn'));
+    } catch (e) { this.ui.toast('Volledig scherm lukt hier niet.', 'warn'); }
+  }
 
   onPortal(to) { this.sound.play('portal'); this.ui.fade(true, 'Je reist naar de ' + WORLDS[to].name + '...'); }
 
@@ -406,6 +486,7 @@ class Game {
       p.update(dt);
       this.ents.update(dt, this.time, p);
       this.weather(dt);
+      this.motes(dt);
       this.particles.update(dt, window.innerHeight);
     }
     this.R.update(this.gameTime, paused ? 0 : dt, { water: p.headIn === 1, lava: p.headIn === 2, nightEyes: !!this.trees.schaduw });
@@ -450,7 +531,32 @@ class Game {
     else if (w === 'wolken') { if (Math.random() < 0.3) P.add(rx(), c.y - 3 + Math.random() * 8, rz(), 0.3, 0.1, 0.1, 1, 1, 0.8, 0.12, 4, 0); }
     else if (this.R.dayF < 0.3 && Math.random() < 0.3) P.add(rx(), c.y - 2 + Math.random() * 4, rz(), (Math.random() - 0.5) * 0.6, (Math.random() - 0.5) * 0.3, (Math.random() - 0.5) * 0.6, 0.8, 1, 0.3, 0.14, 3, 0);
   }
+
+  // Zwevende lichtjes onder de levensboom: een paar als de boom ziek is, een hele zwerm als hij leeft.
+  motes(dt) {
+    if (this.state !== 'play') return;
+    const T = WORLDS[this.worldId].tree, c = this.R.camera.position;
+    const d = Math.hypot(c.x - T.x, c.z - T.z);
+    if (d > 70) return;
+    this.moteT = (this.moteT || 0) + dt * (this.trees[T.key] ? 26 : 7);
+    const col = MOTE_COLORS[this.worldId];
+    while (this.moteT >= 1) {
+      this.moteT -= 1;
+      const a = Math.random() * 6.283, r = Math.sqrt(Math.random()) * 30;
+      const k = col[(Math.random() * col.length) | 0];
+      this.particles.add(T.x + Math.cos(a) * r, T.y + 1 + Math.random() * 24, T.z + Math.sin(a) * r,
+        (Math.random() - 0.5) * 0.5, 0.15 + Math.random() * 0.5, (Math.random() - 0.5) * 0.5, k[0], k[1], k[2], 0.16 + Math.random() * 0.14, 5 + Math.random() * 4, -0.02);
+    }
+  }
 }
+
+const MOTE_COLORS = {
+  groen: [[0.5, 1, 0.75], [0.4, 0.9, 1], [1, 0.6, 0.9], [0.9, 1, 0.6]],
+  ijs: [[0.7, 0.9, 1], [1, 1, 1], [0.7, 0.6, 1]],
+  vuur: [[1, 0.6, 0.2], [1, 0.9, 0.5], [1, 0.4, 0.6]],
+  schaduw: [[0.8, 0.5, 1], [1, 0.5, 0.9], [0.5, 0.7, 1]],
+  wolken: [[1, 0.95, 0.6], [1, 1, 1], [1, 0.7, 0.85]],
+};
 
 window.addEventListener('DOMContentLoaded', () => {
   try { window.game = new Game(); }

@@ -1,5 +1,5 @@
 // Alle blokken van Graet Blok.
-// shape: 0 = lucht, 1 = kubus, 2 = kruis (plantje/fakkel), 3 = vloeistof
+// shape: 0 = lucht, 1 = kubus, 2 = klein ding (plantje, fakkel, vuur: een 3D-model), 3 = vloeistof
 //        4 = laag blok (lager dan een heel blok, zoals een bed)
 //        5 = ei (een rond 3D-ei; in de rugzak is het een plaatje)
 // pass:  0 = dicht, 1 = met gaatjes (bladeren), 2 = doorzichtig (water, glas)
@@ -40,6 +40,7 @@ function def(id, key, name, p = {}) {
     support: !!p.support,                        // valt om als het blok eronder weg is
     climb: !!p.climb,
     height: p.height || 1,                       // hoe hoog het blok is (1 = heel blok)
+    glow: p.glow || 0,                           // 0..15: het blok zelf licht op in het donker (fluorescerend)
   };
   BLOCKS[id] = blk;
   B[key] = id;
@@ -140,6 +141,46 @@ def(86, 'blad_goud', 'Gouden blad', { ...LEAF });
 def(87, 'stam_hemel', 'Hemelstam', { ...LOG, tiles: ['stam_hemel_top', 'stam_hemel', 'stam_hemel_top'] });
 def(88, 'krat_leeg', 'Lege krat', { hard: 3, tool: 'pick', snd: 'metal' });
 
+// ---- meer om te delven: ertsen, edelstenen en gesteente ----
+def(97, 'koper_erts', 'Kopererts', { hard: 4.5, tool: 'pick', tier: 1, xp: 2 });
+def(98, 'zilver_erts', 'Zilvererts', { hard: 5, tool: 'pick', tier: 2, xp: 4 });
+def(99, 'robijn_erts', 'Robijnerts', { hard: 6, tool: 'pick', tier: 3, drop: [276, 1, 1], xp: 8, glow: 3 });
+def(100, 'saffier_erts', 'Saffiererts', { hard: 6, tool: 'pick', tier: 3, drop: [277, 1, 1], xp: 8, glow: 3 });
+def(101, 'smaragd_erts', 'Smaragderts', { hard: 6, tool: 'pick', tier: 3, drop: [278, 1, 1], xp: 8, glow: 3 });
+def(102, 'amethist_erts', 'Amethisterts', { hard: 5, tool: 'pick', tier: 2, drop: [279, 1, 2], xp: 5, snd: 'glass', glow: 3 });
+def(103, 'zwavel_erts', 'Zwavelerts', { hard: 4.5, tool: 'pick', tier: 1, drop: [297, 1, 3], xp: 2 });
+def(104, 'marmer', 'Marmer', { hard: 4, tool: 'pick', tier: 1 });
+def(105, 'graniet', 'Graniet', { hard: 4.5, tool: 'pick', tier: 1 });
+def(106, 'marmerblok', 'Marmeren tegels', { hard: 4, tool: 'pick', tier: 1 });
+def(107, 'granietblok', 'Gepolijst graniet', { hard: 4.5, tool: 'pick', tier: 1 });
+def(108, 'marmerzuil', 'Marmeren zuil', { tiles: ['marmerzuil_top', 'marmerzuil', 'marmerzuil_top'], hard: 4, tool: 'pick', tier: 1 });
+def(109, 'robijnblok', 'Robijnblok', { hard: 4, tool: 'pick', tier: 2, snd: 'glass', light: 5, glow: 7 });
+def(110, 'saffierblok', 'Saffierblok', { hard: 4, tool: 'pick', tier: 2, snd: 'glass', light: 5, glow: 7 });
+def(111, 'smaragdblok', 'Smaragdblok', { hard: 4, tool: 'pick', tier: 2, snd: 'glass', light: 5, glow: 7 });
+def(112, 'amethistblok', 'Amethistblok', { hard: 4, tool: 'pick', tier: 2, snd: 'glass', light: 5, glow: 7 });
+def(113, 'lantaarn', 'Koperen lantaarn', { tiles: ['lantaarn_top', 'lantaarn', 'lantaarn_top'], hard: 0.8, light: 15, glow: 12, snd: 'metal' });
+// dynamiet: tik erop om het aan te steken, en maak dan dat je wegkomt
+def(114, 'dynamiet', 'Dynamiet', { tiles: ['dynamiet_top', 'dynamiet', 'dynamiet_top'], hard: 0.6, snd: 'wood', interact: true });
+def(115, 'dynamiet_aan', 'Brandend dynamiet', { tiles: ['dynamiet_top', 'dynamiet_aan', 'dynamiet_top'], hard: 0.6, snd: 'wood', light: 9, glow: 10, drop: [114, 1, 1] });
+def(116, 'koperblok', 'Koperblok', { hard: 5, tool: 'pick', tier: 2, snd: 'metal' });
+def(117, 'zilverblok', 'Zilverblok', { hard: 5, tool: 'pick', tier: 2, snd: 'metal' });
+
+// ---- rond de levensbomen: alles geeft licht in het donker ----
+// Lichtranken hangen uit de kruin, lichtvruchten zitten er als lampionnen tussen. Ze horen
+// bij de boom (je kunt ze niet weghakken). Zwammen, zwamhoeden, mos en bloemen kun je wel
+// meenemen om er zelf mee te bouwen.
+export const TREE_KEYS = ['groen', 'ijs', 'vuur', 'schaduw', 'wolken'];
+const RANK = { shape: SHAPE_CROSS, pass: 1, solid: false, opaque: false, hard: Infinity, snd: 'leaf', light: 8, glow: 15 };
+TREE_KEYS.forEach((k, i) => def(120 + i, 'lichtrank_' + k, 'Lichtrank', { ...RANK }));
+export const ZWAM_KEYS = ['blauw', 'roze', 'groen', 'oranje', 'paars'];
+const ZWAM_NAMES = ['Blauwe', 'Roze', 'Groene', 'Oranje', 'Paarse'];
+ZWAM_KEYS.forEach((k, i) => def(125 + i, 'gloeizwam_' + k, ZWAM_NAMES[i] + ' gloeizwam', { ...CROSS, light: 9, glow: 15 }));
+ZWAM_KEYS.forEach((k, i) => def(130 + i, 'zwamhoed_' + k, ZWAM_NAMES[i] + ' zwamhoed', { tiles: ['zwamhoed_' + k, 'zwamhoed_' + k, 'zwamlamellen_' + k], hard: 0.5, snd: 'leaf', light: 10, glow: 12 }));
+def(135, 'zwamsteel', 'Zwamsteel', { tiles: ['zwamsteel_top', 'zwamsteel', 'zwamsteel_top'], hard: 0.8, tool: 'axe', snd: 'wood', glow: 4 });
+def(136, 'gloeimos', 'Gloeimos', { tiles: ['gloeimos_top', 'gloeimos_side', 'aarde'], hard: 0.7, snd: 'grass', glow: 5 });
+def(137, 'lichtbloem', 'Lichtbloem', { ...CROSS, light: 8, glow: 15 });
+TREE_KEYS.forEach((k, i) => def(138 + i, 'lichtvrucht_' + k, 'Lichtvrucht', { hard: Infinity, snd: 'glass', light: 13, glow: 15 }));
+
 // Een bed is twee blokken lang: een voeteneind en een hoofdeind. Er zijn vier richtingen
 // (waar het hoofdeind ligt, gezien vanaf het voeteneind): 0 = +x, 1 = +z, 2 = -x, 3 = -z.
 // Blok 36 ('bed') is het voorwerp in je rugzak (en een oud, enkel bed in oudere werelden).
@@ -161,17 +202,25 @@ export const TILE_DOR = tile('levensblad_dor');
 // Scheurtjes als je een blok aan het hakken bent.
 export const TILE_CRACK = [tile('crack0'), tile('crack1'), tile('crack2'), tile('crack3')];
 
-export const NUM_BLOCKS = 128;
+// Plaatjes voor de 3D-modellen van kleine dingen (gras, bloemen, fakkel, vuur...): zie
+// src/client/blockmodels.js. De plaatjes van die blokken zelf worden alleen nog gebruikt
+// als icoontje in de rugzak.
+export const MODEL_TILES = ['gras_spriet', 'plant_steel', 'plant_blad', 'bloemblad_rood', 'bloemblad_geel', 'bloemblad_blauw',
+  'bloemhart', 'bes', 'tak', 'stok_hout', 'vlam', 'lichtblad', 'zwamhoed_turkoois', 'zwamlamellen_turkoois'];
+MODEL_TILES.forEach(tile);
+
+export const NUM_BLOCKS = 256;
 // Snelle opzoektabellen
 export const B_SHAPE = new Uint8Array(NUM_BLOCKS);
 export const B_PASS = new Uint8Array(NUM_BLOCKS);
 export const B_OPAQUE = new Uint8Array(NUM_BLOCKS);
 export const B_SOLID = new Uint8Array(NUM_BLOCKS);
 export const B_LIGHT = new Uint8Array(NUM_BLOCKS);
-export const B_TOP = new Uint8Array(NUM_BLOCKS);
-export const B_SIDE = new Uint8Array(NUM_BLOCKS);
-export const B_BOTTOM = new Uint8Array(NUM_BLOCKS);
+export const B_TOP = new Uint16Array(NUM_BLOCKS);
+export const B_SIDE = new Uint16Array(NUM_BLOCKS);
+export const B_BOTTOM = new Uint16Array(NUM_BLOCKS);
 export const B_HEIGHT = new Float32Array(NUM_BLOCKS).fill(1);
+export const B_GLOW = new Uint8Array(NUM_BLOCKS);     // 0..15: licht het blok zelf op? (alleen voor het tekenen)
 export const B_BED = new Uint8Array(NUM_BLOCKS);      // 0 = geen bed-helft, 1..4 = voeteneind, 5..8 = hoofdeind (richting erbij)
 for (const b of BLOCKS) {
   if (!b) continue;
@@ -180,11 +229,15 @@ for (const b of BLOCKS) {
   B_LIGHT[b.id] = b.light;
   B_TOP[b.id] = b.tTop; B_SIDE[b.id] = b.tSide; B_BOTTOM[b.id] = b.tBottom;
   B_HEIGHT[b.id] = b.height;
+  B_GLOW[b.id] = b.glow;
   const bp = bedPart(b.id);
   if (bp) B_BED[b.id] = 1 + bp.d + (bp.head ? 4 : 0);
 }
 
 export const LIFE_LEAVES = { groen: B.levensblad_groot, ijs: B.levensblad_ijs, vuur: B.levensblad_vuur, schaduw: B.levensblad_schaduw, wolken: B.levensblad_hemel };
+export const LIFE_VINES = {}, LIFE_FRUIT = {};
+TREE_KEYS.forEach((k, i) => { LIFE_VINES[k] = 120 + i; LIFE_FRUIT[k] = 138 + i; });
+export const ZWAMMEN = ZWAM_KEYS.map((k, i) => 125 + i), ZWAMHOEDEN = ZWAM_KEYS.map((k, i) => 130 + i);
 export const LOGS = [B.stam_eik, B.stam_den, B.stam_berk, B.stam_schaduw, B.stam_verkoold, B.stam_hemel];
 export const LEAVES = [B.blad_eik, B.blad_den, B.blad_berk, B.blad_schaduw, B.blad_goud];
 export const EGGS = { vuur: B.ei_vuur, ijs: B.ei_ijs, natuur: B.ei_natuur, bliksem: B.ei_bliksem, schaduw: B.ei_schaduw, robot: B.ei_robot, goud: B.ei_goud, kristal: B.ei_kristal };

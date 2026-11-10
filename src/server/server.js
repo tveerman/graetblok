@@ -136,7 +136,8 @@ export class GameServer {
 
   // ---------- rugzak ----------
 
-  sendInv(p) { this.send(p, { t: 'inv', s: p.inv.map((s) => (s ? [s.id, s.n] : 0)), sel: p.sel }); }
+  // een vakje is [id, aantal] of, voor gereedschap dat kan slijten, [id, aantal, hoe heel het nog is]
+  sendInv(p) { this.send(p, { t: 'inv', s: p.inv.map((s) => (s ? (s.d === undefined ? [s.id, s.n] : [s.id, s.n, s.d]) : 0)), sel: p.sel }); }
   sendStats(p) {
     this.send(p, { t: 'stats', hp: p.hp, max: this.maxHp(p), xp: p.xp, need: xpNeed(p.level), level: p.level, rank: this.rank(p), armor: this.armor(p), trees: this.meta.trees });
   }
@@ -145,16 +146,34 @@ export class GameServer {
 
   give(p, id, n) {
     const max = maxStack(id);
+    const dur = id >= 256 && ITEMS[id] ? ITEMS[id].dur : 0;      // nieuw gereedschap is helemaal heel
     for (let i = 0; i < INV_SIZE && n > 0; i++) {
       const s = p.inv[i];
       if (s && s.id === id && s.n < max) { const a = Math.min(n, max - s.n); s.n += a; n -= a; }
     }
     for (let i = 0; i < INV_SIZE && n > 0; i++) {
-      if (!p.inv[i]) { const a = Math.min(n, max); p.inv[i] = { id, n: a }; n -= a; }
+      if (!p.inv[i]) {
+        const a = Math.min(n, max);
+        p.inv[i] = dur ? { id, n: a, d: dur } : { id, n: a };
+        n -= a;
+      }
     }
     if (EGG_TYPE[id]) p.flags.egg = 1;
     if (id === I.oerwapen) p.flags.oer = 1;
     return n;
+  }
+
+  // Gereedschap slijt bij elk blok dat je ermee weghakt en bij elke klap. Bij 0 is het kapot.
+  wear(p, n = 1) {
+    const s = p.inv[p.sel], it = s && ITEMS[s.id];
+    if (!it || !it.dur) return false;
+    if (s.d === undefined || s.d > it.dur) s.d = it.dur;       // gereedschap uit een oudere versie is nog heel
+    s.d -= n;
+    if (s.d <= 0) {
+      p.inv[p.sel] = null;
+      this.send(p, { t: 'toolBroke', id: s.id, name: it.name });
+    } else if (s.d === Math.ceil(it.dur * 0.1)) this.toast(p, 'Je ' + it.name.toLowerCase() + ' is bijna kapot!', 'warn');
+    return true;
   }
 
   take(p, need, n) {
@@ -309,6 +328,7 @@ export class GameServer {
       this.setBlock(w, x, y + 1, z, 0);
       this.dropFor(p, BLOCKS[above]);
     }
+    if (def.hard >= 0.5) this.wear(p);              // plantjes en bladeren kosten niets
     this.sendInv(p);
     this.checkQuests(p);
   }
@@ -414,6 +434,9 @@ export class GameServer {
       p.flags.krat = 1;
       this.addXp(p, 5);
       this.sendInv(p);
+    } else if (id === B.dynamiet) {
+      this.ignite(w, x, y, z, p, 2.6);
+      this.toast(p, 'Het lont brandt... wegwezen!', 'warn');
     } else if (id === B.scheepscomputer) {
       p.flags.computer = 1;
       this.send(p, { t: 'dialog', title: 'Scheepscomputer', lines: computerLines(p, this) });
@@ -436,6 +459,73 @@ export class GameServer {
       else this.toast(p, 'Het ei heeft het koud. Zet er een kampvuur vlak naast!', 'warn');
     }
     this.checkQuests(p);
+  }
+
+  // ---------- dynamiet ----------
+
+  // Steek een blok dynamiet aan: na een paar tellen ontploft het.
+  ignite(w, x, y, z, p, delay) {
+    this.setBlock(w, x, y, z, B.dynamiet_aan);
+    if (!this.meta.fuses) this.meta.fuses = [];
+    this.meta.fuses.push({ w: w.id, x, y, z, t: this.meta.time + delay, by: p ? p.name : '' });
+    this.fx(w.id, 'fuse', x + 0.5, y + 1.1, z + 0.5);
+  }
+
+  updateFuses() {
+    const list = this.meta.fuses;
+    if (!list || !list.length) return;
+    for (let i = list.length - 1; i >= 0; i--) {
+      const f = list[i];
+      if (this.meta.time < f.t) continue;
+      list.splice(i, 1);
+      this.explode(this.worlds[f.w], f);
+    }
+  }
+
+  // De klap: blaast alle gewone blokken in de buurt weg (ertsen krijg je, de rest soms),
+  // steekt ander dynamiet aan en doet pijn als je te dichtbij staat.
+  explode(w, f) {
+    const { x, y, z } = f;
+    if (!w || w.get(x, y, z) !== B.dynamiet_aan) return;      // het blok is intussen weggehaald
+    let p = null;
+    for (const q of this.players.values()) if (q.name === f.by && q.world === w.id) p = q;
+    this.setBlock(w, x, y, z, 0);
+    const R = 3.3, loot = new Map(), rnd = this.rnd;
+    for (let dx = -4; dx <= 4; dx++) for (let dy = -4; dy <= 4; dy++) for (let dz = -4; dz <= 4; dz++) {
+      if (Math.hypot(dx, dy, dz) > R + rnd() * 0.9) continue;
+      const bx = x + dx, by = y + dy, bz = z + dz;
+      if (by < 1) continue;
+      const id = w.get(bx, by, bz);
+      if (!id) continue;
+      const def = BLOCKS[id];
+      if (id === B.dynamiet) { this.ignite(w, bx, by, bz, p, 0.25 + rnd() * 0.5); continue; }
+      if (def.hard === Infinity || EGG_TYPE[id] || isBed(id) || id === B.dynamiet_aan) continue;
+      this.setBlock(w, bx, by, bz, 0);
+      if (def.drop === null || !(def.xp || rnd() < 0.3)) continue;
+      const [did, a, b] = def.drop === undefined ? [id, 1, 1] : def.drop;
+      loot.set(did, (loot.get(did) || 0) + a + Math.floor(rnd() * (b - a + 1)));
+    }
+    // plantjes en fakkels waar de grond onder weg is, vallen om
+    for (let dx = -4; dx <= 4; dx++) for (let dz = -4; dz <= 4; dz++) for (let dy = -3; dy <= 5; dy++) {
+      const id = w.get(x + dx, y + dy, z + dz);
+      if (id && BLOCKS[id].support && !w.solid(x + dx, y + dy - 1, z + dz)) this.setBlock(w, x + dx, y + dy, z + dz, 0);
+    }
+    this.fx(w.id, 'explode', x + 0.5, y + 0.5, z + 0.5);
+    for (const e of Array.from(w.ents.values())) {
+      if (e.owner) continue;                                   // je eigen draken en dieren blijven heel
+      const d = Math.hypot(e.x - x - 0.5, e.y + e.h / 2 - y - 0.5, e.z - z - 0.5);
+      if (d < 6.5) this.damageEntity(w, e, Math.round(26 * (1 - d / 6.5)) + 2, p, e.x - x - 0.5, e.z - z - 0.5);
+    }
+    for (const q of this.players.values()) {
+      if (q.world !== w.id || q.dead) continue;
+      const d = Math.hypot(q.x - x - 0.5, q.y + 0.9 - y - 0.5, q.z - z - 0.5);
+      if (d < 6) this.hurtPlayer(q, Math.max(1, Math.round(9 * (1 - d / 6))), null);
+    }
+    if (p) {
+      for (const [id, n] of loot) this.giveLoot(p, id, n);
+      this.sendInv(p);
+      this.checkQuests(p);
+    }
   }
 
   lootChest(p, w, x, y, z) {
@@ -663,6 +753,7 @@ export class GameServer {
         this.updateProjectiles(w, dt);
       }
 
+      this.updateFuses();
       this.acc.snap += dt;
       if (this.acc.snap >= 0.1) { this.acc.snap = 0; this.snapshots(); }
 

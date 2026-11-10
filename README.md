@@ -97,6 +97,7 @@ you left off.
 | Quest log | 📜 | `Q` |
 | Pause menu (settings, back to the home screen) | ⚙️ | `Esc` |
 | Camera (first / third person) | 📷 | `V` |
+| Full screen on / off | the ⛶ button next to ⚙️ | the same button |
 | Dragon window (feed, name, stay/follow) | "🐉 <name>" button when it is near, or tap the dragon | `G` |
 | Mount / dismount dragon | "🐉 Vliegen" / "Afstappen" | `R` |
 | Hotbar | tap a slot | `1`–`9` or scroll |
@@ -108,7 +109,10 @@ the tablet is put away or the tab is hidden.
 The pause menu has separate switches for music ("Muziek") and sound effects
 ("Geluidseffecten"). Its last line reports what the audio is doing on that device, for example
 "Geluid: aan · muziek: 262 noten gespeeld, sterkte 9% · effecten: aan" — useful when a device
-stays silent. The landing screen shows which version is running ("versie van 10 nov, 18:40",
+stays silent. On iPad and iPhone the line ends with "stille stand omzeild: ja/nee": Web Audio
+is silenced there by the device's silent mode (the bell in Control Centre, or the side switch
+on older iPads), so the game keeps a silent `<audio>` element looping, which makes iOS route
+all of the page's sound through the media channel instead. The landing screen shows which version is running ("versie van 10 nov, 18:40",
 the date of the most recently changed game file), so you can tell whether a device is still
 running an older copy.
 
@@ -130,6 +134,19 @@ From Jorian's design document (`spel.txt`), following development phases 1–4, 
   caves, robot spiders, ice wolves, fire spirits, shades and Stormvleugels.
 - **Weapons and progress** – swords, bow, magic staff, laser gun, armour, XP, levels, the eight
   ranks plus the secret rank, and the hidden Oerwapen.
+- **Tools wear out** – pickaxes, axes, swords and the bow lose a little with every block
+  broken or hit landed; a bar under the item shows what is left and the tool breaks at zero.
+  Better materials last longer (wood 60 uses, stone 130, copper 190, iron 260, crystal 800).
+- **More to mine and make** – copper, silver, sulphur, ruby, sapphire, emerald and amethyst
+  ores, plus marble and granite. They give copper and silver tools and armour, gem swords and
+  pickaxes, four elemental staffs, jump boots, binoculars, lanterns, polished stone, pillars,
+  gem blocks and dynamite (tap it to light the fuse, then run). The recipe list has a search
+  box that filters on the name of the thing or of an ingredient.
+- **Glowing life trees** – each tree is a giant with buttress roots, long limbs, hanging
+  light vines and lantern fruit, a carpet of glowing moss, small and giant mushrooms in bright
+  colours, and a spiral staircase of mushrooms around the trunk (it starts on the tall root at
+  the back). Everything glows in the dark; a restored tree glows much brighter and fills the
+  air with drifting lights.
 - **Story quests** – 18 steps from "chop a tree" to "defeat the Drakenkoning", shown top-left,
   with a compass marker for the early ones.
 
@@ -147,7 +164,8 @@ vendor/                   three.js (unmodified)
 src/shared/               game data used by both sides: blocks, items, recipes, creatures, worlds
 src/server/               the game server: world generation, block edits, inventory, crafting,
                           creatures, bosses, dragons, quests, saving
-src/client/               everything you see and hear: rendering, sprites, input, UI, sound
+src/client/               everything you see and hear: rendering, sprites, 3D models of plants
+                          and other small things, input, UI, sound
 ```
 
 ### The built-in server
@@ -182,11 +200,42 @@ are packed into one atlas with padding so they do not bleed into each other. Ite
 skins, the sun, moon and clouds are made the same way. `src/client/audio.js` synthesises all
 sound effects, ambience and the soft background music with the Web Audio API.
 
+`sprites.html` shows every tile and icon; `sprites.html?hq` also builds the high-quality set.
+
+Small things that are not full blocks — tall grass, flowers, the berry bush, the dead bush,
+mushrooms, torches, campfires and the hanging light vines — are real 3D shapes, not crossed
+flat pictures. `src/client/blockmodels.js` builds each one once at start-up from a small kit
+(boxes, tubes with a varying thickness, discs, leaf and petal quads, grass blades). The chunk
+mesher copies the model into the world and gives every spot its own rotation, offset and
+height, derived from the position, so no two plants look identical. Their old flat pictures
+are still in the atlas, but only as backpack icons.
+
+### "Mooie graphics" (experimental)
+
+The pause menu has a switch "Mooie graphics (proef)", off by default. Turning it on:
+
+- draws every tile again at 128 instead of 64 pixels, with extra detail (single leaves, pebbles,
+  wood grain, nails, cut gems) — the same pixel functions run with a `HQ` flag;
+- builds a second atlas holding, per pixel, the surface direction (derived from a height the
+  pixel functions report), a gloss value and a glow value;
+- switches the blocks to a second shader (`HQ_VERT` / `HQ_FRAG` in `render.js`) that lights
+  each pixel: sun or moon light across the relief, highlights on water, ice, metal and gems,
+  per-pixel glow, leaves and plants swaying in the wind, rippling water that reflects the sky,
+  sun-tinted fog and a softer tone curve;
+- raises the render resolution (up to 1.5× on touch devices, 2× on desktop).
+
+Making the textures takes about 1.3 s on a recent Mac and noticeably longer on an old tablet;
+it happens in the background the first time the switch is turned on. The standard mode is
+unchanged and remains the default. There are still no real shadows or post-processing.
+
 ### Performance notes (old iPad)
 
 - One draw call per chunk and pass, no shadows; lighting is baked into vertices and day/night
   is a single uniform.
 - World generation and creature simulation run in the worker, off the render thread.
+- "Mooie graphics" costs two texture lookups and per-pixel lighting for every block pixel, and
+  about 50 MB of texture memory; the pause menu shows the frame rate and resolution so you
+  can see what a device can handle.
 - The render resolution lowers itself automatically when the frame rate drops
   ("Scherpte aanpassen" in the pause menu), and "Kijkafstand" sets how far you can see
   (default 4 on touch devices, 5 on desktop).

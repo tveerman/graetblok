@@ -486,6 +486,7 @@ export const entityMethods = {
     const s = p.inv[p.sel], it = s && ITEMS[s.id];
     const dmg = ((it && it.dmg) || 1) + Math.floor(p.level / 5);
     this.damageEntity(w, e, dmg, p, e.x - p.x, e.z - p.z);
+    if (this.wear(p)) this.sendInv(p);
   },
 
   on_shoot(p, m) {
@@ -515,6 +516,7 @@ export const entityMethods = {
       if (!this.take(p, r.ammo, 1)) { this.toast(p, 'Je hebt geen pijlen meer!', 'warn'); return; }
       this.sendInv(p);
     }
+    if (this.wear(p)) this.sendInv(p);
     this.spawnProj(w, r.proj, p.x + dx * 0.7, p.y + 1.5 + dy * 0.7, p.z + dz * 0.7, dx * r.speed, dy * r.speed, dz * r.speed, r.grav, r.dmg + Math.floor(p.level / 5), 'p', p.id);
     this.send(p, { t: 'shot', k: r.proj });
   },

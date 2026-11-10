@@ -19,8 +19,12 @@
 <h2>Blokken</h2><div class="grid" id="tiles"></div>
 <h2>Icoontjes</h2><div class="grid" id="icons"></div>
 <h2>Atlas</h2><canvas id="atlas"></canvas>
+<h2>Mooie graphics</h2>
+<p id="hqinfo"><a href="?hq" style="color:#9cf">Maak ook de mooie plaatjes (128 pixels, met reliëf, glans en gloed)</a></p>
+<canvas id="hqcolor" style="max-width:100%"></canvas>
+<canvas id="hqnormal" style="max-width:100%"></canvas>
 <script type="module">
-import { buildAtlas, setIconAtlas, iconCanvas } from './src/client/textures.js';
+import { buildAtlas, buildAtlasHQ, setIconAtlas, iconCanvas } from './src/client/textures.js';
 import { TILE_NAMES, BLOCKS } from './src/shared/blocks.js';
 import { ITEMS } from './src/shared/items.js';
 const t0 = performance.now();
@@ -34,6 +38,21 @@ for (const id in ITEMS) add(document.getElementById('icons'), iconCanvas(+id), I
 const ac = document.getElementById('atlas'); ac.width = atlas.W; ac.height = atlas.H;
 ac.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(atlas.data), atlas.W, atlas.H), 0, 0);
 window.__ok = true;
+// met ?hq in het adres: ook de mooie atlas (kleur, en daaronder reliëf/glans/gloed)
+if (/[?&]hq\b/.test(location.search)) {
+  const info = document.getElementById('hqinfo');
+  const t1 = performance.now();
+  const hq = await buildAtlasHQ((f) => { info.textContent = 'Bezig... ' + Math.round(f * 100) + '%'; });
+  info.textContent = 'Mooie plaatjes getekend in ' + Math.round(performance.now() - t1) + ' ms. Atlas: ' + hq.W + ' x ' + hq.H + '. Onder: reliëf (rood/groen), glans (blauw) en gloed (helderheid).';
+  const put = (id, d, opaque) => {
+    const cv = document.getElementById(id); cv.width = hq.W; cv.height = hq.H;
+    const c = new Uint8ClampedArray(d);
+    if (opaque) for (let i = 0; i < c.length; i += 4) { const e = c[i + 3] / 255; c[i] = c[i] * (0.4 + 0.6 * e); c[i + 1] = c[i + 1] * (0.4 + 0.6 * e); c[i + 3] = 255; }
+    cv.getContext('2d').putImageData(new ImageData(c, hq.W, hq.H), 0, 0);
+  };
+  put('hqcolor', hq.data, false); put('hqnormal', hq.ndata, true);
+  window.__hq = hq;
+}
 </script>
 </body>
 </html>

@@ -39,6 +39,11 @@ function cell(u, v, n, seed) {
     else if (d < F2) F2 = d;
   }
 }
+// De "mooie" plaatjes (zie verderop): als HQ aan staat tekenen dezelfde functies meer detail,
+// en geven ze per pixel ook door hoe hoog het oppervlak is (HH, voor reliëf), hoe het glanst
+// (HS) en of het licht geeft (HE). -1 betekent: niets gezegd.
+let HQ = false, HH = -1, HS = -1, HE = -1;
+const c01 = (x) => (x < 0 ? 0 : x > 1 ? 1 : x);
 const mix = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
 const mul = (c, f) => [c[0] * f, c[1] * f, c[2] * f];
 const sst = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
@@ -49,27 +54,74 @@ const hex = (h) => [(h >> 16) & 255, (h >> 8) & 255, h & 255];
 const dirt = (x, y, u, v) => {
   let c = mix([92, 62, 40], [136, 98, 64], fbm(u, v, 4, 4, 4, 21));
   cell(u, v, 9, 22);
-  if (F1 < 0.2) c = mul(c, CID > 0.5 ? 1.25 : 0.72);
-  return mul(c, 0.94 + hash2(x, y, 23) * 0.12);
+  if (!HQ) {
+    if (F1 < 0.2) c = mul(c, CID > 0.5 ? 1.25 : 0.72);
+    return mul(c, 0.94 + hash2(x, y, 23) * 0.12);
+  }
+  // mooie versie: kluitjes, kiezels en fijne korrel
+  const klomp = F1 < 0.22 ? 1 - F1 / 0.22 : 0, licht = CID > 0.5;
+  if (klomp > 0) c = mul(c, licht ? 1 + 0.3 * klomp : 1 - 0.34 * klomp);
+  const fijn = fbm(u, v, 14, 14, 3, 24);
+  c = mul(c, 0.8 + fijn * 0.4);
+  cell(u, v, 20, 25);
+  let kiezel = 0;
+  if (CID > 0.72 && F1 < 0.3) {
+    kiezel = sst(0.3, 0.1, F1);
+    c = mix(c, mix([150, 136, 120], [196, 186, 170], CID), kiezel * 0.85);
+    if (-CDX - CDY > 0.12) c = mul(c, 1.12);
+  }
+  HH = 0.3 + fijn * 0.3 + (licht ? klomp * 0.25 : -klomp * 0.25) + kiezel * 0.35;
+  return mul(c, 0.95 + hash2(x, y, 23) * 0.1);
 };
 const grassTop = (c1, c2, tuft, seed) => (x, y, u, v) => {
   const n = fbm(u, v, 4, 4, 4, seed), blades = vn(u * 32, v * 32, 32, 32, seed + 1), t = fbm(u, v, 8, 8, 2, seed + 2);
   let c = mul(mix(c1, c2, n), 0.8 + blades * 0.4);
   if (t > 0.66) c = mix(c, tuft, (t - 0.66) * 2.2);
+  if (HQ) {
+    // mooie versie: pollen gras met sprietjes die het licht vangen
+    cell(u, v, 18, seed + 5);
+    const pol = 1 - Math.min(1, F1 * 1.5), kant = c01(0.5 + (-CDX - CDY) * 0.9), id = CID, f1 = F1;
+    const spriet = vn(u * 96 + id * 9, v * 26, 96, 26, seed + 6) * 0.5 + vn(u * 26, v * 96 + id * 7, 26, 96, seed + 7) * 0.5;
+    c = mul(c, 0.62 + 0.3 * kant + 0.36 * spriet);
+    if (id > 0.9 && f1 < 0.3) c = mix(c, tuft, 0.5);                          // een droog polletje
+    if (hash2(x, y, seed + 8) > 0.994) c = mix(c, [255, 255, 230], 0.45);       // dauwdruppel
+    HH = 0.25 + pol * 0.4 + spriet * 0.35;
+  }
   return c;
 };
 const grassSide = (grass, under, seed) => (x, y, u, v) => {
-  const edge = 0.16 + 0.16 * vn(u * 16, 0, 16, 1, seed) + 0.05 * vn(u * 32, 0, 32, 1, seed + 1);
-  if (v < edge) return mul(grass(x, y, u, v), 0.72 + 0.28 * (1 - v / edge));
+  let edge = 0.16 + 0.16 * vn(u * 16, 0, 16, 1, seed) + 0.05 * vn(u * 32, 0, 32, 1, seed + 1);
+  if (HQ) edge += 0.08 * vn(u * 64, 0, 64, 1, seed + 2) - 0.03;                 // losse sprietjes over de rand
+  if (v < edge) {
+    const c = mul(grass(x, y, u, v), 0.72 + 0.28 * (1 - v / edge));
+    if (!HQ) return c;
+    const str = vn(u * 64, v * 6, 64, 6, seed + 3);
+    HH = 0.7 + 0.3 * str;
+    return mul(c, 0.84 + 0.32 * str);
+  }
   const c = under(x, y, u, v);
-  return mul(c, v < edge + 0.07 ? 0.72 : 1);
+  if (!HQ) return mul(c, v < edge + 0.07 ? 0.72 : 1);
+  HH = (HH < 0 ? 0.4 : HH) * 0.75;
+  return mul(c, 1 - 0.4 * sst(edge + 0.13, edge, v));                           // schaduw onder het gras
 };
 const stone = (c1, c2, seed, crack = 0.7) => (x, y, u, v) => {
   const n = fbm(u, v, 3, 3, 5, seed);
   let c = mix(c1, c2, n);
   cell(u, v, 4, seed + 1);
-  if (F2 - F1 < 0.05) c = mul(c, crack);
-  return mul(c, 0.95 + hash2(x, y, seed + 2) * 0.1);
+  if (!HQ) {
+    if (F2 - F1 < 0.05) c = mul(c, crack);
+    return mul(c, 0.95 + hash2(x, y, seed + 2) * 0.1);
+  }
+  // mooie versie: zachte scheuren, haarscheurtjes, korrel en lichte adertjes
+  const scheur = sst(0.0, 0.075, F2 - F1), vlak = CID;
+  const fijn = fbm(u, v, 10, 10, 3, seed + 3), korrel = fbm(u, v, 36, 36, 2, seed + 4);
+  c = mul(c, (0.86 + vlak * 0.14) * (0.84 + fijn * 0.2 + korrel * 0.14));
+  cell(u, v, 9, seed + 5);
+  const haar = sst(0.0, 0.03, F2 - F1);
+  c = mul(c, (crack + (1 - crack) * scheur) * (0.88 + 0.12 * haar));
+  if (korrel > 0.72) c = mix(c, c2, (korrel - 0.72) * 1.6);
+  HH = 0.2 + vlak * 0.18 + n * 0.25 + fijn * 0.15 + scheur * 0.25 - (1 - haar) * 0.12;
+  return mul(c, 0.96 + hash2(x, y, seed + 2) * 0.08);
 };
 const steen = stone([98, 98, 100], [152, 150, 146], 30);
 const basalt = stone([40, 38, 44], [78, 74, 80], 31, 0.55);
@@ -79,21 +131,72 @@ const cobble = (c1, c2, seed) => (x, y, u, v) => {
   cell(u, v, 5, seed);
   const e = sst(0.02, 0.16, F2 - F1);
   const c = mul(mix(c1, c2, CID), 0.45 + 0.55 * e);
+  if (HQ) {
+    // mooie versie: bolle keien met een lichte en een donkere kant, en wat mos in de voegen
+    const bol = e * (0.65 + 0.35 * c01(1 - F1 * 1.4)), kant = c01(0.5 + (-CDX - CDY) * 0.7);
+    const fijn = fbm(u, v, 18, 18, 3, seed + 4);
+    HH = bol * 0.8 + fijn * 0.15;
+    const mos = e < 0.3 && fbm(u, v, 6, 6, 2, seed + 5) > 0.58 ? 0.4 : 0;
+    return mix(mul(c, (0.72 + 0.36 * kant) * (0.82 + fijn * 0.36)), [66, 92, 50], mos);
+  }
   return mul(c, 0.9 + fbm(u, v, 8, 8, 2, seed + 3) * 0.2);
 };
 const bark = (dark, light, seed, fx = 10) => (x, y, u, v) => {
   const r = 0.6 * vn(u * fx, v * 3, fx, 3, seed) + 0.4 * vn(u * fx * 2, v * 6, fx * 2, 6, seed + 1);
   let c = mix(dark, light, r);
   if (r < 0.3) c = mul(c, 0.7);
+  if (HQ) {
+    // mooie versie: diepe groeven met fijne ribbels ertussen
+    const fijn = vn(u * fx * 5, v * 9, fx * 5, 9, seed + 3), groef = sst(0.24, 0.42, r);
+    c = mul(c, (0.72 + 0.28 * groef) * (0.82 + 0.36 * fijn));
+    if (vn(u * fx * 0.5, v * 2, fx * 0.5 | 0 || 1, 2, seed + 4) > 0.82) c = mix(c, [96, 112, 70], 0.3);     // een plukje mos
+    HH = r * 0.7 + fijn * 0.3;
+  }
   return mul(c, 0.93 + hash2(x, y, seed + 2) * 0.14);
 };
 const logTop = (w1, w2, barkc, seed) => (x, y, u, v) => {
   const d = Math.hypot(u - 0.5, v - 0.5) * 2;
-  if (d > 0.84 + fbm(u, v, 8, 8, 2, seed) * 0.08) return mul(barkc, 0.8 + hash2(x, y, seed) * 0.3);
-  const ring = Math.sin(d * 24 + fbm(u, v, 4, 4, 2, seed + 1) * 4) * 0.5 + 0.5;
+  if (d > 0.84 + fbm(u, v, 8, 8, 2, seed) * 0.08) { if (HQ) HH = 0.85; return mul(barkc, 0.8 + hash2(x, y, seed) * 0.3); }
+  const wob = fbm(u, v, 4, 4, 2, seed + 1);
+  const ring = Math.sin(d * 24 + wob * 4) * 0.5 + 0.5;
+  if (HQ) {
+    // mooie versie: fijne jaarringen, droogscheurtjes en een donker hart
+    const fijn = Math.sin(d * 70 + wob * 9) * 0.5 + 0.5;
+    let c = mul(mix(w1, w2, ring * 0.7 + fijn * 0.2), 0.9 + fbm(u, v, 20, 20, 2, seed + 2) * 0.2);
+    const a = Math.atan2(v - 0.5, u - 0.5);
+    const barst = Math.abs(Math.sin(a * 3.5 + wob * 2.5));
+    if (barst < 0.05 && d > 0.12 && d < 0.6 + wob * 0.2) c = mul(c, 0.55 + barst * 6);
+    if (d < 0.1) c = mul(c, 0.7 + d * 3);
+    HH = 0.45 + ring * 0.2 + fijn * 0.1 - (barst < 0.05 ? 0.25 : 0);
+    return c;
+  }
   return mix(w1, w2, ring * 0.8);
 };
+// mooie versie: drie lagen blaadjes over elkaar; elk blaadje is een ovaaltje met een nerf,
+// een lichte en een schaduwkant
+function leavesHQ(c1, c2, seed, cover, glow, x, y, u, v) {
+  for (let L = 0; L < 3; L++) {
+    const n = L === 0 ? 9 : L === 1 ? 7 : 5, cov = cover * (L === 0 ? 1.0 : L === 1 ? 1.08 : 1.22);
+    cell(u, v, n, seed + L * 5);
+    if (F1 >= cov) continue;
+    const ang = CID * 6.283, ca = Math.cos(ang), sa = Math.sin(ang);
+    const langs = CDX * ca + CDY * sa, dwars = -CDX * sa + CDY * ca;
+    const d = Math.hypot(langs * 0.78, dwars * 1.3);
+    if (d >= cov) continue;
+    const t = d / cov, diep = L === 0 ? 1 : L === 1 ? 0.86 : 0.7;
+    let c = mul(mix(c1, c2, CID * 0.7 + 0.3 * (1 - t)), (1.22 - 0.36 * t) * diep);
+    if (Math.abs(dwars) < 0.03) c = mix(c, c2, 0.5);                           // de nerf
+    else if (dwars > 0) c = mul(c, 0.84);                                       // de schaduwkant
+    if (-CDX - CDY > cov * 0.5) c = mul(c, 1.14);                               // lichtrandje
+    if (glow && hash2(x >> 2, y >> 2, seed + 9) > 0.93) { c = glow; HE = 1; }
+    HH = (1 - t) * 0.45 * diep + (L === 0 ? 0.5 : L === 1 ? 0.25 : 0.05);
+    return [c[0], c[1], c[2], 255];
+  }
+  HH = 0;
+  return [c1[0] * 0.6, c1[1] * 0.6, c1[2] * 0.6, 0];
+}
 const leaves = (c1, c2, seed, cover = 0.4, glow = null) => (x, y, u, v) => {
+  if (HQ) return leavesHQ(c1, c2, seed, cover, glow, x, y, u, v);
   cell(u, v, 7, seed);
   const a1 = F1, id1 = CID;
   cell(u, v, 5, seed + 5);
@@ -109,6 +212,23 @@ const ore = (base, c1, c2, seed, size = 0.24, n = 4) => (x, y, u, v) => {
   cell(u, v, n, seed);
   if (CID < 0.25) return b;
   const s = size * (0.7 + CID * 0.5);
+  if (HQ) {
+    // mooie versie: geslepen klompjes met vlakjes die het licht vangen
+    const ang = Math.atan2(CDY, CDX) + CID * 6.283, k = F1 / s;
+    const rand = 0.92 + 0.08 * Math.cos(ang * 4);                              // hoekige omtrek
+    if (k > rand) {
+      if (k > rand + 0.24) return b;
+      HH = (HH < 0 ? 0.4 : HH) * 0.55;
+      return mul(b, 0.6 + 0.4 * (k - rand) / 0.24);
+    }
+    const vlak = Math.floor((((ang / 6.283) % 1) + 1) % 1 * 5);
+    const f = [0.5, 1.0, 0.72, 0.36, 0.86][vlak];
+    let c = mix(c1, c2, f * (0.55 + 0.45 * (1 - k)));
+    if (k < 0.3) c = mix(c, c2, 0.55);                                           // het platte bovenvlak
+    if (vlak === 1 && k > 0.35 && k < 0.72) c = mix(c, [255, 255, 255], 0.5);    // glinstering
+    HH = 0.75 + 0.25 * (1 - k); HS = 1; HE = 1;
+    return c;
+  }
   if (F1 > s) return F1 < s + 0.05 ? mul(b, 0.7) : b;
   const t = 1 - F1 / s;
   const hi = (-CDX - CDY) > s * 0.2 ? 1 : 0;
@@ -119,15 +239,36 @@ const planks = (c1, seed) => (x, y, u, v) => {
   const g = vn(u * 4 + b * 1.7, v * 48, 4, 48, seed) * 0.6 + vn(u * 8, v * 96, 8, 96, seed + 1) * 0.4;
   let c = mul(c1, (0.8 + g * 0.35) * (0.9 + hash2(b, 0, seed) * 0.2));
   const joint = hash2(b, 1, seed);
-  if (fv < 0.06 || Math.abs(u - joint) < 0.012) c = mul(c, 0.55);
+  const naad = fv < 0.06 || Math.abs(u - joint) < 0.012;
+  if (naad) c = mul(c, 0.55);
+  if (HQ) {
+    // mooie versie: fijne nerven, noesten en spijkers
+    const nerf = vn(u * 6 + b * 3.1, v * 120, 6, 120, seed + 2);
+    c = mul(c, 0.84 + 0.28 * nerf);
+    const ku = hash2(b, 2, seed) , kd = Math.hypot((u - ku) * 1.0, (fv - 0.55) * 0.22);
+    if (hash2(b, 3, seed) > 0.45 && kd < 0.05) c = mul(c, 0.55 + kd * 8);       // een noest
+    const su = Math.abs(((u - joint + 1) % 1) - 0.035), sd = Math.hypot(su, (fv - 0.5) * 0.25);
+    const spijker = sd < 0.012 || Math.hypot(Math.abs(((u - joint + 1) % 1) - 0.965), (fv - 0.5) * 0.25) < 0.012;
+    if (spijker) c = [70, 70, 76];
+    HH = naad ? 0.05 : (spijker ? 0.85 : 0.55 + g * 0.2 + nerf * 0.12 + sst(0.06, 0.16, fv) * 0.1);
+    if (spijker) HS = 0.7;
+  }
   return c;
 };
 const bricks = (c1, c2, mortar, rows, colsN, seed) => (x, y, u, v) => {
   const r = Math.floor(v * rows), fv = v * rows - r;
   const uu = (u + (r % 2) * 0.5 / colsN) % 1;
   const cI = Math.floor(uu * colsN), fu = uu * colsN - cI;
-  if (fv < 0.09 || fu < 0.045) return mul(mortar, 0.9 + hash2(x, y, seed) * 0.15);
+  if (fv < 0.09 || fu < 0.045) { if (HQ) HH = 0.12 + hash2(x, y, seed) * 0.1; return mul(mortar, 0.9 + hash2(x, y, seed) * 0.15); }
   const id = hash2(cI, r, seed + 1);
+  if (HQ) {
+    // mooie versie: elke steen is een beetje bol, met putjes en een lichte bovenrand
+    const putjes = fbm(u, v, 24, 24, 2, seed + 3), rand = Math.min(fv - 0.09, 1 - fv, fu - 0.045, 1 - fu);
+    HH = 0.6 + id * 0.15 + putjes * 0.15 + sst(0, 0.08, rand) * 0.15;
+    let c = mul(mix(c1, c2, id), 0.78 + fbm(u, v, 8, 8, 2, seed + 2) * 0.3 + putjes * 0.14);
+    if (fv < 0.16) c = mul(c, 1.12); else if (fv > 0.9) c = mul(c, 0.8);
+    return c;
+  }
   return mul(mix(c1, c2, id), 0.85 + fbm(u, v, 8, 8, 2, seed + 2) * 0.3);
 };
 const metal = (base, seed) => (x, y, u, v) => {
@@ -135,7 +276,13 @@ const metal = (base, seed) => (x, y, u, v) => {
   const fu = (u * 2) % 1, fv = (v * 2) % 1;
   if (fu < 0.03 || fv < 0.03) c = mul(c, 0.6);
   const ru = Math.abs(fu - 0.5) > 0.38, rv = Math.abs(fv - 0.5) > 0.38;
-  if (ru && rv && Math.hypot((fu < 0.5 ? fu : 1 - fu) - 0.09, (fv < 0.5 ? fv : 1 - fv) - 0.09) < 0.035) c = mul(c, 1.35);
+  const klinknagel = ru && rv && Math.hypot((fu < 0.5 ? fu : 1 - fu) - 0.09, (fv < 0.5 ? fv : 1 - fv) - 0.09) < 0.035;
+  if (klinknagel) c = mul(c, 1.35);
+  if (HQ) {
+    c = mul(c, 0.92 + fbm(u, v, 30, 4, 2, seed + 1) * 0.16);                    // geborsteld
+    HH = (fu < 0.03 || fv < 0.03) ? 0.1 : (klinknagel ? 1 : 0.55);
+    HS = 0.75;
+  }
   return c;
 };
 const swirl = (c1, c2, seed) => (x, y, u, v) => {
@@ -150,12 +297,14 @@ const gemBlock = (c1, c2, seed) => (x, y, u, v) => {
   let c = mix(c1, c2, CID * 0.7 + (CDX + CDY < 0 ? 0.3 : 0));
   c = mix([255, 255, 255], c, 0.25 + 0.75 * e);
   const b = Math.min(u, v, 1 - u, 1 - v);
+  if (HQ) { HH = 0.3 + e * 0.35 + CID * 0.35; HS = 1; HE = 1; }
   return mul(c, b < 0.05 ? 0.75 : 1);
 };
 const bevel = (base, seed) => (x, y, u, v) => {
   const b = Math.min(u, v, 1 - u, 1 - v);
   let c = mul(base, 0.92 + fbm(u, v, 4, 4, 3, seed) * 0.16);
   if (b < 0.09) c = mul(c, (u < 0.09 || v < 0.09) && u + v < 1 ? 1.25 : 0.68);
+  if (HQ) { HH = b < 0.09 ? b / 0.09 * 0.7 : 0.7 + fbm(u, v, 12, 12, 2, seed + 1) * 0.08; HS = 0.85; }
   return c;
 };
 
@@ -614,6 +763,266 @@ for (let k = 0; k < 4; k++) {
   };
 }
 
+// ---------- nieuwe ertsen, edelstenen, gesteente en spullen ----------
+
+const marmer = (x, y, u, v) => {
+  let c = mix([214, 212, 206], [250, 249, 244], fbm(u, v, 3, 3, 4, 310));
+  const w = fbm(u, v, 2, 2, 3, 311);
+  const ader = Math.abs(fbm((u + w * 0.3) % 1, (v + w * 0.2) % 1, 3, 3, 4, 312) - 0.5);
+  if (ader < 0.035) c = mix([134, 136, 148], c, ader / 0.035);
+  const ader2 = Math.abs(fbm(u, v, 5, 5, 3, 313) - 0.5);
+  if (ader2 < 0.012) c = mix([176, 170, 160], c, 0.4);
+  return c;
+};
+const graniet = (x, y, u, v) => {
+  cell(u, v, 13, 314);
+  let c = CID < 0.3 ? [84, 70, 72] : CID < 0.62 ? [186, 142, 128] : CID < 0.86 ? [214, 196, 186] : [48, 44, 48];
+  c = mix(c, [150, 118, 110], sst(0.25, 0.6, F1));
+  return mul(c, 0.9 + fbm(u, v, 6, 6, 2, 315) * 0.2);
+};
+const tegels = (base, n, seed) => (x, y, u, v) => {
+  const fu = (u * n) % 1, fv = (v * n) % 1;
+  const b = Math.min(fu, fv, 1 - fu, 1 - fv);
+  let c = mul(base(x, y, u, v), 0.94 + hash2(Math.floor(u * n), Math.floor(v * n), seed) * 0.1);
+  if (b < 0.035) c = mul(c, 0.62); else if (b < 0.075) c = mul(c, (fu < 0.075 || fv < 0.075) ? 1.1 : 0.85);
+  return c;
+};
+const zwamKleur = {
+  blauw: [[24, 110, 230], [120, 226, 255]], roze: [[214, 30, 140], [255, 170, 226]], groen: [[40, 190, 60], [196, 255, 150]],
+  oranje: [[236, 104, 14], [255, 220, 120]], paars: [[120, 40, 226], [222, 176, 255]],
+  turkoois: [[16, 150, 150], [150, 250, 236]],
+};
+const rankKleur = { groen: [[60, 220, 170], [224, 255, 240]], ijs: [[90, 180, 255], [236, 250, 255]], vuur: [[255, 130, 30], [255, 240, 170]], schaduw: [[170, 70, 255], [246, 214, 255]], wolken: [[255, 206, 80], [255, 252, 224]] };
+
+Object.assign(PX, {
+  koper_erts: ore(steen, [186, 96, 44], [255, 180, 116], 300),
+  zilver_erts: ore(steen, [186, 198, 214], [255, 255, 255], 301),
+  robijn_erts: ore(steen, [196, 14, 44], [255, 150, 164], 302, 0.2),
+  saffier_erts: ore(steen, [26, 64, 220], [150, 204, 255], 303, 0.2),
+  smaragd_erts: ore(steen, [16, 164, 76], [160, 255, 196], 304, 0.2),
+  amethist_erts: ore(steen, [132, 52, 208], [232, 184, 255], 305),
+  zwavel_erts: ore(steen, [212, 190, 24], [255, 250, 150], 306, 0.26, 5),
+  marmer,
+  graniet,
+  marmerblok: tegels(marmer, 2, 316),
+  granietblok: tegels((x, y, u, v) => mul(graniet(x, y, u, v), 1.08), 2, 317),
+  marmerzuil: (x, y, u, v) => {
+    const c = marmer(x, y, u, v);
+    const groef = Math.cos(u * Math.PI * 2 * 5);                      // vijf groeven
+    let f = 0.78 + 0.26 * groef;
+    if (v < 0.1 || v > 0.9) f = (v < 0.03 || v > 0.97 || Math.abs(v - 0.1) < 0.012 || Math.abs(v - 0.9) < 0.012) ? 0.7 : 1.04;
+    return mul(c, f);
+  },
+  marmerzuil_top: (x, y, u, v) => {
+    const d = Math.hypot(u - 0.5, v - 0.5), b = Math.min(u, v, 1 - u, 1 - v);
+    let c = marmer(x, y, u, v);
+    if (b < 0.05 || Math.abs(d - 0.36) < 0.015) c = mul(c, 0.7);
+    return d < 0.36 ? mul(c, 0.92) : c;
+  },
+  robijnblok: gemBlock([190, 10, 40], [255, 120, 140], 320),
+  saffierblok: gemBlock([20, 60, 214], [130, 190, 255], 321),
+  smaragdblok: gemBlock([10, 156, 70], [130, 250, 170], 322),
+  amethistblok: gemBlock([126, 44, 204], [222, 164, 255], 323),
+  koperblok: bevel([214, 122, 66], 324),
+  zilverblok: bevel([226, 232, 240], 325),
+  lantaarn: (x, y, u, v) => {
+    const du = Math.abs(u - 0.5), b = Math.min(u, 1 - u);
+    const koper = mul([188, 104, 52], 0.85 + fbm(u, v, 2, 12, 2, 326) * 0.3);
+    if (v < 0.12 || v > 0.88 || b < 0.09) return (v < 0.03 || v > 0.97 || b < 0.02) ? mul(koper, 0.6) : koper;
+    if (du < 0.03 || Math.abs(v - 0.5) < 0.02) return mul(koper, 0.8);                // spijltjes
+    const d = Math.hypot((u - 0.5) * 1.2, v - 0.56);
+    return mix([255, 255, 236], [255, 176, 60], Math.min(1, d * 2.4));
+  },
+  lantaarn_top: (x, y, u, v) => {
+    const d = Math.hypot(u - 0.5, v - 0.5);
+    const c = mul([188, 104, 52], 0.85 + fbm(u, v, 6, 6, 2, 327) * 0.3);
+    return d < 0.1 ? mul(c, 0.55) : (Math.abs(d - 0.3) < 0.02 ? mul(c, 0.7) : c);
+  },
+  dynamiet: (x, y, u, v) => {
+    const fu = (u * 4) % 1, rond = Math.sin(fu * Math.PI);                             // vier staven naast elkaar
+    let c = mul([206, 34, 30], 0.5 + 0.6 * rond);
+    if (v > 0.36 && v < 0.64) {                                                         // papieren band met een vlam erop
+      c = mul([236, 222, 186], 0.72 + 0.3 * rond);
+      const X = (u - 0.5) * 5, Y = (0.57 - v) * 7;
+      if (X * X + (Y - 0.2) * (Y - 0.2) * 0.6 < 0.42 - Y * 0.3 && Y > -0.55) c = Y > 0.1 ? [236, 70, 20] : [255, 190, 40];
+    } else if (Math.abs(v - 0.36) < 0.02 || Math.abs(v - 0.64) < 0.02) c = mul(c, 0.5);
+    if (v < 0.05 || v > 0.95) c = mul(c, 0.6);
+    return c;
+  },
+  dynamiet_aan: (x, y, u, v) => {
+    const fu = (u * 4) % 1, rond = Math.sin(fu * Math.PI);
+    let c = mix(mul([255, 90, 40], 0.6 + 0.5 * rond), [255, 250, 200], 0.35 + 0.3 * fbm(u, v, 4, 4, 2, 328));
+    if (v > 0.36 && v < 0.64) c = mix([255, 244, 190], [255, 150, 30], Math.abs(v - 0.5) * 6);
+    if (hash2(x >> 1, y >> 1, 329) > 0.9) c = [255, 255, 255];
+    return c;
+  },
+  dynamiet_top: (x, y, u, v) => {
+    const fu = (u * 2) % 1 - 0.5, fv = (v * 2) % 1 - 0.5, d = Math.hypot(fu, fv);
+    if (d > 0.44) return [70, 22, 20];
+    let c = mul([214, 44, 36], 1.05 - d * 0.7);
+    if (d < 0.09) c = [60, 50, 44];                                                     // lontje
+    else if (Math.abs(d - 0.3) < 0.025) c = mul(c, 0.72);
+    return c;
+  },
+  zwamsteel: (x, y, u, v) => {
+    const vezel = vn(u * 14, v * 3, 14, 3, 330) * 0.6 + vn(u * 28, v * 5, 28, 5, 331) * 0.4;
+    let c = mix([196, 190, 170], [246, 244, 230], vezel);
+    if (vn(u * 5, v * 9, 5, 9, 332) > 0.78) c = mix(c, [150, 232, 220], 0.45);            // lichtgevende plekjes
+    return c;
+  },
+  zwamsteel_top: (x, y, u, v) => {
+    const d = Math.hypot(u - 0.5, v - 0.5) * 2;
+    const c = mix([250, 248, 236], [206, 200, 180], Math.min(1, d));
+    return Math.abs(d - 0.55) < 0.05 ? mul(c, 0.86) : c;
+  },
+  gloeimos_top: (x, y, u, v) => {
+    let c = mix([18, 70, 62], [44, 128, 96], fbm(u, v, 5, 5, 4, 333));
+    c = mul(c, 0.8 + vn(u * 32, v * 32, 32, 32, 334) * 0.4);
+    cell(u, v, 8, 335);
+    if (F1 < 0.16 + CID * 0.1 && CID > 0.35) c = mix([150, 255, 214], c, sst(0.02, 0.2, F1));
+    if (hash2(x, y, 336) > 0.985) c = [220, 255, 240];
+    return c;
+  },
+});
+PX.gloeimos_side = grassSide(PX.gloeimos_top, dirt, 337);
+for (const k in zwamKleur) {
+  const [dark, light] = zwamKleur[k];
+  const seed = 340 + Object.keys(zwamKleur).indexOf(k) * 7;
+  // de hoed: felle kleur met lichte stippen
+  PX['zwamhoed_' + k] = (x, y, u, v) => {
+    let c = mix(dark, mix(dark, light, 0.45), fbm(u, v, 3, 3, 3, seed));
+    cell(u, v, 4, seed + 1);
+    const r = 0.13 + CID * 0.12;
+    if (F1 < r) c = mix([255, 255, 255], light, sst(0, r, F1) * 0.9);
+    else if (F1 < r + 0.05) c = mix(light, c, 0.35);
+    return c;
+  };
+  // de onderkant: lamellen die vanuit het midden naar buiten lopen
+  PX['zwamlamellen_' + k] = (x, y, u, v) => {
+    const a = Math.atan2(v - 0.5, u - 0.5), d = Math.hypot(u - 0.5, v - 0.5);
+    const lam = Math.sin(a * 22) * 0.5 + 0.5;
+    const c = mix(mul(dark, 0.55), light, 0.25 + 0.75 * lam * lam);
+    return mix([255, 255, 255], c, Math.min(1, 0.3 + d * 1.6));
+  };
+}
+for (const k in rankKleur) {
+  const [col, light] = rankKleur[k];
+  const seed = 380 + Object.keys(rankKleur).indexOf(k) * 5;
+  // lichtrank: dunne slierten met kraaltjes van licht; sluit boven en onder op zichzelf aan
+  PX['lichtrank_' + k] = (x, y, u, v) => {
+    let best = 9, kraal = 0;
+    for (let i = 0; i < 4; i++) {
+      const cx = 0.14 + i * 0.24 + Math.sin(v * Math.PI * 2 * (1 + (i & 1)) + i * 1.9) * 0.045;
+      const d = Math.abs(u - cx);
+      if (d < best) { best = d; kraal = Math.pow(Math.sin(v * Math.PI * (3 + i) + i * 2.3), 8); }
+    }
+    const w = 0.022 + kraal * 0.05;
+    if (best > w) return [col[0], col[1], col[2], 0];
+    const c = mix(light, col, Math.min(1, best / w) * (1 - kraal * 0.7));
+    return [c[0], c[1], c[2], 255];
+  };
+  // lichtvrucht: een lampion van blaadjes met een fel hart
+  PX['lichtvrucht_' + k] = (x, y, u, v) => {
+    const d = Math.hypot(u - 0.5, v - 0.5);
+    cell(u, v, 3, seed);
+    const rand = sst(0.0, 0.09, F2 - F1);
+    let c = mix([255, 255, 255], col, Math.min(1, d * 1.5 + 0.1));
+    c = mix(mul(col, 0.55), c, 0.35 + 0.65 * rand);
+    return mix(c, light, 0.25);
+  };
+}
+
+function zwamDraw(dark, light) {
+  const cd = 'rgb(' + dark.join(',') + ')', cl = 'rgb(' + light.join(',') + ')';
+  return (g) => {
+    const een = (x, base, h, r) => {
+      g.strokeStyle = '#e9e6d6'; g.lineWidth = Math.max(3, r * 0.34); g.lineCap = 'round';
+      g.beginPath(); g.moveTo(x, base); g.quadraticCurveTo(x + r * 0.2, base - h * 0.5, x, base - h); g.stroke();
+      const gr = g.createRadialGradient(x - r * 0.2, base - h - r * 0.5, 1, x, base - h, r * 1.2);
+      gr.addColorStop(0, '#ffffff'); gr.addColorStop(0.35, cl); gr.addColorStop(1, cd);
+      g.fillStyle = gr;
+      g.beginPath(); g.moveTo(x - r, base - h + 1); g.bezierCurveTo(x - r, base - h - r * 1.25, x + r, base - h - r * 1.25, x + r, base - h + 1); g.closePath(); g.fill();
+      g.fillStyle = 'rgba(255,255,255,0.85)';
+      for (let i = 0; i < 3; i++) { g.beginPath(); g.arc(x - r * 0.5 + i * r * 0.5, base - h - r * (0.35 + (i % 2) * 0.3), r * 0.11, 0, 6.3); g.fill(); }
+    };
+    een(20, 64, 26, 11); een(42, 64, 40, 14); een(53, 64, 16, 7);
+  };
+}
+for (const k in zwamKleur) DRAW['gloeizwam_' + k] = zwamDraw(zwamKleur[k][0], zwamKleur[k][1]);
+DRAW.lichtbloem = (g) => {
+  g.strokeStyle = '#2f9a78'; g.lineWidth = 3; g.lineCap = 'round';
+  g.beginPath(); g.moveTo(32, 64); g.quadraticCurveTo(26, 44, 32, 26); g.stroke();
+  g.beginPath(); g.moveTo(30, 50); g.quadraticCurveTo(16, 46, 14, 36); g.stroke();
+  const gr = g.createRadialGradient(32, 20, 1, 32, 20, 17);
+  gr.addColorStop(0, '#ffffff'); gr.addColorStop(0.45, '#a8fff0'); gr.addColorStop(1, '#2fd4ff');
+  g.fillStyle = gr;
+  for (let i = 0; i < 5; i++) { const a = -Math.PI / 2 + (i - 2) * 0.62; g.beginPath(); g.ellipse(32 + Math.cos(a) * 10, 22 + Math.sin(a) * 10, 9, 4.6, a, 0, 6.3); g.fill(); }
+  g.fillStyle = '#fffbe0'; g.beginPath(); g.arc(32, 22, 4, 0, 6.3); g.fill();
+  g.fillStyle = '#c8fff4'; g.beginPath(); g.arc(14, 34, 3.5, 0, 6.3); g.fill();
+};
+
+// ---------- plaatjes voor de 3D-modellen van planten, vuur en zo (zie blockmodels.js) ----------
+// De vorm van een blaadje zit in het plaatje: v = 1 is waar het vastzit, v = 0 is de punt.
+// spits blad (met een punt) of rond bloemblad (smal onderaan, rond van boven)
+const bladBreedte = (t) => 0.46 * Math.pow(Math.sin(Math.PI * Math.pow(c01(t), 0.72)), 0.75);
+const bloembladBreedte = (t) => (t > 0.62 ? 0.47 * Math.sqrt(Math.max(0, 1 - Math.pow((t - 0.62) / 0.36, 2))) : 0.47 * (0.22 + 0.78 * sst(0, 0.62, t)));
+const bloemblad = (basis, midden, punt, seed) => (x, y, u, v) => {
+  const t = 1 - v, d = Math.abs(u - 0.5), w = bloembladBreedte(t);
+  let c = t < 0.35 ? mix(basis, midden, t / 0.35) : mix(midden, punt, (t - 0.35) / 0.65);
+  c = mul(c, 0.9 + 0.2 * vn(u * 18, v * 3, 18, 3, seed) - (w > 0 ? 0.18 * Math.pow(d / w, 3) : 0));
+  if (d < 0.02) c = mul(c, 0.9);
+  return [c[0], c[1], c[2], d < w && t > 0.02 ? 255 : 0];
+};
+Object.assign(PX, {
+  gras_spriet: (x, y, u, v) => {
+    const t = 1 - v, rib = Math.abs(u - 0.5);
+    let c = mix([28, 80, 24], [132, 192, 64], c01(t * 0.85 + (fbm(u, v, 4, 8, 2, 400) - 0.5) * 0.3));
+    if (rib < 0.07) c = mul(c, 1.16); else if (rib > 0.36) c = mul(c, 0.8);
+    return c;
+  },
+  plant_steel: (x, y, u, v) => mul([56, 124, 46], 0.78 + vn(u * 12, v * 4, 12, 4, 401) * 0.44),
+  plant_blad: (x, y, u, v) => {
+    const t = 1 - v, d = Math.abs(u - 0.5), w = bladBreedte(t);
+    let c = mix([34, 96, 30], [96, 170, 60], c01(0.25 + t * 0.6 + (fbm(u, v, 6, 6, 2, 402) - 0.5) * 0.3));
+    const nerf = Math.abs(((d * 6 + t * 3) % 1) - 0.5);
+    if (d < 0.025) c = mul(c, 1.3); else if (nerf < 0.06) c = mul(c, 1.1);
+    if (u > 0.5) c = mul(c, 0.88);
+    return [c[0], c[1], c[2], d < w && t > 0.01 ? 255 : 0];
+  },
+  bloemblad_rood: bloemblad([96, 8, 16], [226, 36, 36], [255, 104, 84], 403),
+  bloemblad_geel: bloemblad([226, 140, 8], [255, 208, 36], [255, 240, 130], 404),
+  bloemblad_blauw: bloemblad([240, 240, 255], [64, 112, 236], [128, 168, 255], 405),
+  bloemhart: (x, y, u, v) => {
+    cell(u, v, 7, 406);
+    const c = F1 < 0.24 ? mix([150, 84, 8], [214, 140, 16], F1 / 0.24) : [246, 190, 36];
+    return mul(c, 0.9 + hash2(x, y, 407) * 0.2);
+  },
+  bes: (x, y, u, v) => {
+    const fu = (u * 5) % 1, d = Math.hypot(fu - 0.32, v - 0.34);       // vijf keer rond: elke kant van de bes een eigen glimlichtje
+    const c = mix([255, 170, 170], [208, 26, 46], sst(0.04, 0.26, d));
+    return mul(c, 1.05 - 0.4 * v);
+  },
+  tak: (x, y, u, v) => {
+    const g = vn(u * 9, v * 3, 9, 3, 408) * 0.6 + vn(u * 22, v * 6, 22, 6, 409) * 0.4;
+    return mul(mix([72, 60, 48], [152, 136, 114], g), 0.92 + hash2(x, y, 410) * 0.14);
+  },
+  stok_hout: (x, y, u, v) => {
+    const g = vn(u * 10, v * 2, 10, 2, 411) * 0.6 + vn(u * 26, v * 4, 26, 4, 412) * 0.4;
+    return mul(mix([110, 74, 38], [178, 130, 72], g), 0.94 + hash2(x, y, 413) * 0.1);
+  },
+  vlam: (x, y, u, v) => {
+    const k = c01((1 - v) * 1.12 + (fbm(u, v, 6, 6, 3, 414) - 0.5) * 0.42);
+    if (k < 0.28) return mix([255, 252, 216], [255, 216, 72], k / 0.28);
+    if (k < 0.68) return mix([255, 216, 72], [250, 122, 18], (k - 0.28) / 0.4);
+    return mix([250, 122, 18], [204, 44, 8], (k - 0.68) / 0.32);
+  },
+  lichtblad: (x, y, u, v) => {
+    const t = 1 - v, d = Math.abs(u - 0.5), w = bloembladBreedte(t);
+    const c = mix([255, 255, 255], [40, 208, 255], c01((w > 0 ? d / w : 1) * 0.75 + t * 0.35));
+    return [c[0], c[1], c[2], d < w && t > 0.02 ? 255 : 0];
+  },
+});
+
 // welke plaatjes niet naadloos herhalen (losse sprites)
 const NO_WRAP = new Set(Object.keys(DRAW));
 
@@ -643,10 +1052,11 @@ function renderTile(name) {
 }
 
 // kleur uitsmeren naar doorzichtige pixels, zodat er geen donkere randjes komen
-function bleed(d) {
+function bleed(d, S = TS) {
+  const TS = S;
   const filled = new Uint8Array(TS * TS);
   for (let i = 0; i < TS * TS; i++) filled[i] = d[i * 4 + 3] > 8 ? 1 : 0;
-  for (let pass = 0; pass < 6; pass++) {
+  for (let pass = 0; pass < (S > 64 ? 12 : 6); pass++) {
     const add = [];
     for (let y = 0; y < TS; y++) for (let x = 0; x < TS; x++) {
       const i = y * TS + x;
@@ -711,6 +1121,173 @@ export function buildAtlas() {
   return { tex, uv, canvases, W, H, data };
 }
 
+// ---------- de mooie atlas (instelling "Mooie graphics") ----------
+//
+// Dezelfde plaatjes, maar dubbel zo groot (128 pixels) en met meer detail. Er hoort een tweede
+// atlas bij met per pixel: de richting van het oppervlak (voor reliëf in het licht), hoe het
+// glanst, en of het zelf licht geeft. De tekenaar in render.js gebruikt die voor zonlicht dat
+// over de hobbels strijkt, glinsteringen en gloed.
+
+export const HQ_TS = 128;
+const HQ_PAD = 16, HQ_CELL = HQ_TS + HQ_PAD * 2, HQ_COLS = 16;
+
+const lum = (r, g, b) => (r * 0.299 + g * 0.587 + b * 0.114) / 255;
+const sat = (r, g, b) => { const mx = Math.max(r, g, b); return mx ? (mx - Math.min(r, g, b)) / mx : 0; };
+
+// Per plaatje: [reliëf, glans, gloed]. gloed is een getal of een functie (r, g, b, a, he) -> 0..1,
+// waarbij he zegt of de teken-functie deze pixel als "lichtgevend" heeft gemerkt.
+function hqMat(name) {
+  let bump = 1, spec = 0.03, emis = 0;
+  const is = (re) => re.test(name);
+  if (name === 'water') return [0, 1, 1];                          // gloed 1 = "dit is water" (zie render.js)
+  if (is(/^(ijs|glas)$/)) { spec = 0.85; bump = 0.5; }
+  else if (name === 'obsidiaan') spec = 0.7;
+  else if (name === 'sneeuw') { spec = 0.25; bump = 0.6; }
+  else if (name === 'zand') spec = 0.1;
+  else if (name === 'wolk') bump = 0.4;
+  else if (is(/^(blad_|levensblad_)/)) spec = 0.12;
+  else if (is(/^(marmerblok|granietblok|marmerzuil)/)) spec = 0.45;
+  else if (is(/^(marmer|graniet)$/)) spec = 0.15;
+  if (name === 'bes') spec = 0.7;
+  else if (is(/^(gras_spriet|plant_blad|bloemblad_)/)) { spec = 0.1; bump = 0.5; }
+  if (name === 'vlam') { emis = 1; bump = 0; }
+  else if (name === 'lichtblad') { emis = 1; bump = 0.3; }
+  else if (name === 'lava') emis = (r, g, b) => Math.pow(lum(r, g, b), 1.3);
+  else if (name === 'magmasteen') emis = (r, g, b) => (r - b > 90 ? sst(120, 235, r) : 0);
+  else if (name === 'gloeikristal') emis = (r, g, b, a, he) => he;
+  else if (is(/(ijskristal|vuurkristal|schaduwkristal|hemelkristal|^kristal)_erts$/)) emis = (r, g, b, a, he) => he * 0.8;
+  else if (is(/(robijn|saffier|smaragd|amethist)_erts$/)) emis = (r, g, b, a, he) => he * 0.5;
+  else if (is(/blok$/) && is(/kristal|robijn|saffier|smaragd|amethist/)) emis = 0.4;
+  else if (is(/^portaal_/)) { emis = 0.9; bump = 0; }
+  else if (name === 'portaalsteen') emis = (r, g, b) => (b > 220 && r < 160 ? 1 : 0);
+  else if (name === 'levenshart') emis = (r, g, b) => sst(0.45, 0.9, lum(r, g, b));
+  else if (is(/^levenshout/)) emis = (r, g, b) => (g > 200 && g - r > 20 ? 0.9 : 0);
+  else if (is(/^levensblad_/)) emis = (r, g, b, a, he) => (he ? 1 : 0.5);
+  else if (is(/^(lamp|lantaarn)$/)) emis = (r, g, b) => sst(0.6, 0.85, lum(r, g, b));
+  else if (is(/^(fakkel|kampvuur)$/)) emis = (r, g, b) => (r > 215 && g > 70 ? 1 : 0);
+  else if (name === 'gloeipaddenstoel') emis = (r, g, b) => (g > 150 && b > 140 ? 1 : 0.1);
+  else if (name === 'oven_side') emis = (r, g, b) => (r > 205 && g > 50 && b < 110 ? 1 : 0);
+  else if (name === 'scheepscomputer') emis = (r, g, b) => (g > 170 && r < 160 ? 1 : 0);
+  else if (name === 'stam_verkoold') emis = (r, g, b) => (r > 220 && g > 90 && b < 90 ? 1 : 0);
+  else if (name === 'schaduwgras_top') emis = (r, g, b) => (r > 200 && b > 240 ? 1 : 0);
+  else if (name === 'blad_schaduw') emis = (r, g, b, a, he) => he;
+  else if (is(/^lichtrank_/)) { emis = 1; bump = 0.3; }
+  else if (is(/^lichtvrucht_/)) emis = (r, g, b) => 0.55 + 0.45 * lum(r, g, b);
+  else if (is(/^gloeizwam_/)) emis = (r, g, b) => (sat(r, g, b) > 0.3 || lum(r, g, b) > 0.92 ? 1 : 0.25);
+  else if (is(/^zwamhoed_/)) emis = (r, g, b) => 0.65 + 0.35 * lum(r, g, b);
+  else if (is(/^zwamlamellen_/)) emis = 0.85;
+  else if (is(/^zwamsteel/)) emis = (r, g, b) => (g - r > 22 ? 0.85 : 0.12);
+  else if (is(/^gloeimos_/)) emis = (r, g, b) => (g > 190 && b > 170 ? 1 : (g > b + 20 && g > r + 20 ? 0.12 : 0));
+  else if (name === 'lichtbloem') emis = (r, g, b) => (b > 200 ? 1 : 0.2);
+  else if (name === 'dynamiet_aan') emis = 0.8;
+  return [bump, spec, emis];
+}
+
+// Eén plaatje op 128 pixels: kleur plus hoogte, glans en gloed per pixel.
+function renderTileHQ(name) {
+  const S = HQ_TS, N = S * S;
+  const [bump, spec0, emis] = hqMat(name);
+  const hgt = new Float32Array(N), spec = new Uint8Array(N), glow = new Uint8Array(N);
+  let col;
+  const efn = typeof emis === 'function' ? emis : null;
+  if (DRAW[name]) {
+    const cv = document.createElement('canvas');
+    cv.width = cv.height = S;
+    const g = cv.getContext('2d');
+    g.scale(S / TS, S / TS);
+    DRAW[name](g);
+    col = g.getImageData(0, 0, S, S).data;
+    for (let i = 0; i < N; i++) {
+      const r = col[i * 4], gg = col[i * 4 + 1], b = col[i * 4 + 2], a = col[i * 4 + 3];
+      hgt[i] = a > 8 ? 0.3 + 0.7 * lum(r, gg, b) : 0;
+      spec[i] = spec0 * 255;
+      glow[i] = a > 8 ? (efn ? efn(r, gg, b, a, 0) : emis) * 255 : 0;
+    }
+    bleed(col, S);
+  } else {
+    col = new Uint8ClampedArray(N * 4);
+    const fn = PX[name] || ((x, y) => (((x >> 4) + (y >> 4)) & 1 ? [255, 0, 255] : [0, 0, 0]));
+    let hasA = false;
+    HQ = true;
+    try {
+      for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+        HH = -1; HS = -1; HE = -1;
+        const c = fn(x, y, x / S, y / S);
+        const i = y * S + x, a = c.length > 3 ? c[3] : 255;
+        col[i * 4] = c[0]; col[i * 4 + 1] = c[1]; col[i * 4 + 2] = c[2]; col[i * 4 + 3] = a;
+        if (a === 0) hasA = true;
+        const r = col[i * 4], gg = col[i * 4 + 1], b = col[i * 4 + 2];
+        hgt[i] = a < 90 ? 0 : (HH >= 0 ? HH : 0.25 + 0.6 * lum(r, gg, b));
+        spec[i] = (HS >= 0 ? HS : spec0) * 255;
+        glow[i] = a < 90 ? 0 : c01(efn ? efn(r, gg, b, a, HE > 0 ? 1 : 0) : emis) * 255;
+      }
+    } finally { HQ = false; }
+    if (hasA) bleed(col, S);
+  }
+  // reliëf: de helling van de hoogte (een klein beetje verzacht) wordt de richting van het oppervlak
+  const wrap = !NO_WRAP.has(name);
+  const at = (x, y) => {
+    if (wrap) { x = (x + S) % S; y = (y + S) % S; } else { x = x < 0 ? 0 : x >= S ? S - 1 : x; y = y < 0 ? 0 : y >= S ? S - 1 : y; }
+    return hgt[y * S + x];
+  };
+  const nrm = new Uint8Array(N * 2);
+  const K = 2.6 * bump;
+  for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+    const dx = (at(x - 1, y) - at(x + 1, y)) * 2 + (at(x - 1, y - 1) - at(x + 1, y - 1)) + (at(x - 1, y + 1) - at(x + 1, y + 1));
+    const dy = (at(x, y - 1) - at(x, y + 1)) * 2 + (at(x - 1, y - 1) - at(x - 1, y + 1)) + (at(x + 1, y - 1) - at(x + 1, y + 1));
+    let nx = dx * 0.25 * K, ny = dy * 0.25 * K;
+    const l = Math.hypot(nx, ny, 1);
+    nx /= l; ny /= l;
+    nrm[(y * S + x) * 2] = Math.round(nx * 127 + 128); nrm[(y * S + x) * 2 + 1] = Math.round(ny * 127 + 128);
+  }
+  return { col, nrm, spec, glow, wrap };
+}
+
+// Bouwt de mooie atlas. Dat kost even tijd, dus het gaat in stukjes zodat het spel niet stilvalt;
+// onProgress krijgt een getal van 0 tot 1.
+export async function buildAtlasHQ(onProgress) {
+  const n = TILE_NAMES.length, S = HQ_TS, PAD = HQ_PAD, CELL = HQ_CELL;
+  const rows = Math.ceil(n / HQ_COLS);
+  const W = HQ_COLS * CELL, H = rows * CELL;
+  const data = new Uint8Array(W * H * 4), ndata = new Uint8Array(W * H * 4);
+  for (let i = 0; i < W * H; i++) { ndata[i * 4] = 128; ndata[i * 4 + 1] = 128; }
+  const uv = new Float32Array(n * 4);
+  let last = performance.now();
+  for (let t = 0; t < n; t++) {
+    const T = renderTileHQ(TILE_NAMES[t]);
+    const ox = (t % HQ_COLS) * CELL, oy = Math.floor(t / HQ_COLS) * CELL;
+    for (let y = 0; y < CELL; y++) for (let x = 0; x < CELL; x++) {
+      let sx = x - PAD, sy = y - PAD, a = 1;
+      if (T.wrap) { sx = ((sx % S) + S) % S; sy = ((sy % S) + S) % S; }
+      else {
+        if (sx < 0 || sy < 0 || sx >= S || sy >= S) a = 0;
+        sx = Math.min(S - 1, Math.max(0, sx)); sy = Math.min(S - 1, Math.max(0, sy));
+      }
+      const si = sy * S + sx, di = ((oy + y) * W + ox + x) * 4;
+      data[di] = T.col[si * 4]; data[di + 1] = T.col[si * 4 + 1]; data[di + 2] = T.col[si * 4 + 2]; data[di + 3] = a ? T.col[si * 4 + 3] : 0;
+      ndata[di] = T.nrm[si * 2]; ndata[di + 1] = T.nrm[si * 2 + 1]; ndata[di + 2] = T.spec[si]; ndata[di + 3] = a ? T.glow[si] : 0;
+    }
+    uv[t * 4] = (ox + PAD) / W; uv[t * 4 + 1] = (oy + PAD) / H;
+    uv[t * 4 + 2] = (ox + PAD + S) / W; uv[t * 4 + 3] = (oy + PAD + S) / H;
+    if (performance.now() - last > 24) {
+      if (onProgress) onProgress((t + 1) / n);
+      await new Promise((r) => setTimeout(r, 0));
+      last = performance.now();
+    }
+  }
+  const mk = (d, srgb) => {
+    const tex = new THREE.DataTexture(d, W, H, THREE.RGBAFormat);
+    if (srgb) tex.colorSpace = THREE.SRGBColorSpace;
+    tex.magFilter = THREE.LinearFilter;
+    tex.minFilter = THREE.LinearMipmapLinearFilter;
+    tex.generateMipmaps = true;
+    tex.needsUpdate = true;
+    return tex;
+  };
+  if (onProgress) onProgress(1);
+  return { tex: mk(data, true), nrm: mk(ndata, false), uv, W, H, data, ndata };
+}
+
 // ---------- icoontjes voor de rugzak ----------
 
 const iconCache = new Map();
@@ -724,6 +1301,29 @@ function shadeHex(h, f) {
 }
 
 const ICONS = {
+  boots: (g, c) => {
+    g.lineWidth = 2; g.strokeStyle = 'rgba(0,0,0,0.65)'; g.lineJoin = 'round';
+    const een = (ox) => {
+      g.fillStyle = '#8a5a30';
+      g.beginPath(); g.moveTo(ox + 4, 12); g.lineTo(ox + 16, 12); g.lineTo(ox + 16, 36); g.lineTo(ox + 26, 42); g.lineTo(ox + 26, 50); g.lineTo(ox + 2, 50); g.closePath(); g.fill(); g.stroke();
+      g.fillStyle = c; g.fillRect(ox + 3, 11, 14, 6); g.strokeRect(ox + 3, 11, 14, 6);
+      g.fillStyle = '#3a2614'; g.fillRect(ox + 1, 50, 26, 5); g.strokeRect(ox + 1, 50, 26, 5);
+      // veer onder de zool
+      g.strokeStyle = c; g.lineWidth = 2.5; g.beginPath(); g.moveTo(ox + 5, 56); g.lineTo(ox + 10, 60); g.lineTo(ox + 15, 56); g.lineTo(ox + 20, 60); g.lineTo(ox + 24, 56); g.stroke();
+      g.strokeStyle = 'rgba(0,0,0,0.65)'; g.lineWidth = 2;
+    };
+    een(3); een(34);
+  },
+  scope: (g, c) => {
+    g.lineWidth = 2; g.strokeStyle = 'rgba(0,0,0,0.65)';
+    g.save(); g.translate(32, 32); g.rotate(-0.6);
+    g.fillStyle = shadeHex(c, 0.75); g.fillRect(-24, -7, 20, 14); g.strokeRect(-24, -7, 20, 14);
+    g.fillStyle = c; g.fillRect(-6, -9, 18, 18); g.strokeRect(-6, -9, 18, 18);
+    g.fillStyle = shadeHex(c, 1.2); g.fillRect(10, -11, 14, 22); g.strokeRect(10, -11, 14, 22);
+    g.fillStyle = '#9fe8ff'; g.fillRect(22, -9, 4, 18); g.strokeRect(22, -9, 4, 18);
+    g.fillStyle = 'rgba(255,255,255,0.35)'; g.fillRect(-22, -5, 44, 3);
+    g.restore();
+  },
   stick: (g) => { g.strokeStyle = '#4a3018'; g.lineWidth = 9; g.lineCap = 'round'; g.beginPath(); g.moveTo(16, 50); g.lineTo(48, 14); g.stroke(); g.strokeStyle = '#9a6e3a'; g.lineWidth = 5; g.stroke(); },
   lump: (g, c) => { g.fillStyle = c; g.strokeStyle = '#000'; g.lineWidth = 2; g.beginPath(); g.moveTo(14, 40); g.lineTo(22, 20); g.lineTo(40, 14); g.lineTo(52, 30); g.lineTo(46, 50); g.lineTo(24, 52); g.closePath(); g.fill(); g.stroke(); g.fillStyle = 'rgba(255,255,255,0.25)'; g.beginPath(); g.moveTo(24, 24); g.lineTo(38, 18); g.lineTo(34, 30); g.closePath(); g.fill(); },
   ingot: (g, c) => {

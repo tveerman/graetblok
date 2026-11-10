@@ -3,9 +3,11 @@
 import * as THREE from '../../vendor/three.module.min.js';
 import { CS, CH, idx, chunkKey } from '../shared/constants.js';
 import {
-  B, B_SHAPE, B_PASS, B_OPAQUE, B_SOLID, B_LIGHT, B_TOP, B_SIDE, B_BOTTOM, B_HEIGHT, B_BED, NUM_BLOCKS,
-  SHAPE_CUBE, SHAPE_CROSS, SHAPE_LIQUID, SHAPE_LOW, SHAPE_EGG, LIFE_LEAVES, LEAVES, TILE_DOR, tileId,
+  B, B_SHAPE, B_PASS, B_OPAQUE, B_SOLID, B_LIGHT, B_GLOW, B_TOP, B_SIDE, B_BOTTOM, B_HEIGHT, B_BED, NUM_BLOCKS,
+  SHAPE_CUBE, SHAPE_CROSS, SHAPE_LIQUID, SHAPE_LOW, SHAPE_EGG, LIFE_LEAVES, LIFE_VINES, LIFE_FRUIT, LEAVES, TILE_DOR, tileId,
 } from '../shared/blocks.js';
+import { hash2 } from '../shared/noise.js';
+import { BLOCK_MODELS } from './blockmodels.js';
 
 const PW = CS + 2, PH = CH + 2;
 const SX = PW * PH, SZ = PH;
@@ -16,11 +18,28 @@ const SKYBLOCK = new Uint8Array(NUM_BLOCKS);     // houdt dit blok zonlicht tege
 for (let i = 0; i < NUM_BLOCKS; i++) SKYBLOCK[i] = B_OPAQUE[i];
 for (const id of LEAVES) SKYBLOCK[id] = 1;
 
+// Licht en gloed per blok (kopie): een herstelde levensboom straalt veel feller dan een zieke.
+// LIGHT = hoeveel licht het blok op zijn omgeving werpt, GLOW = hoe fel het blok zelf oplicht.
+const LIGHT = B_LIGHT.slice(), GLOW = B_GLOW.slice();
+// Het vierde getal van "light" per hoekpunt: gloed (0..60) + 64 voor plantjes + 128 voor
+// hoekpunten die in de wind bewegen (dat laatste gebruikt alleen de mooie weergave).
+const SWAY = new Uint8Array(NUM_BLOCKS);
+for (const id of LEAVES) SWAY[id] = 128;
+for (const k in LIFE_LEAVES) SWAY[LIFE_LEAVES[k]] = 128;
+
+// In de mooie weergave rekent de tekenaar zelf uit hoe licht elke kant is; dan bakken we de
+// vaste schaduw per kant (boven licht, opzij donkerder) niet in het zon- en fakkellicht.
+let HQ_MESH = false;
+export function setMeshHQ(on) { HQ_MESH = !!on; }
+
 export function setTreeTiles(trees) {
   for (const k in LIFE_LEAVES) {
-    const id = LIFE_LEAVES[k];
+    const id = LIFE_LEAVES[k], vine = LIFE_VINES[k], fruit = LIFE_FRUIT[k];
     const alive = !!(trees && trees[k]);
     T_TOP[id] = alive ? B_TOP[id] : TILE_DOR; T_SIDE[id] = T_TOP[id]; T_BOTTOM[id] = T_TOP[id];
+    GLOW[id] = alive ? 10 : 0;
+    GLOW[vine] = alive ? 15 : 8;
+    GLOW[fruit] = alive ? 15 : 9; LIGHT[fruit] = alive ? 13 : 7;
   }
 }
 
@@ -128,7 +147,8 @@ export class ChunkWorld {
     const key = chunkKey(cx, cz);
     const old = this.chunks.get(key);
     if (old) this.dispose(old);
-    const c = { cx, cz, key, b: blocks, hm: new Uint8Array(256), maxY: 0, emit: [], meshes: [null, null, null], meshed: false, urgent: false };
+    // urgent: 0 = kan wachten, 1 = snel (licht veranderd), 2 = nu meteen (er is een blok weg of bij)
+    const c = { cx, cz, key, b: blocks, hm: new Uint8Array(256), maxY: 0, emit: [], meshes: [null, null, null], meshed: false, urgent: 0 };
     this.scan(c);
     this.chunks.set(key, c);
     this._lk = -1;
@@ -162,7 +182,7 @@ export class ChunkWorld {
         if (!id) continue;
         if (!top) top = y;
         if (!h && SKYBLOCK[id]) h = y;
-        const L = B_LIGHT[id];
+        const L = LIGHT[id];
         if (L) {
           if (B_SHAPE[id] === SHAPE_LIQUID) { if ((x & 3) === 0 && (z & 3) === 0 && b[p + y + 1] === 0) c.emit.push(x, y, z, L); }
           else c.emit.push(x, y, z, L);
@@ -202,19 +222,33 @@ export class ChunkWorld {
     if (old === id) return;
     c.b[i] = id;
     this.scan(c);
-    c.urgent = true;
+    c.urgent = 2;
     this.dirty.add(c.key);
-    const wide = B_LIGHT[old] || B_LIGHT[id] || SKYBLOCK[old] !== SKYBLOCK[id];
+    const wide = LIGHT[old] || LIGHT[id] || SKYBLOCK[old] !== SKYBLOCK[id];
     const m = wide ? 8 : 1;
     for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) {
       if (!dx && !dz) continue;
       if ((dx < 0 && lx >= m) || (dx > 0 && lx < 16 - m) || (dz < 0 && lz >= m) || (dz > 0 && lz < 16 - m)) continue;
       const n = this.get(cx + dx, cz + dz);
-      if (n && n.meshed) { n.urgent = true; this.dirty.add(n.key); }
+      if (!n || !n.meshed) continue;
+      // Ligt het blok precies tegen de buur-chunk aan, dan moet die in hetzelfde beeld mee
+      // veranderen: daar komt een vlak vrij (of verdwijnt er een). Anders kijk je een paar
+      // beelden lang dwars door de wereld heen. Andere buren hoeven alleen ander licht.
+      const touches = (dz === 0 && ((dx < 0 && lx === 0) || (dx > 0 && lx === 15))) || (dx === 0 && ((dz < 0 && lz === 0) || (dz > 0 && lz === 15)));
+      if (touches) n.urgent = 2; else if (!n.urgent) n.urgent = 1;
+      this.dirty.add(n.key);
     }
   }
 
   remeshAll() { for (const c of this.chunks.values()) if (c.meshed) this.dirty.add(c.key); }
+  // andere plaatjes en materialen gebruiken (wisselen tussen gewone en mooie weergave)
+  setLook(mats, uv) {
+    this.mats = mats; this.uv = uv;
+    for (const c of this.chunks.values()) for (let i = 0; i < 3; i++) if (c.meshes[i]) c.meshes[i].material = mats[i];
+    this.remeshAll();
+  }
+  // als een levensboom herstelt, geven zijn vruchten meer licht: de lichtbronnen opnieuw opzoeken
+  rescanAll() { for (const c of this.chunks.values()) this.scan(c); this.remeshAll(); }
 
   // Elke frame: een paar chunks (opnieuw) opbouwen, dichtbij eerst.
   update(px, pz, budgetMs) {
@@ -222,6 +256,17 @@ export class ChunkWorld {
     const t0 = performance.now();
     const pcx = Math.floor(px / 16), pcz = Math.floor(pz / 16);
     let done = 0;
+    // Eerst alles wat samen in één beeld moet veranderen (de chunk waar een blok weg is of bij
+    // is gekomen, en op de rand ook de buur): dat gaat altijd door, ook als de tijd op is.
+    let must = null;
+    for (const key of this.dirty) {
+      const c = this.chunks.get(key);
+      if (c && c.urgent === 2 && this.get(c.cx + 1, c.cz) && this.get(c.cx - 1, c.cz) && this.get(c.cx, c.cz + 1) && this.get(c.cx, c.cz - 1)) (must || (must = [])).push(c);
+    }
+    if (must) {
+      for (const c of must) { this.dirty.delete(c.key); c.urgent = 0; this.mesh(c); done++; }
+      if (performance.now() - t0 > budgetMs) return done;
+    }
     while (this.dirty.size) {
       let best = null, bd = 1e9;
       for (const key of this.dirty) {
@@ -234,7 +279,7 @@ export class ChunkWorld {
       }
       if (!best) break;
       this.dirty.delete(best.key);
-      best.urgent = false;
+      best.urgent = 0;
       this.mesh(best);
       done++;
       if (performance.now() - t0 > budgetMs) break;
@@ -335,7 +380,8 @@ export class ChunkWorld {
         if (shape === SHAPE_CUBE) {
           const pass = B_PASS[id];
           const buf = bufs[pass];
-          const selfL = B_LIGHT[id];
+          const selfL = LIGHT[id];
+          const gl = pass === 2 ? 0 : GLOW[id] * 4, sw = pass === 2 ? 0 : SWAY[id];
           for (let f = 0; f < 6; f++) {
             const np = p + NSTR[f];
             const nid = pad[np];
@@ -348,8 +394,8 @@ export class ChunkWorld {
             if (sl > 15) sl = 15; else if (sl < 0) sl = 0;
             let bl = hasBL ? BL[np] : 0;
             if (selfL > bl) bl = selfL;
-            const sh = SHADE[f];
-            const sky = SKY_LUT[sl] * sh * 255, blk = BLK_LUT[bl] * sh * 255, amb = sh * 255;
+            const sh = SHADE[f], ls = HQ_MESH ? 1 : sh;
+            const sky = SKY_LUT[sl] * ls * 255, blk = BLK_LUT[bl] * ls * 255, amb = sh * 255;
             const tile = f === 2 ? T_TOP[id] : (f === 3 ? T_BOTTOM[id] : T_SIDE[id]);
             const u0 = uvT[tile * 4], v0 = uvT[tile * 4 + 1], du = uvT[tile * 4 + 2] - u0, dv = uvT[tile * 4 + 3] - v0;
             buf.need(4);
@@ -364,7 +410,8 @@ export class ChunkWorld {
               const vi = nv + k;
               buf.pos[vi * 3] = x + FC[fk * 3]; buf.pos[vi * 3 + 1] = y + FC[fk * 3 + 1]; buf.pos[vi * 3 + 2] = z + FC[fk * 3 + 2];
               buf.uv[vi * 2] = u0 + FUV[fk * 2] * du; buf.uv[vi * 2 + 1] = v0 + FUV[fk * 2 + 1] * dv;
-              buf.light[vi * 4] = sky * af; buf.light[vi * 4 + 1] = blk * af; buf.light[vi * 4 + 2] = amb * af; buf.light[vi * 4 + 3] = 0;
+              buf.light[vi * 4] = sky * af; buf.light[vi * 4 + 1] = blk * af; buf.light[vi * 4 + 2] = amb * af;
+              buf.light[vi * 4 + 3] = (gl ? Math.round(gl * (0.7 + 0.3 * sh * af)) : 0) + sw;
             }
             const ni = buf.ni;
             if (a0 + a2 >= a1 + a3) {
@@ -398,8 +445,8 @@ export class ChunkWorld {
               bl = hasBL ? BL[np] : 0;
             }
             if (sl > 15) sl = 15; else if (sl < 0) sl = 0;
-            const sh = SHADE[f];
-            const sky = SKY_LUT[sl] * sh * 255, blk = BLK_LUT[bl] * sh * 255, amb = sh * 255;
+            const sh = SHADE[f], ls = HQ_MESH ? 1 : sh;
+            const sky = SKY_LUT[sl] * ls * 255, blk = BLK_LUT[bl] * ls * 255, amb = sh * 255;
             const fh = f === endFace ? 1 : h;
             const tile = f === 2 ? T_TOP[id] : (f === 3 ? T_BOTTOM[id] : (f === endFace ? T_BED_END : T_SIDE[id]));
             const u0 = uvT[tile * 4], v0 = uvT[tile * 4 + 1], du = uvT[tile * 4 + 2] - u0, dv = uvT[tile * 4 + 3] - v0;
@@ -450,7 +497,7 @@ export class ChunkWorld {
           let sl = 15 - (E[ecol] - y);
           if (sl > 15) sl = 15; else if (sl < 0) sl = 0;
           let bl = hasBL ? BL[p] : 0;
-          if (B_LIGHT[id] > bl) bl = B_LIGHT[id];
+          if (LIGHT[id] > bl) bl = LIGHT[id];
           const skyL = SKY_LUT[sl] * 255, blkL = BLK_LUT[bl] * 255;
           const tile = T_TOP[id];
           const u0 = uvT[tile * 4], v0 = uvT[tile * 4 + 1], du = uvT[tile * 4 + 2] - u0, dv = uvT[tile * 4 + 3] - v0;
@@ -476,25 +523,46 @@ export class ChunkWorld {
           }
           if (y < loY) loY = y; if (y > hiY) hiY = y;
         } else if (shape === SHAPE_CROSS) {
+          // Klein ding (plantje, paddenstoel, fakkel, vuur, rank): een 3D-model uit blockmodels.js.
+          // Elke plek krijgt zijn eigen draaiing, plekje en hoogte, afgeleid van waar hij staat.
+          const models = BLOCK_MODELS[id];
+          if (!models) continue;
           const buf = bufs[1];
           const ecol = (x + 5) * 26 + z + 5;
           let sl = 15 - (E[ecol] - y);
           if (sl > 15) sl = 15; else if (sl < 0) sl = 0;
           let bl = hasBL ? BL[p] : 0;
-          if (B_LIGHT[id] > bl) bl = B_LIGHT[id];
+          if (LIGHT[id] > bl) bl = LIGHT[id];
           const sky = SKY_LUT[sl] * 242, blk = BLK_LUT[bl] * 255;
-          const tile = T_SIDE[id];
-          const u0 = uvT[tile * 4], v0 = uvT[tile * 4 + 1], u1 = uvT[tile * 4 + 2], v1 = uvT[tile * 4 + 3];
-          buf.need(8);
-          for (let q = 0; q < 2; q++) {
+          const wx = cx * 16 + x, wz = cz * 16 + z;
+          const h1 = hash2(wx, wz, 7001), h2 = hash2(wx, wz, 7002);
+          const M = models[(h1 * models.length) | 0];
+          let cs = 1, sn = 0;
+          if (M.rot === 2) { cs = Math.cos(h2 * 6.2832); sn = Math.sin(h2 * 6.2832); }
+          else if (M.rot === 1) { const q = (h2 * 4) | 0; cs = q === 0 ? 1 : q === 2 ? -1 : 0; sn = q === 1 ? 1 : q === 3 ? -1 : 0; }
+          const ox = x + 0.5 + (hash2(wx, wz, 7003) - 0.5) * 2 * M.jit, oz = z + 0.5 + (hash2(wx, wz, 7004) - 0.5) * 2 * M.jit;
+          const sy = 1 + (hash2(wx, wz, 7005) - 0.5) * 2 * M.vary;
+          const gB = GLOW[id];
+          const mp = M.pos, mu = M.uv, mn = M.nrm, mf = M.flags;
+          buf.need(M.n * 4);
+          for (let q = 0; q < M.n; q++) {
+            // hoe licht dit vlak is: van boven lichter, en een beetje afhankelijk van de kant
+            const nx = mn[q * 3], nz = mn[q * 3 + 2];
+            let sh = 0.72 + 0.22 * mn[q * 3 + 1] + 0.1 * ((nx * cs - nz * sn) * 0.75 + (nx * sn + nz * cs) * 0.35);
+            if (sh > 1) sh = 1;
+            const ls = HQ_MESH ? 1 : sh;
+            const tile = M.tile[q];
+            const u0 = uvT[tile * 4], v0 = uvT[tile * 4 + 1], du = uvT[tile * 4 + 2] - u0, dv = uvT[tile * 4 + 3] - v0;
+            const g4 = (M.glow[q] < 0 ? gB : M.glow[q]) * 4;
             const nv = buf.nv;
-            const xa = x + 0.12, xb = x + 0.88, za = z + (q ? 0.88 : 0.12), zb = z + (q ? 0.12 : 0.88);
-            const P = [xa, y, za, u0, v1, xb, y, zb, u1, v1, xb, y + 1, zb, u1, v0, xa, y + 1, za, u0, v0];
             for (let k = 0; k < 4; k++) {
-              const vi = nv + k;
-              buf.pos[vi * 3] = P[k * 5]; buf.pos[vi * 3 + 1] = P[k * 5 + 1]; buf.pos[vi * 3 + 2] = P[k * 5 + 2];
-              buf.uv[vi * 2] = P[k * 5 + 3]; buf.uv[vi * 2 + 1] = P[k * 5 + 4];
-              buf.light[vi * 4] = sky; buf.light[vi * 4 + 1] = blk; buf.light[vi * 4 + 2] = 242; buf.light[vi * 4 + 3] = 0;
+              const vi = nv + k, si = q * 4 + k;
+              const px = mp[si * 3] - 0.5, py = mp[si * 3 + 1], pz = mp[si * 3 + 2] - 0.5;
+              buf.pos[vi * 3] = ox + px * cs - pz * sn; buf.pos[vi * 3 + 1] = y + py * sy; buf.pos[vi * 3 + 2] = oz + px * sn + pz * cs;
+              buf.uv[vi * 2] = u0 + mu[si * 2] * du; buf.uv[vi * 2 + 1] = v0 + mu[si * 2 + 1] * dv;
+              const ao = M.ao ? 0.66 + 0.34 * (py > 0.4 ? 1 : py * 2.5) : 1;          // vlak bij de grond wat donkerder
+              buf.light[vi * 4] = sky * ls * ao; buf.light[vi * 4 + 1] = blk * ls * ao; buf.light[vi * 4 + 2] = 242 * sh * ao;
+              buf.light[vi * 4 + 3] = g4 + mf[si];
             }
             const ni = buf.ni;
             buf.idx[ni] = nv; buf.idx[ni + 1] = nv + 1; buf.idx[ni + 2] = nv + 2; buf.idx[ni + 3] = nv; buf.idx[ni + 4] = nv + 2; buf.idx[ni + 5] = nv + 3;
@@ -515,9 +583,9 @@ export class ChunkWorld {
             const ecol = (((ncol / PW) | 0) + 4) * 26 + (ncol % PW) + 4;
             let sl = 15 - (E[ecol] - ny);
             if (sl > 15) sl = 15; else if (sl < 0) sl = 0;
-            const sh = SHADE[f];
-            const sky = SKY_LUT[sl] * sh * 255;
-            const blk = lava ? 255 : (hasBL ? BLK_LUT[BL[np]] * sh * 255 : 0);
+            const sh = SHADE[f], ls = HQ_MESH ? 1 : sh;
+            const sky = SKY_LUT[sl] * ls * 255;
+            const blk = lava ? 255 : (hasBL ? BLK_LUT[BL[np]] * ls * 255 : 0);
             const tile = T_TOP[id];
             const u0 = uvT[tile * 4], v0 = uvT[tile * 4 + 1], du = uvT[tile * 4 + 2] - u0, dv = uvT[tile * 4 + 3] - v0;
             buf.need(4);

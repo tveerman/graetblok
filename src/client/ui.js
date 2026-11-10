@@ -43,7 +43,7 @@ export class UI {
     const hb = $('hotbar');
     for (let i = 0; i < HOTBAR; i++) {
       const s = el('div', 'slot');
-      s.appendChild(el('img')); s.appendChild(el('span', 'cnt'));
+      s.appendChild(el('img')); s.appendChild(el('span', 'dur')); s.appendChild(el('span', 'cnt'));
       tap(s, () => { g.select(i); });
       hb.appendChild(s); this.hot.push(s);
     }
@@ -51,6 +51,7 @@ export class UI {
     tap($('btnQuest'), () => this.modal === 'quest' ? this.close() : this.openQuest());
     tap($('btnCam'), () => g.toggleCam());
     tap($('btnMenu'), () => this.modal === 'pause' ? this.close() : this.openPause());
+    tap($('btnFull'), () => g.toggleFullscreen());
     tap($('btnUse'), () => g.player.use(null));
     tap($('btnOff'), () => g.net.send({ t: 'dismount' }));
     tap($('btnRide'), () => g.rideNearest());
@@ -90,6 +91,7 @@ export class UI {
       const img = node.firstChild, cnt = node.lastChild;
       if (s) { const u = iconURL(s[0]); if (img.dataset.u !== String(s[0])) { img.src = u; img.dataset.u = String(s[0]); } img.style.display = ''; cnt.textContent = s[1] > 1 ? s[1] : ''; }
       else { img.style.display = 'none'; img.dataset.u = ''; cnt.textContent = ''; }
+      this.durBar(node.children[1], s);
       node.classList.toggle('sel', i === g.sel);
     }
     const s = g.inv[g.sel];
@@ -217,23 +219,50 @@ export class UI {
 
   toggleInventory() { if (this.modal === 'inv') this.close(); else this.openInventory(''); }
 
+  // het balkje dat laat zien hoe lang gereedschap nog meegaat
+  durBar(node, s) {
+    const it = s && ITEMS[s[0]];
+    if (!it || !it.dur || s[2] === undefined || s[2] >= it.dur) { node.style.display = 'none'; return; }
+    const f = Math.max(0, s[2] / it.dur);
+    node.style.display = '';
+    node.className = 'dur' + (f < 0.2 ? ' low' : f < 0.5 ? ' mid' : '');
+    node.innerHTML = '<i style="width:' + Math.round(f * 100) + '%"></i>';
+  }
+
   openInventory(station) {
     this.station = station || '';
     this.pick = -1;
-    this.open('inv', 'Rugzak en maken', el('div'), true);
+    this.search = '';
+    // het venster bestaat uit vaste delen; alleen de vakjes en de lijst worden steeds opnieuw getekend,
+    // zodat het zoekvak zijn tekst (en het toetsenbord) houdt
+    const wrap = el('div', 'invwrap');
+    const left = el('div', 'invleft');
+    const right = el('div', 'invright');
+    const head = el('div', 'rhead');
+    const searchRow = el('div', 'rsearch');
+    const input = el('input');
+    input.type = 'search'; input.placeholder = 'Zoek een recept...'; input.autocomplete = 'off'; input.spellcheck = false;
+    input.addEventListener('input', () => { this.search = input.value.trim().toLowerCase(); this.renderRecipes(); });
+    input.addEventListener('keydown', (e) => { if (e.key === 'Escape' || e.key === 'Enter') input.blur(); e.stopPropagation(); });
+    const clear = el('button', 'btn small', '✕');
+    tap(clear, () => { input.value = ''; this.search = ''; this.renderRecipes(); });
+    searchRow.appendChild(input); searchRow.appendChild(clear);
+    const list = el('div', 'recipes');
+    right.appendChild(head); right.appendChild(searchRow); right.appendChild(list);
+    wrap.appendChild(left); wrap.appendChild(right);
+    this.invRefs = { left, head, list, input };
+    this.open('inv', 'Rugzak en maken', wrap, true);
     this.renderInventory();
   }
 
   count(need) { let n = 0; for (const s of this.g.inv) if (s && matches(need, s[0])) n += s[1]; return n; }
 
   renderInventory() {
-    const g = this.g;
-    const body = $('modalBody');
-    const keepScroll = body.querySelector('.recipes') ? body.querySelector('.recipes').scrollTop : 0;
-    body.innerHTML = '';
-    const wrap = el('div', 'invwrap');
+    const g = this.g, R = this.invRefs;
+    if (!R) return;
     // links: de rugzak
-    const left = el('div', 'invleft');
+    const left = R.left;
+    left.innerHTML = '';
     const info = el('div', 'invinfo', this.pick >= 0 && g.inv[this.pick] ? '<b>' + itemName(g.inv[this.pick][0]) + '</b> – tik op een ander vakje om te verplaatsen' : 'Tik op een vakje en dan op een ander vakje om spullen te verplaatsen.');
     left.appendChild(info);
     const grid = el('div', 'invgrid');
@@ -243,7 +272,11 @@ export class UI {
     for (const i of order) {
       const s = g.inv[i];
       const node = el('div', 'slot' + (i < HOTBAR ? ' hot' : '') + (i === this.pick ? ' pick' : ''));
-      if (s) { const img = el('img'); img.src = iconURL(s[0]); node.appendChild(img); node.appendChild(el('span', 'cnt', s[1] > 1 ? s[1] : '')); }
+      if (s) {
+        const img = el('img'); img.src = iconURL(s[0]); node.appendChild(img);
+        const dur = el('span', 'dur'); node.appendChild(dur); this.durBar(dur, s);
+        node.appendChild(el('span', 'cnt', s[1] > 1 ? s[1] : ''));
+      }
       tap(node, () => {
         if (this.pick < 0) { if (g.inv[i]) { this.pick = i; g.sound.play('click'); } }
         else if (this.pick === i) this.pick = -1;
@@ -259,20 +292,33 @@ export class UI {
       tap(tr, () => { g.net.send({ t: 'trash', a: this.pick }); this.pick = -1; });
       left.appendChild(tr);
     }
-    wrap.appendChild(left);
+    this.renderRecipes();
+  }
 
-    // rechts: maken
-    const right = el('div', 'invright');
+  // rechts: de lijst met recepten (gefilterd op het zoekvak)
+  renderRecipes() {
+    const g = this.g, R = this.invRefs;
+    if (!R) return;
     const nearW = g.nearBlock(B.werkbank), nearO = g.nearBlock(B.oven), nearK = g.nearBlock(B.kampvuur);
-    const head = el('div', 'rhead');
+    const head = R.head;
+    head.innerHTML = '';
     head.appendChild(el('span', '', '<b>Maken</b> ' + (nearW ? '<span class="ok">🔨 werkbank</span> ' : '') + (nearO ? '<span class="ok">🔥 oven</span>' : '')));
     const flt = el('button', 'btn small' + (this.onlyCan ? ' active' : ''), this.onlyCan ? '✔ Wat ik kan maken' : 'Alles');
-    tap(flt, () => { this.onlyCan = !this.onlyCan; this.renderInventory(); });
+    tap(flt, () => { this.onlyCan = !this.onlyCan; this.renderRecipes(); });
     head.appendChild(flt);
-    right.appendChild(head);
-    const list = el('div', 'recipes');
+    const list = R.list;
+    const keepScroll = list.scrollTop;
+    list.innerHTML = '';
+    const q = this.search || '';
+    const needName = (need) => (typeof need === 'string' ? GROUP_NAMES[need] : itemName(need));
     const rows = [];
     for (const r of RECIPES) {
+      if (q) {
+        // zoeken in de naam van het ding zelf en in wat je ervoor nodig hebt
+        let hit = itemName(r.out).toLowerCase().includes(q);
+        for (const [need] of r.in) if (!hit && needName(need).toLowerCase().includes(q)) hit = true;
+        if (!hit) continue;
+      }
       const stationOk = !r.station || (r.station === 'werkbank' && nearW) || (r.station === 'oven' && (nearO || (r.out === 267 && nearK)));
       const treeOk = !r.needs || g.trees[r.needs];
       let have = true;
@@ -291,7 +337,7 @@ export class UI {
       for (const [need, n] of r.in) {
         const id = typeof need === 'string' ? GROUPS[need][0] : need;
         const h = this.count(need);
-        ing.appendChild(el('span', 'ingr' + (h >= n ? '' : ' lack'), '<img src="' + iconURL(id) + '">' + Math.min(h, 999) + '/' + n + ' ' + (typeof need === 'string' ? GROUP_NAMES[need] : itemName(need))));
+        ing.appendChild(el('span', 'ingr' + (h >= n ? '' : ' lack'), '<img src="' + iconURL(id) + '">' + Math.min(h, 999) + '/' + n + ' ' + needName(need)));
       }
       mid.appendChild(ing);
       let note = '';
@@ -303,10 +349,7 @@ export class UI {
       tap(card, () => { if (can) g.net.send({ t: 'craft', id: r.id }); else g.sound.play('deny'); });
       list.appendChild(card);
     }
-    if (!rows.length) list.appendChild(el('div', 'hint', 'Je kunt nu niets maken. Verzamel meer spullen!'));
-    right.appendChild(list);
-    wrap.appendChild(right);
-    body.appendChild(wrap);
+    if (!rows.length) list.appendChild(el('div', 'hint', q ? 'Niets gevonden voor "' + q + '".' : 'Je kunt nu niets maken. Verzamel meer spullen!'));
     list.scrollTop = keepScroll;
   }
 
@@ -423,6 +466,7 @@ export class UI {
     row.appendChild(toggle('Geluidseffecten', 'sfx'));
     row.appendChild(toggle('Vanzelf springen', 'autoJump'));
     row.appendChild(toggle('Scherpte aanpassen', 'dynRes'));
+    row.appendChild(toggle('Mooie graphics (proef)', 'hq'));
     b.appendChild(row);
     const row2 = el('div', 'btnrow');
     const save = el('button', 'btn small', '💾 Nu opslaan');
@@ -436,6 +480,8 @@ export class UI {
     // een regel over het geluid, die zichzelf bijwerkt zolang dit venster open staat
     const diag = el('p', 'hint', g.audioText());
     b.appendChild(diag);
+    const tip = g.audioTip();
+    if (tip) b.appendChild(el('p', 'hint', tip));
     const tick = () => {
       if (this.modal !== 'pause' || !diag.isConnected) return;
       diag.textContent = g.audioText();
