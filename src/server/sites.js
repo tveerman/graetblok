@@ -19,9 +19,9 @@ export const SITE_CELL = 224;
 
 // kans per vak op een dorp, een kasteel of een kamp (de rest blijft leeg)
 const SITE_ODDS = {
-  groen: { dorp: 0.5, kasteel: 0, kamp: 0 },
-  ijs: { dorp: 0.3, kasteel: 0, kamp: 0 },
-  schaduw: { dorp: 0, kasteel: 0, kamp: 0 },
+  groen: { dorp: 0.5, kasteel: 0.18, kamp: 0.18 },
+  ijs: { dorp: 0.3, kasteel: 0.1, kamp: 0.2 },
+  schaduw: { dorp: 0, kasteel: 0.1, kamp: 0.16 },
 };
 // r0 = tot hier is de grond helemaal vlak, r1 = vanaf hier is het weer gewoon landschap
 const SITE_R = { dorp: [44, 62], kasteel: [56, 76], kamp: [15, 27] };
@@ -34,10 +34,17 @@ const PAL = {
   ijs: { wall: B.planken, base: B.keisteen, wood: B.planken, log: B.stam_den, roof: B.sneeuw, thatch: B.sneeuw, floor: B.planken, road: B.grind, land: B.sneeuw, under: B.sneeuw },
   schaduw: { wall: B.schaduwsteen, base: B.schaduwsteen, wood: B.planken, log: B.stam_schaduw, roof: B.spookmuur, thatch: B.spookmuur, floor: B.planken, road: B.grind, land: B.schaduwgras, under: B.schaduwsteen },
 };
+const CASTLE = {
+  goed: { wall: B.kasteelmuur, trim: B.steenblok, roof: B.dakpan, floor: B.steenblok, hall: B.marmerblok, carpet: B.wol_rood, banner: B.wol_blauw, pillar: B.marmerzuil, yard: B.grind },
+  spook: { wall: B.spookmuur, trim: B.basalt, roof: B.spookmuur, floor: B.basalt, hall: B.granietblok, carpet: B.wol_rood, banner: B.wol_rood, pillar: B.spookmuur, yard: B.as },
+  ijs: { wall: B.ijs, trim: B.sneeuw, roof: B.sneeuw, floor: B.steenblok, hall: B.marmerblok, carpet: B.wol_blauw, banner: B.wol_blauw, pillar: B.ijs, yard: B.sneeuw },
+};
 
 const DORP_A = ['Linde', 'Eiken', 'Beuken', 'Molen', 'Zonne', 'Wilgen', 'Vossen', 'Uilen', 'Honing', 'Appel', 'Draken', 'Klaver', 'Zwanen', 'Bloemen', 'Regenboog', 'Sterren'];
 const DORP_B = ['dorp', 'hoven', 'veld', 'dam', 'burg', 'wijk', 'huizen', 'rode', 'berg', 'dal'];
 const IJS_A = ['Sneeuw', 'Vorst', 'IJzel', 'Winter', 'Rijp', 'Noorder', 'Kristal', 'Pinguïn'];
+const BURCHT = ['Valkenstein', 'Leeuwenburg', 'Drakenrots', 'Zonneburcht', 'Adelaarsnest', 'Zilvertoren', 'Hoogwacht', 'Koningsveste'];
+const SPOOK = ['Ravenrots', 'Schimmenburg', 'Bottenstein', 'Nachtveste', 'Spinnentoren', 'Doodskop', 'Grafburcht', 'Mistwacht'];
 
 // Tekenen in één chunk: alles wat buiten de chunk valt wordt overgeslagen.
 function canvas(blocks, ox, oz) {
@@ -374,6 +381,283 @@ export const siteMethods = {
       house(T, b.w, b.d, P, o);
       INSIDE[b.type](T, b.w, b.d, P);
     }
+  },
+
+  // ---------- kasteel ----------
+
+  castlePlan(s) {
+    const npcs = [], y = s.y + 1, x = s.x, z = s.z;
+    const at = (k, dx, dz, r, extra) => npcs.push(Object.assign({ k, x: x + dx + 0.5, y, z: z + dz + 0.5, r }, extra));
+    if (s.evil) {
+      at('skeletkoning', 0, -19, 6, { yaw: 0 });
+      at('skeletridder', -4, -15, 5); at('skeletridder', 4, -15, 5); at('skeletridder', -3, 24, 5); at('skeletridder', 3, 24, 5);
+      at('skelet', -16, 6, 8); at('skelet', 16, 6, 8); at('skelet', -18, -18, 6); at('skelet', 18, -18, 6);
+      at('spin', -12, 16, 8); at('spin', 12, 16, 8); at('spin', 0, 8, 8);
+    } else {
+      at('dorpeling', 0, -20, 0.8, { job: 'koning', yaw: 0 });
+      at('ridder', -3, -19, 1.5, { yaw: 0 }); at('ridder', 3, -19, 1.5, { yaw: 0 });
+      at('ridder', -3, 25, 3); at('ridder', 3, 25, 3); at('ridder', -14, 4, 10); at('ridder', 14, 4, 10);
+      at('dorpeling', 20, 9, 1.2, { job: 'smid' });
+      at('dorpeling', -19, 9, 1.5, { job: 'kok' });
+      at('dorpeling', 12, 20, 0.8, { job: 'drakenhandelaar' });
+      at('dorpeling', -6, 12, 9, { job: 'dorpeling' });
+    }
+    return { npcs };
+  },
+
+  drawCastle(S, s) {
+    const C = CASTLE[s.evil ? (this.world === 'ijs' ? 'ijs' : 'spook') : 'goed'];
+    const x = s.x, y = s.y, z = s.z, evil = s.evil, P = PAL[this.world];
+    if (!S.hit(x - 40, z - 40, x + 40, z + 42)) return;
+    const R = 30;
+    const rnd = (a, b, salt) => hash3(a, b, salt, s.seed);
+
+    // gracht rondom, met een brug voor de poort
+    const moat = this.world === 'schaduw' ? 0 : B.water;
+    for (const [x0, z0, x1, z1] of [[-37, -37, 37, -34], [-37, 34, 37, 37], [-37, -33, -34, 33], [34, -33, 37, 33]]) {
+      S.fill(x + x0, y - 1, z + z0, x + x1, y, z + z1, moat);
+      S.fill(x + x0, y + 1, z + z0, x + x1, y + 8, z + z1, 0);
+      if (this.world === 'ijs') S.fill(x + x0, y, z + z0, x + x1, y, z + z1, B.ijs);
+    }
+    S.fill(x - 2, y, z + 33, x + 2, y, z + 38, B.planken);
+    S.fill(x - 2, y + 1, z + 31, x + 2, y + 6, z + 40, 0);
+
+    // binnenplaats
+    S.fill(x - R + 3, y, z - R + 3, x + R - 3, y, z + R - 3, C.yard);
+    S.fill(x - R + 3, y + 1, z - R + 3, x + R - 3, y + 30, z + R - 3, 0);
+
+    // ringmuur met weergang en kantelen
+    const wall = (x0, z0, x1, z1, outer) => {
+      S.fill(x + x0, y - 2, z + z0, x + x1, y + 8, z + z1, C.wall);
+      S.fill(x + x0, y + 9, z + z0, x + x1, y + 14, z + z1, 0);
+      const [ox0, oz0, ox1, oz1] = outer;
+      S.fill(x + ox0, y + 9, z + oz0, x + ox1, y + 9, z + oz1, C.wall);
+      for (let a = Math.min(ox0, ox1); a <= Math.max(ox0, ox1); a++) for (let b = Math.min(oz0, oz1); b <= Math.max(oz0, oz1); b++) if ((a + b) & 1) S.set(x + a, y + 10, z + b, C.trim);
+    };
+    wall(-R, -R, R, -R + 2, [-R, -R, R, -R]);
+    wall(-R, R - 2, R, R, [-R, R, R, R]);
+    wall(-R, -R, -R + 2, R, [-R, -R, -R, R]);
+    wall(R - 2, -R, R, R, [R, -R, R, R]);
+    // vaandels aan de buitenkant
+    for (const bx of [-12, -6, 6, 12]) S.fill(x + bx, y + 5, z + R + 1, x + bx, y + 7, z + R + 1, C.banner);
+
+    // hoektorens: rond, met een kamer op de hoogte van de weergang en een puntdak
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+      const tx = x + sx * R, tz = z + sz * R;
+      if (!S.hit(tx - 7, tz - 7, tx + 7, tz + 7)) continue;
+      for (let dx = -6; dx <= 6; dx++) for (let dz = -6; dz <= 6; dz++) {
+        const d = Math.hypot(dx, dz);
+        if (d > 5.6) { if (!evil && d <= 6.6) S.set(tx + dx, y + 19, tz + dz, C.roof); continue; }
+        const ring = d > 4.4;
+        S.fill(tx + dx, y - 2, tz + dz, tx + dx, y + 8, tz + dz, C.wall);                          // massieve voet
+        S.fill(tx + dx, y + 9, tz + dz, tx + dx, y + 13, tz + dz, ring ? C.wall : 0);              // kamer
+        S.set(tx + dx, y + 14, tz + dz, C.trim);                                                    // plafond = bovenste vloer
+        S.fill(tx + dx, y + 15, tz + dz, tx + dx, y + 18, tz + dz, ring ? (evil ? 0 : C.wall) : 0);
+        if (ring) {
+          S.set(tx + dx, y + 15, tz + dz, C.wall);
+          if (evil) { if ((dx + dz) & 1) S.set(tx + dx, y + 16, tz + dz, C.trim); }
+          else if (Math.abs(dx) === 0 || Math.abs(dz) === 0) S.fill(tx + dx, y + 16, tz + dz, tx + dx, y + 17, tz + dz, 0);      // uitkijkgaten
+          if ((dx === 0 || dz === 0) && !(dx * sx < 0 || dz * sz < 0)) S.fill(tx + dx, y + 11, tz + dz, tx + dx, y + 12, tz + dz, B.tralies);   // schietgaten
+        }
+        if (!evil) for (let k = 0; k < 6; k++) if (d <= 5.6 - k) S.set(tx + dx, y + 19 + k, tz + dz, C.roof);
+      }
+      // deuren naar de weergang
+      S.fill(tx - sx * 5, y + 9, tz - sz, tx - sx * 4, y + 10, tz - sz * 2, 0);
+      S.fill(tx - sx, y + 9, tz - sz * 5, tx - sx * 2, y + 10, tz - sz * 4, 0);
+      S.set(tx, y + 13, tz, B.lantaarn);
+      if (evil) { S.set(tx + sx, y + 9, tz + sz, B.botten); S.set(tx - sx, y + 12, tz + sz, B.spinnenweb); }
+      else S.fill(tx, y + 25, tz, tx, y + 27, tz, C.banner);
+      if ((sx + sz) !== 0) S.set(tx + sx * 2, y + 9, tz + sz * 2, B.schatkist);
+    }
+
+    // poortgebouw in de zuidmuur
+    if (S.hit(x - 8, z + R - 4, x + 8, z + R + 3)) {
+      for (const sx of [-1, 1]) {
+        S.fill(x + sx * 2, y - 2, z + R - 3, x + sx * 6, y + 13, z + R + 2, C.wall);
+        S.fill(x + sx * 3, y + 9, z + R - 2, x + sx * 5, y + 12, z + R + 1, 0);
+        S.fill(x + sx * 4, y + 10, z + R + 2, x + sx * 4, y + 11, z + R + 2, B.tralies);
+        S.fill(x + sx * 2, y + 9, z + R - 1, x + sx * 2, y + 10, z + R, 0);
+        S.fill(x + sx * 6, y + 9, z + R - 1, x + sx * 6, y + 10, z + R, 0);
+        for (let a = 2; a <= 6; a++) for (let b = -3; b <= 2; b++) if ((a === 2 || a === 6 || b === -3 || b === 2) && ((a + b) & 1)) S.set(x + sx * a, y + 14, z + R + b, C.trim);
+        S.set(x + sx * 4, y + 13, z + R, B.lantaarn);
+      }
+      S.fill(x - 1, y + 5, z + R - 3, x + 1, y + 11, z + R + 2, C.wall);
+      S.fill(x - 1, y + 9, z + R - 1, x + 1, y + 10, z + R, 0);
+      S.fill(x - 1, y + 1, z + R - 3, x + 1, y + 4, z + R + 2, 0);
+      S.fill(x - 1, y, z + R - 3, x + 1, y, z + R + 2, C.trim);
+      S.fill(x - 1, y + 4, z + R + 1, x + 1, y + 4, z + R + 1, B.tralies);                       // het valhek, omhoog getrokken
+      S.set(x - 2, y + 3, z + R + 2, B.lantaarn); S.set(x + 2, y + 3, z + R + 2, B.lantaarn);
+    }
+    // trappen naar de weergang, links en rechts van de poort
+    for (const sx of [-1, 1]) for (let k = 0; k < 8; k++) S.fill(x + sx * (9 + k), y + 1, z + R - 4, x + sx * (9 + k), y + 1 + k, z + R - 3, C.trim);
+
+    this.drawKeep(S, s, C, P);
+
+    // binnenplaats: put, stallen, smidse, kraam
+    if (S.hit(x - 27, z - 4, x + 27, z + 27)) {
+      S.fill(x - 1, y, z - 5, x + 1, y, z + R - 3, C.trim);                                       // pad van de poort naar de burcht
+      for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) { const mid = !dx && !dz; S.set(x - 9 + dx, y, z + 16 + dz, mid ? (evil ? 0 : B.water) : C.trim); S.set(x - 9 + dx, y + 1, z + 16 + dz, mid ? 0 : C.trim); }
+      // stal (west) en smidse (oost): een afdak op palen
+      for (const sx of [-1, 1]) {
+        const x0 = x + sx * 16, x1 = x + sx * 26;
+        for (const px of [x0, x1]) for (const pz of [z + 5, z + 13]) S.fill(px, y + 1, pz, px, y + 4, pz, P.log);
+        S.fill(x0, y + 5, z + 4, x1, y + 5, z + 14, evil ? C.trim : (sx < 0 ? P.thatch : C.roof));
+        if (evil) { for (let k = 0; k < 14; k++) S.set(x + sx * (17 + Math.floor(rnd(k, sx, 3) * 9)), y + 5, z + 5 + Math.floor(rnd(k, sx, 4) * 9), 0); }
+      }
+      if (evil) {
+        for (let k = 0; k < 16; k++) {
+          const bx = x + Math.floor((rnd(k, 1, 5) - 0.5) * 50), bz = z + Math.floor(rnd(k, 2, 6) * 26);
+          if (Math.abs(bx - x) < 3) continue;
+          S.set(bx, y + 1, bz, k % 3 === 0 ? B.botten : k % 3 === 1 ? B.dode_struik : B.spinnenweb);
+        }
+      } else {
+        S.fill(x - 25, y + 1, z + 12, x - 22, y + 1, z + 12, B.hooi); S.set(x - 24, y + 2, z + 12, B.hooi);
+        S.fill(x - 21, y + 1, z + 6, x - 18, y + 1, z + 6, B.tafel); S.set(x - 22, y + 1, z + 6, B.kookpot); S.set(x - 23, y + 1, z + 6, B.oven);
+        S.set(x + 19, y + 1, z + 7, B.aambeeld); S.set(x + 24, y + 1, z + 6, B.oven); S.set(x + 25, y + 1, z + 6, B.oven); S.set(x + 24, y + 1, z + 12, B.ijzerblok);
+        for (const [dx, dz] of [[10, 19], [14, 19], [10, 22], [14, 22]]) S.fill(x + dx, y + 1, z + dz, x + dx, y + 2, z + dz, P.log);
+        S.fill(x + 10, y + 3, z + 19, x + 14, y + 3, z + 22, B.luifel);
+        S.fill(x + 11, y + 1, z + 19, x + 13, y + 1, z + 19, B.tafel); S.set(x + 12, y + 2, z + 19, B.ei_ijs); S.set(x + 13, y + 1, z + 22, B.ei_natuur);
+        // oefenpoppen voor de ridders
+        for (const dx of [-8, -5]) { S.fill(x + dx, y + 1, z + 4, x + dx, y + 2, z + 4, P.log); S.set(x + dx, y + 3, z + 4, B.hooi); }
+        for (const [dx, dz] of [[-4, 10], [4, 10], [-4, 20], [4, 20]]) { S.fill(x + dx, y + 1, z + dz, x + dx, y + 2, z + dz, C.trim); S.set(x + dx, y + 3, z + dz, B.lantaarn); }
+      }
+    }
+  },
+
+  // De burcht: drie verdiepingen, een kerker eronder en een hoge toren met de schatkamer.
+  drawKeep(S, s, C, P) {
+    const x = s.x, y = s.y, z = s.z, evil = s.evil;
+    const X0 = x - 10, X1 = x + 10, Z0 = z - 25, Z1 = z - 6;
+    if (!S.hit(X0 - 1, Z0 - 1, X1 + 1, Z1 + 1)) return;
+    S.fill(X0, y - 8, Z0, X1, y + 18, Z1, C.wall);
+    for (let f = 0; f < 3; f++) {
+      const fy = y + f * 6;
+      S.fill(X0 + 1, fy + 1, Z0 + 1, X1 - 1, fy + 5, Z1 - 1, 0);
+      S.fill(X0 + 1, fy, Z0 + 1, X1 - 1, fy, Z1 - 1, f === 0 ? C.hall : P.floor);
+      // ramen
+      for (let a = X0 + 3; a <= X1 - 3; a += 4) { S.fill(a, fy + 2, Z0, a, fy + 3, Z0, B.glas); if (f > 0 || Math.abs(a - x) > 2) S.fill(a, fy + 2, Z1, a, fy + 3, Z1, B.glas); }
+      for (let b = Z0 + 3; b <= Z1 - 3; b += 4) { S.fill(X0, fy + 2, b, X0, fy + 3, b, B.glas); S.fill(X1, fy + 2, b, X1, fy + 3, b, B.glas); }
+      // lampen in de hoeken
+      for (const [a, b] of [[X0 + 1, Z0 + 1], [X1 - 1, Z0 + 1], [X0 + 1, Z1 - 1], [X1 - 1, Z1 - 1]]) S.set(a, fy + 5, b, B.lantaarn);
+    }
+    // het dak met kantelen
+    S.fill(X0 + 1, y + 18, Z0 + 1, X1 - 1, y + 18, Z1 - 1, C.trim);
+    // trappen naar de volgende verdieping: afwisselend langs de oost- en de westmuur
+    for (let f = 0; f < 3; f++) {
+      const fy = y + f * 6, sx = f % 2 === 0 ? X1 - 1 : X0 + 1, sx2 = f % 2 === 0 ? X1 - 2 : X0 + 2;
+      S.fill(sx, fy + 6, Z0 + 2, sx2, fy + 6, Z0 + 8, 0);
+      for (let k = 0; k < 6; k++) S.fill(sx, fy + 1, Z0 + 3 + k, sx2, fy + 1 + k, Z0 + 3 + k, C.trim);
+    }
+    S.fill(X0, y + 19, Z0, X1, y + 19, Z1, C.wall); S.fill(X0 + 1, y + 19, Z0 + 1, X1 - 1, y + 19, Z1 - 1, 0);
+    for (let a = X0; a <= X1; a++) for (let b = Z0; b <= Z1; b++) if ((a === X0 || a === X1 || b === Z0 || b === Z1) && ((a + b) & 1)) S.set(a, y + 20, b, C.trim);
+    // de grote poort
+    S.fill(x - 1, y + 1, Z1, x + 1, y + 4, Z1, 0);
+    S.set(x - 2, y + 4, Z1, B.lantaarn); S.set(x + 2, y + 4, Z1, B.lantaarn);
+    S.fill(x - 3, y + 6, Z1 + 1, x - 3, y + 9, Z1 + 1, C.banner); S.fill(x + 3, y + 6, Z1 + 1, x + 3, y + 9, Z1 + 1, C.banner);
+
+    // begane grond: de troonzaal
+    S.fill(x - 1, y, Z0 + 4, x + 1, y, Z1 - 1, C.carpet);
+    S.fill(x - 3, y + 1, Z0 + 1, x + 3, y + 1, Z0 + 3, C.trim);
+    S.fill(x - 1, y + 1, Z0 + 3, x + 1, y + 1, Z0 + 3, C.carpet);
+    S.set(x, y + 2, Z0 + 1, B.troon); S.set(x, y + 3, Z0 + 1, evil ? B.botten : B.goudblok);
+    S.fill(x - 2, y + 3, Z0 + 1, x - 2, y + 5, Z0 + 1, C.banner); S.fill(x + 2, y + 3, Z0 + 1, x + 2, y + 5, Z0 + 1, C.banner);
+    for (const sx of [-1, 1]) for (let b = Z0 + 6; b <= Z1 - 3; b += 4) { S.fill(x + sx * 4, y + 1, b, x + sx * 4, y + 5, b, C.pillar); S.set(x + sx * 4, y + 4, b + 1, B.lantaarn); }
+    if (evil) { for (let k = 0; k < 10; k++) S.set(x + Math.floor((hash3(k, 1, 9, s.seed) - 0.5) * 16), y + 1, Z0 + 5 + Math.floor(hash3(k, 2, 9, s.seed) * 12), k & 1 ? B.botten : B.spinnenweb); }
+    else for (const sx of [-1, 1]) { S.fill(x + sx * 7, y + 1, Z0 + 10, x + sx * 7, y + 1, Z1 - 4, B.tafel); S.fill(x + sx * 6, y + 1, Z0 + 10, x + sx * 6, y + 1, Z1 - 4, B.kruk); }
+
+    // eerste verdieping: bibliotheek en slaapkamers
+    const y1 = y + 6;
+    S.fill(X0 + 3, y1 + 1, Z0 + 1, X1 - 1, y1 + 3, Z0 + 1, B.boekenkast);
+    S.fill(X1 - 1, y1 + 1, Z0 + 10, X1 - 1, y1 + 3, Z1 - 2, B.boekenkast);
+    S.fill(x - 1, y1 + 1, z - 16, x + 1, y1 + 1, z - 16, B.tafel); S.set(x, y1 + 1, z - 15, B.kruk);
+    for (let k = 0; k < 3; k++) { S.set(x + 2 + k * 2, y1 + 1, Z1 - 2, bedHead(1)); S.set(x + 2 + k * 2, y1 + 1, Z1 - 3, bedFoot(1)); }
+    S.fill(x - 4, y1, Z1 - 6, x + 8, y1, Z1 - 1, C.carpet);
+    // tweede verdieping: wapenkamer en keuken
+    const y2 = y + 12;
+    S.set(X1 - 2, y2 + 1, Z1 - 2, B.kookpot); S.set(X1 - 3, y2 + 1, Z1 - 2, B.oven); S.fill(X1 - 6, y2 + 1, Z1 - 4, X1 - 2, y2 + 1, Z1 - 4, B.tafel);
+    S.set(X0 + 2, y2 + 1, Z1 - 2, B.aambeeld); S.set(X0 + 4, y2 + 1, Z1 - 2, B.ijzerblok); S.set(X0 + 6, y2 + 1, Z1 - 2, B.werkbank);
+    S.set(x, y2 + 1, z - 12, B.schatkist);
+
+    // de kerker: een trap omlaag vanuit de troonzaal, cellen met tralies en een kist
+    S.fill(X0 + 1, y - 7, Z0 + 1, X1 - 1, y - 7, Z1 - 1, C.floor);
+    S.fill(X0 + 1, y - 6, Z0 + 1, X1 - 1, y - 2, Z1 - 1, 0);
+    S.fill(X0 + 1, y - 1, Z0 + 1, X1 - 1, y - 1, Z1 - 1, C.wall);
+    for (let k = 0; k < 6; k++) {
+      const zk = Z1 - 2 - k;
+      S.fill(X0 + 1, y - k, zk, X0 + 2, y, zk, 0);
+      S.fill(X0 + 1, y - 6, zk, X0 + 2, y - 1 - k, zk, C.trim);
+    }
+    for (let a = X0 + 5; a <= X1 - 2; a += 4) {
+      S.fill(a, y - 6, Z0 + 1, a, y - 2, Z0 + 5, C.wall);
+      S.fill(a - 3, y - 6, Z0 + 5, a - 1, y - 3, Z0 + 5, B.tralies); S.fill(a - 3, y - 2, Z0 + 5, a - 1, y - 2, Z0 + 5, C.wall);
+      S.set(a - 2, y - 6, Z0 + 5, 0); S.set(a - 2, y - 5, Z0 + 5, 0);
+      S.set(a - 2, y - 6, Z0 + 2, evil ? B.botten : B.hooi);
+    }
+    S.set(X1 - 2, y - 6, Z0 + 2, B.schatkist);
+    S.set(x, y - 2, z - 12, B.lantaarn); S.set(X0 + 4, y - 2, Z1 - 3, B.lantaarn); S.set(X1 - 3, y - 2, Z1 - 3, B.lantaarn);
+    if (evil) for (let k = 0; k < 8; k++) S.set(x + Math.floor((hash3(k, 3, 9, s.seed) - 0.5) * 14), y - 6, Z0 + 8 + Math.floor(hash3(k, 4, 9, s.seed) * 9), k & 1 ? B.botten : B.spinnenweb);
+
+    // de hoge toren op het dak, met de schatkamer
+    const TX0 = x - 4, TX1 = x + 4, TZ0 = Z0 + 1, TZ1 = Z0 + 9;
+    S.fill(TX0, y + 19, TZ0, TX1, y + 29, TZ1, C.wall);
+    S.fill(TX0 + 1, y + 19, TZ0 + 1, TX1 - 1, y + 23, TZ1 - 1, 0);
+    S.fill(TX0 + 1, y + 25, TZ0 + 1, TX1 - 1, y + 29, TZ1 - 1, 0);
+    S.fill(x, y + 19, TZ1, x, y + 20, TZ1, 0);                                                    // deur vanaf het dak
+    for (let a = TX0 + 2; a <= TX1 - 2; a += 2) { S.fill(a, y + 21, TZ0, a, y + 22, TZ0, B.glas); S.fill(a, y + 26, TZ0, a, y + 27, TZ0, B.glas); S.fill(a, y + 26, TZ1, a, y + 27, TZ1, B.glas); }
+    S.set(TX0 + 1, y + 19, TZ0 + 1, B.schatkist); S.set(TX1 - 1, y + 19, TZ0 + 1, B.schatkist);
+    S.set(x, y + 19, TZ0 + 1, evil ? B.botten : B.goudblok); S.set(x, y + 23, TZ0 + 4, B.lantaarn);
+    for (let a = TX0 - 1; a <= TX1 + 1; a++) for (let b = TZ0 - 1; b <= TZ1 + 1; b++) {
+      const e = Math.max(Math.abs(a - x), Math.abs(b - (TZ0 + 4)));
+      if (evil) { if (e === 4 && ((a + b) & 1)) S.set(a, y + 30, b, C.trim); if (e < 4) S.set(a, y + 29, b, C.trim); }
+      else for (let k = 0; k <= 5; k++) if (e <= 5 - k) S.set(a, y + 30 + k, b, C.roof);
+    }
+    const top = y + (evil ? 30 : 36);
+    S.fill(x, top, TZ0 + 4, x, top + 4, TZ0 + 4, P.log);
+    S.fill(x + 1, top + 3, TZ0 + 4, x + 3, top + 4, TZ0 + 4, C.banner);
+  },
+
+  // ---------- trollenkamp ----------
+
+  campPlan(s) {
+    const y = s.y + 1;
+    const npcs = [{ k: 'trolhoofdman', x: s.x + 0.5, y, z: s.z - 3.5, r: 5 }];
+    for (const [dx, dz] of [[-3, 9], [3, 9], [-7, 0], [7, 0]]) npcs.push({ k: 'trol', x: s.x + dx + 0.5, y, z: s.z + dz + 0.5, r: 4 });
+    return { npcs };
+  },
+
+  drawCamp(S, s) {
+    const x = s.x, y = s.y, z = s.z, P = PAL[this.world];
+    if (!S.hit(x - 13, z - 13, x + 13, z + 13)) return;
+    for (let dx = -12; dx <= 12; dx++) for (let dz = -12; dz <= 12; dz++) {
+      const d = Math.hypot(dx, dz);
+      if (d > 11.5) continue;
+      S.fill(x + dx, y + 1, z + dz, x + dx, y + 9, z + dz, 0);
+      if (d < 9.5) { if (hash2(x + dx, z + dz, 8811) < 0.5) S.set(x + dx, y, z + dz, this.world === 'groen' ? B.aarde : P.land); continue; }
+      if (d < 10.5 && !(Math.abs(dx) <= 1 && dz > 0)) {
+        // palissade van boomstammen, met een opening aan de zuidkant
+        const h = 3 + (hash2(x + dx, z + dz, 8812) < 0.4 ? 1 : 0);
+        S.fill(x + dx, y + 1, z + dz, x + dx, y + h, z + dz, P.log);
+      }
+    }
+    // kampvuur in het midden
+    for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) S.set(x + dx, y, z + dz + 2, B.keisteen);
+    S.set(x, y + 1, z + 2, B.kampvuur);
+    // tenten: de grote van de hoofdman achterin, twee kleine opzij
+    const tent = (cx, cz, r, cloth) => {
+      for (let k = 0; k <= r; k++) for (let dx = -r + k; dx <= r - k; dx++) for (let dz = -r + k; dz <= r - k; dz++) {
+        const edge = Math.max(Math.abs(dx), Math.abs(dz)) === r - k;
+        if (edge) S.set(cx + dx, y + 1 + k, cz + dz, cloth);
+      }
+      S.fill(cx, y + 1, cz + r, cx, y + 2, cz + r, 0);
+      if (r > 2) S.set(cx, y + 2, cz + r - 1, 0);
+    };
+    tent(x, z - 5, 3, B.wol_rood);
+    tent(x - 6, z + 1, 2, B.stro); tent(x + 6, z + 1, 2, B.stro);
+    S.set(x, y + 1, z - 6, B.schatkist);
+    S.set(x - 1, y + 1, z - 5, B.botten); S.set(x + 1, y + 1, z - 6, B.hooi);
+    // totempalen bij de ingang
+    for (const sx of [-2, 2]) { S.fill(x + sx, y + 1, z + 10, x + sx, y + 4, z + 10, P.log); S.set(x + sx, y + 5, z + 10, B.botten); S.set(x + sx, y + 4, z + 11, B.wol_rood); }
+    for (const [dx, dz] of [[4, -3], [-5, 5], [5, 6], [-3, -2]]) S.set(x + dx, y + 1, z + dz, B.botten);
   },
 
   // ---------- alles in één chunk tekenen ----------

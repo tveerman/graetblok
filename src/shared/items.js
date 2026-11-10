@@ -105,7 +105,11 @@ item(330, 'pannenkoek', 'Pannenkoeken', { icon: ['pancake'], food: 10 });
 item(331, 'stoofpot', 'Stoofpot', { icon: ['bowl', '#b8642c'], food: 14 });
 item(332, 'heldenmaal', 'Heldenmaal', { icon: ['bowl', '#ffd23a'], food: 40, stack: 16 });
 item(333, 'appeltaart', 'Appeltaart', { icon: ['pie'], food: 12 });
+item(336, 'koningszwaard', 'Koningszwaard', { icon: ['sword', '#ffe680', '#3a6cf0'], dmg: 16, stack: 1, weapon: true, dur: 1500 });
+item(337, 'ridderharnas', 'Ridderharnas', { icon: ['armor', '#b8c4d8'], armor: 0.48, stack: 1 });
+item(338, 'spookkroon', 'Kroon van de Skeletkoning', { icon: ['crown', '#cfd6e6'], stack: 1 });
 item(339, 'harnas_leer', 'Leren harnas', { icon: ['armor', '#9a6a3c'], armor: 0.15, stack: 1 });
+item(340, 'trollenknots', 'Trollenknots', { icon: ['club'], dmg: 12, stack: 1, weapon: true, dur: 500 });
 
 export const isBlock = (id) => id > 0 && id < 256;
 export function itemName(id) {
@@ -225,12 +229,15 @@ recipe(I.boog, 1, [[I.stok, 3], [I.draad, 2]], 'werkbank');
 recipe(I.harnas_leer, 1, [[I.leer, 5]], 'werkbank');
 recipe(B.dakpan, 4, [[B.baksteen, 4]], 'werkbank');
 recipe(B.vakwerk, 4, [[B.planken, 2], [B.zand, 2]], 'werkbank');
+recipe(B.kasteelmuur, 4, [[B.steenblok, 2], [B.keisteen, 2]], 'werkbank');
 recipe(B.grind, 4, [[B.keisteen, 2], [B.zand, 2]]);
 recipe(B.tafel, 1, [[B.planken, 3], [I.stok, 4]], 'werkbank');
 recipe(B.kruk, 2, [[B.planken, 1], [I.stok, 3]], 'werkbank');
 recipe(B.boekenkast, 1, [[B.planken, 4], [I.leer, 1]], 'werkbank');
 recipe(B.aambeeld, 1, [[B.ijzerblok, 1], [I.ijzerstaaf, 2]], 'werkbank');
 recipe(B.kookpot, 1, [[I.ijzerstaaf, 4], [I.steenkool, 1]], 'werkbank');
+recipe(B.tralies, 6, [[I.ijzerstaaf, 3]], 'werkbank');
+recipe(B.troon, 1, [[I.goudstaaf, 4], [B.wol_rood, 2]], 'werkbank');
 
 export function matches(need, id) {
   return typeof need === 'string' ? GROUPS[need].includes(id) : need === id;

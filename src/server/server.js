@@ -595,6 +595,7 @@ export class GameServer {
       this.checkQuests(q);
     }
     this.fx(w.id, 'restore', T.x + 0.5, T.y + 4, T.z + 0.5);
+    this.depopulate(w, 'boom');                    // de doornwachters maken plaats voor boomwachters
   }
 
   // ---------- portalen ----------

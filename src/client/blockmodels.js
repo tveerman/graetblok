@@ -361,6 +361,16 @@ function tarwe(seed) {
   return M.finish();
 }
 
+// Spinnenweb: twee webben kruislings in de hoek.
+function spinnenweb() {
+  const M = new Model({ rot: 1, ao: 0 });
+  const t = tileId('web'), uv = [[0, 1], [1, 1], [1, 0], [0, 0]];
+  M.quad(t, [[0.04, 0, 0.04], [0.96, 0, 0.96], [0.96, 1, 0.96], [0.04, 1, 0.04]], uv);
+  M.quad(t, [[0.04, 0, 0.96], [0.96, 0, 0.04], [0.96, 1, 0.04], [0.04, 1, 0.96]], uv);
+  M.quad(t, [[0, 0.55, 0], [1, 0.5, 0], [1, 0.5, 1], [0, 0.55, 1]], uv);
+  return M.finish();
+}
+
 // ---------- welk blok krijgt welk model ----------
 // Per blok een lijstje: de mesher kiest er per plek één uit.
 
@@ -378,3 +388,4 @@ BLOCK_MODELS[B.gloeipaddenstoel] = [paddenstoelen('turkoois', true)];
 ZWAM_KEYS.forEach((k) => { BLOCK_MODELS[B['gloeizwam_' + k]] = [paddenstoelen(k, false)]; });
 TREE_KEYS.forEach((k) => { const t = tileId('lichtvrucht_' + k); BLOCK_MODELS[LIFE_VINES[k]] = [rank(t, 0), rank(t, 1), rank(t, 2)]; });
 BLOCK_MODELS[B.tarwe] = [tarwe(21), tarwe(22), tarwe(23)];
+BLOCK_MODELS[B.spinnenweb] = [spinnenweb()];

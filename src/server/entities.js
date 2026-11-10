@@ -219,6 +219,19 @@ export const entityMethods = {
     // spinnen springen op je af
     if (e.def.leap && e.onGround && h > 3 && h < 7 && e.cd2 <= 0) { e.cd2 = 2.5; e.vy = 8.5; e.kx = dx / h * 9; e.kz = dz / h * 9; }
     if (e.cd2 > 0) e.cd2 -= dt;
+    // de baas van een kamp of kasteel roept af en toe hulp
+    if (e.def.chief) {
+      e.cd3 -= dt;
+      if (e.cd3 <= 0) {
+        e.cd3 = 12;
+        let cnt = 0;
+        for (const m of w.ents.values()) if (m.site === e.site && m !== e && this.hostile(m)) cnt++;
+        if (cnt < 3) {
+          this.fx(w.id, 'roar', e.x, e.y, e.z);
+          for (let i = 0; i < 2; i++) { const m = this.spawnEnt(w, e.def.chief === 'trol' ? 'trol' : (i ? 'skelet' : 'skeletridder'), e.x + (i ? 2 : -2), e.y + 0.2, e.z + 1, { site: e.site, home: e.home }); const rec = w.pop.get(e.site); if (rec) rec.ids.push(m.id); this.fx(w.id, 'poof', m.x, m.y + 1, m.z, 1); }
+        }
+      }
+    }
   },
 
   aiRanged(w, e, dt) {
@@ -484,6 +497,12 @@ export const entityMethods = {
         this.send(q, { t: 'bossDown', name: e.def.name });
         this.toast(q, 'De bewaker is verslagen! Raak nu het levenshart van de boom aan.', 'good');
       }
+    }
+    if (e.def.chief && e.site) {
+      // de baas van een kamp of spookkasteel: daarna blijft het er een paar dagen rustig
+      if (!this.meta.cleared) this.meta.cleared = {};
+      this.meta.cleared[w.id + ':' + e.site] = this.meta.time;
+      for (const q of this.players.values()) if (q.world === w.id) { this.send(q, { t: 'bossDown', name: e.def.name }); this.toast(q, e.def.name + ' is verslagen! De schat is van jou.', 'good'); }
     }
     if (!p) return;
     if (e.dtype && this.rnd() < 0.3) this.giveLoot(p, this.eggOf(e.dtype), 1);      // een wilde draak laat soms een ei achter
@@ -858,7 +877,7 @@ export const entityMethods = {
         if (!p.known.has(e.id)) { p.known.add(e.id); this.send(p, this.entDesc(e)); }
         const flags = (e.atk > 0 ? 1 : 0) | ((e.fly && !e.landed) ? 2 : 0) | (e.mode === 'stay' ? 4 : 0) | (e.hurtT > 0 ? 8 : 0) | (e.slowT > 0 ? 16 : 0) | (e.poisonT > 0 ? 32 : 0);
         list.push(e.id, r2(e.x), r2(e.y), r2(e.z), r2(e.yaw), flags, r2(e.hp / e.max));
-        if (e.def.boss) boss = [e.def.name, r2(e.hp / e.max)];
+        if (e.def.boss || (e.def.chief && !boss && Math.hypot(e.x - p.x, e.z - p.z) < 40)) boss = [e.def.name, r2(e.hp / e.max)];
       }
       for (const id of p.known) if (!seen.has(id)) { p.known.delete(id); this.send(p, { t: 'despawn', id }); }
       this.send(p, { t: 'ents', l: list, boss });

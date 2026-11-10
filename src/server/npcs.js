@@ -38,6 +38,8 @@ export const JOBS = {
   drakenhandelaar: { title: 'Drakenhandelaar', hi: 'Psst... zoek je iets bijzonders? Ik heb eieren van heel ver weg.',
     trades: [[M, 40, B.ei_vuur, 1], [M, 40, B.ei_ijs, 1], [M, 50, B.ei_bliksem, 1], [M, 50, B.ei_schaduw, 1], [M, 80, B.ei_kristal, 1],
       [M, 6, I.drakenschub, 1], [I.drakenschub, 1, M, 4]] },
+  koning: { title: 'Koning', hi: 'Welkom in mijn kasteel, dappere held. Breng mij de kroon van de Skeletkoning en ik beloon je rijkelijk!',
+    trades: [[I.spookkroon, 1, M, 100], [M, 100, B.ei_goud, 1], [M, 60, I.ridderharnas, 1], [M, 30, I.zwaard_zilver, 1], [I.drakenschub, 2, M, 10]] },
 };
 const NAMES = ['Sanne', 'Daan', 'Lotte', 'Bram', 'Fenna', 'Joep', 'Noor', 'Siem', 'Tess', 'Gijs', 'Jet', 'Koen', 'Maud', 'Pim', 'Roos', 'Teun', 'Vera', 'Wout', 'Yara', 'Ties', 'Mila', 'Finn', 'Evi', 'Stijn'];
 const KINGS = ['Alfred', 'Boudewijn', 'Karel', 'Lodewijk', 'Willem', 'Floris'];
@@ -76,10 +78,16 @@ export const npcMethods = {
 
   // ---------- bouwwerken en hun bewoners ----------
 
+  treeSite(w) {
+    const T = WORLDS[w.id].tree;
+    return { key: 'boom', kind: 'boom', x: T.x, y: T.y, z: T.z, r0: 30, r1: 40, name: '' };
+  },
+
   // elke seconde, per speler: bewoners neerzetten bij bouwwerken waar je in de buurt komt
   updateSites(p) {
     const w = this.worlds[p.world], gen = w.gen;
     const near = gen.sitesNear(p.x, p.z, 170);
+    near.push(this.treeSite(w));
     let inside = null;
     for (const s of near) {
       const d = Math.hypot(s.x - p.x, s.z - p.z);
@@ -140,6 +148,20 @@ export const npcMethods = {
     if (!rec) return;
     for (const id of rec.ids) w.ents.delete(id);
     w.pop.delete(key);
+  },
+
+  // De bewakers van een levensboom: doornwachters zolang de boom ziek is, daarna boomwachters.
+  treeGuards(w, s) {
+    const alive = !!this.meta.trees[WORLDS[w.id].tree.key];
+    const list = [];
+    for (let k = 0; k < 4; k++) {
+      const a = k * Math.PI / 2 + 0.6;
+      const x = Math.floor(s.x + Math.cos(a) * 22) + 0.5, z = Math.floor(s.z + Math.sin(a) * 22) + 0.5;
+      const top = w.topY(Math.floor(x), Math.floor(z), Math.min(127, s.y + 12));
+      if (top < 2 || w.liquid(Math.floor(x), top + 1, Math.floor(z))) continue;
+      list.push({ k: alive ? 'boomwachter' : 'doornwachter', x, y: top + 1, z, r: 7 });
+    }
+    return list;
   },
 
   // Staat hier een dorp of een bewoond kasteel? (daar komen geen monsters uit de grond)

@@ -1061,6 +1061,8 @@ Object.assign(PX, {
     if (HQ) HH = 0.4 + fbm(u, v, 14, 14, 3, 505) * 0.2;
     return mul([234, 226, 206], (0.9 + fbm(u, v, 6, 6, 3, 505) * 0.14) * (rand < 0.03 ? 0.82 : 1));
   },
+  kasteelmuur: bricks([124, 126, 134], [172, 172, 178], [66, 66, 72], 3, 2, 506),
+  spookmuur: bricks([40, 36, 52], [74, 66, 90], [16, 14, 22], 3, 2, 507),
   grind: (x, y, u, v) => {
     cell(u, v, 13, 508);
     const e = sst(0.02, 0.2, F2 - F1), id = CID, kant = c01(0.5 + (-CDX - CDY) * 0.8);
@@ -1149,6 +1151,22 @@ Object.assign(PX, {
     if (HQ) HH = 0.4 + 0.4 * Math.sin(fu * Math.PI);
     return c;
   },
+  troon: (x, y, u, v) => {
+    const b = Math.min(u, v, 1 - u, 1 - v);
+    if (b < 0.11) { if (HQ) { HS = 0.9; HH = 0.9; } return mul([236, 188, 62], (b < 0.02 ? 0.6 : 0.9) + fbm(u, v, 8, 8, 2, 530) * 0.2); }
+    const knoop = Math.cos(u * Math.PI * 6) * Math.cos(v * Math.PI * 6);
+    if (HQ) HH = 0.4 + knoop * 0.3;
+    return knoop > 0.93 ? [246, 210, 96] : mul([172, 24, 42], 0.8 + 0.22 * knoop);
+  },
+  troon_top: bevel([236, 190, 64], 531),
+  tralies: (x, y, u, v) => {
+    const fu = (u * 4) % 1, staaf = Math.abs(fu - 0.5) < 0.17, dwars = Math.abs(v - 0.14) < 0.055 || Math.abs(v - 0.86) < 0.055;
+    if (!staaf && !dwars) return [60, 62, 70, 0];
+    const rond = staaf ? Math.cos((fu - 0.5) / 0.17 * 1.4) : Math.cos(((v < 0.5 ? v - 0.14 : v - 0.86) / 0.055) * 1.4);
+    if (HQ) HS = 0.7;
+    const c = mul([112, 116, 128], 0.45 + 0.7 * rond);
+    return [c[0], c[1], c[2], 255];
+  },
   akker_top: (x, y, u, v) => {
     const rib = Math.sin(v * Math.PI * 8) * 0.5 + 0.5;
     if (HQ) HH = 0.2 + rib * 0.6;
@@ -1167,6 +1185,16 @@ Object.assign(PX, {
     const rib = Math.abs(Math.sin(Math.atan2(dv, du) * 5));
     return mul([236, 132, 26], (0.62 + 0.4 * rib) * (1.05 - d * 0.5));
   },
+  botten: (x, y, u, v) => {
+    // een stapel botten: lichte, langwerpige vormen door elkaar
+    const a = fbm(u, v, 3, 3, 2, 535) * 6.283;
+    const s = Math.abs(Math.sin((u * Math.cos(a) + v * Math.sin(a)) * 30 + fbm(u, v, 5, 5, 2, 536) * 6));
+    const bot = sst(0.35, 0.7, s);
+    cell(u, v, 5, 537);
+    const knok = F1 < 0.14 ? 1 : 0;
+    if (HQ) HH = Math.max(bot, knok) * 0.8;
+    return mix([52, 46, 40], mul([232, 224, 200], 0.82 + CID * 0.2), Math.max(bot, knok));
+  },
   tarwe_halm: (x, y, u, v) => mul(mix([214, 186, 84], [128, 150, 52], v), 0.85 + vn(u * 10, v * 3, 10, 3, 541) * 0.3),
   tarwe_aar: (x, y, u, v) => {
     // een aar: twee rijen korrels langs een steeltje, met naaldjes eraan
@@ -1178,6 +1206,13 @@ Object.assign(PX, {
     if (naald) c = [226, 200, 110];
     return [c[0], c[1], c[2], (d < w && t > 0.03) || naald ? 255 : 0];
   },
+  web: (x, y, u, v) => {
+    const du = u - 0.5, dv = v - 0.5, d = Math.hypot(du, dv), a = Math.atan2(dv, du);
+    const spaak = Math.abs(((a / (Math.PI / 4) + 16.5) % 1) - 0.5) * d * 0.785 < 0.012;
+    const hang = d + 0.035 * Math.abs(Math.sin(a * 4));                                  // de draden hangen een beetje door
+    const ring = Math.abs(((hang * 7.5) % 1) - 0.5) < 0.085 && d > 0.06;
+    return [246, 246, 250, (spaak || ring) && d < 0.7 ? 255 : 0];
+  },
 });
 DRAW.tarwe = (g) => {
   g.lineCap = 'round';
@@ -1187,6 +1222,15 @@ DRAW.tarwe = (g) => {
     g.fillStyle = hash2(i, 3, 545) > 0.5 ? '#f0cc5a' : '#dcb040';
     g.beginPath(); g.ellipse(x + sw, 64 - h + 4, 3.6, 10, sw * 0.03, 0, 6.3); g.fill();
     g.strokeStyle = 'rgba(120,84,20,0.7)'; g.lineWidth = 1; g.stroke();
+  }
+};
+DRAW.spinnenweb = (g) => {
+  g.strokeStyle = 'rgba(250,250,255,0.95)'; g.lineWidth = 1.6;
+  for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4; g.beginPath(); g.moveTo(32, 32); g.lineTo(32 + Math.cos(a) * 30, 32 + Math.sin(a) * 30); g.stroke(); }
+  for (let r = 7; r <= 28; r += 7) {
+    g.beginPath();
+    for (let i = 0; i <= 8; i++) { const a = i * Math.PI / 4, x = 32 + Math.cos(a) * r, y = 32 + Math.sin(a) * r; if (i) g.quadraticCurveTo(32 + Math.cos(a - Math.PI / 8) * r * 0.82, 32 + Math.sin(a - Math.PI / 8) * r * 0.82, x, y); else g.moveTo(x, y); }
+    g.stroke();
   }
 };
 
@@ -1315,7 +1359,7 @@ function hqMat(name) {
   else if (is(/^(blad_|levensblad_)/)) spec = 0.12;
   else if (is(/^(marmerblok|granietblok|marmerzuil)/)) spec = 0.45;
   else if (is(/^(marmer|graniet)$/)) spec = 0.15;
-  if (is(/^(aambeeld|kookpot)/)) spec = 0.6;
+  if (is(/^(tralies|aambeeld|kookpot|troon)/)) spec = 0.6;
   if (name === 'bes') spec = 0.7;
   else if (is(/^(gras_spriet|plant_blad|bloemblad_)/)) { spec = 0.1; bump = 0.5; }
   if (name === 'vlam') { emis = 1; bump = 0; }
@@ -1545,6 +1589,14 @@ const ICONS = {
     for (let i = -2; i <= 2; i++) { g.beginPath(); g.moveTo(32 + i * 9 - 6, 26); g.lineTo(32 + i * 9 + 6, 42); g.stroke(); g.beginPath(); g.moveTo(32 + i * 9 + 6, 26); g.lineTo(32 + i * 9 - 6, 42); g.stroke(); }
     g.fillStyle = '#d8281e'; g.beginPath(); g.arc(32, 22, 5, 0, 6.3); g.fill();
   },
+  club: (g) => {
+    g.save(); g.translate(32, 32); g.rotate(0.75);
+    g.strokeStyle = 'rgba(0,0,0,0.65)'; g.lineWidth = 2;
+    g.fillStyle = '#6a4a2c'; g.fillRect(-3.5, 2, 7, 26); g.strokeRect(-3.5, 2, 7, 26);
+    g.fillStyle = '#8a6238'; g.beginPath(); g.ellipse(0, -10, 11, 17, 0, 0, 6.3); g.fill(); g.stroke();
+    g.fillStyle = '#d8d8de'; for (const [x, y] of [[-9, -14], [9, -10], [-7, -2], [6, -20], [0, -27]]) { g.beginPath(); g.moveTo(x - 3, y + 2); g.lineTo(x + (x < 0 ? -5 : 5), y - 2); g.lineTo(x + 3, y - 3); g.closePath(); g.fill(); g.stroke(); }
+    g.restore();
+  },
   boots: (g, c) => {
     g.lineWidth = 2; g.strokeStyle = 'rgba(0,0,0,0.65)'; g.lineJoin = 'round';
     const een = (ox) => {
@@ -1692,8 +1744,8 @@ const ICONS = {
     g.beginPath(); g.moveTo(32, 54); g.bezierCurveTo(2, 34, 12, 8, 32, 22); g.bezierCurveTo(52, 8, 62, 34, 32, 54); g.fill(); g.stroke();
     g.fillStyle = 'rgba(255,255,255,0.55)'; g.beginPath(); g.ellipse(22, 24, 5, 7, -0.5, 0, 6.3); g.fill();
   },
-  crown: (g) => {
-    g.fillStyle = '#f5c93a'; g.strokeStyle = 'rgba(0,0,0,0.65)'; g.lineWidth = 2;
+  crown: (g, c) => {
+    g.fillStyle = c || '#f5c93a'; g.strokeStyle = 'rgba(0,0,0,0.65)'; g.lineWidth = 2;
     g.beginPath(); g.moveTo(8, 50); g.lineTo(6, 18); g.lineTo(20, 32); g.lineTo(32, 10); g.lineTo(44, 32); g.lineTo(58, 18); g.lineTo(56, 50); g.closePath(); g.fill(); g.stroke();
     g.fillStyle = '#e0362c'; g.beginPath(); g.arc(32, 40, 5, 0, 6.3); g.fill();
     g.fillStyle = '#4ae0ff'; g.beginPath(); g.arc(17, 42, 3.5, 0, 6.3); g.fill(); g.beginPath(); g.arc(47, 42, 3.5, 0, 6.3); g.fill();

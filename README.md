@@ -156,6 +156,13 @@ From Jorian's design document (`spel.txt`), following development phases 1–4, 
   you five coins. Two knights guard each village and fight monsters that come near. In the
   green world there is always a village south-east of the spaceship; the compass shows the
   nearest village (🏠) and castle (🏰).
+- **Castles** – 76 blocks across: a moat with a bridge, a curtain wall with a wall walk and
+  battlements, four round corner towers, a gatehouse, a courtyard with stables and a smithy,
+  and a three-storey keep with a throne room, library, armoury, dungeon and a tall tower
+  holding the treasury. A king's castle has a king (who pays 100 coins for the Skeleton
+  King's crown and sells a golden dragon egg), knights, a cook, a smith and a dragon trader.
+  A haunted castle ("spookkasteel") is dark and ruined and belongs to the Skeletkoning and
+  his skeleton knights, archers and giant spiders.
 - **Dragon species** – the eight kinds now differ in shape (flame crest, ice crystals, leaf
   collar, zigzag horns, jets and antenna, crown, crystal spikes...), in flying speed and
   strength, and in what they breathe: exploding fireballs, three freezing ice shards, a
@@ -171,6 +178,9 @@ From Jorian's design document (`spel.txt`), following development phases 1–4, 
   wolf packs that hunt at night (three bones tame a wolf, which then fights for you), bears
   that only attack when you come close, giant spiders that leap, skeleton archers, and troll
   camps: a palisade with tents, a treasure chest, four trolls and the Trollenhoofdman.
+- **Guards** – knights in villages and castles, trolls around their chief, skeleton knights
+  around the Skeletkoning, and four thorn guards ("doornwachters") around every sick life
+  tree. Once a tree is restored they are replaced by friendly tree guards ("boomwachters").
 - **Story quests** – 18 steps from "chop a tree" to "defeat the Drakenkoning", shown top-left,
   with a compass marker for the early ones.
 

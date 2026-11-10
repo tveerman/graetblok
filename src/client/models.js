@@ -429,6 +429,49 @@ function skelet(soort) {
   return root;
 }
 
+function trol(tint) {
+  const root = base('biped'), g = root.userData.a.inner, a = root.userData.a;
+  const c = tint || 0x5a8a4a;
+  const huid = mat(c, 'vacht'), donker = mat(c, 'vacht', { color: 0xaaaaaa });
+  a.legs = [limb(g, donker, 0.34, 0.74, 0.36, -0.22, 0.74, 0), limb(g, donker, 0.34, 0.74, 0.36, 0.22, 0.74, 0)];
+  part(g, huid, 0.9, 0.86, 0.56, 0, 1.2, 0);
+  part(g, mat(0x6a4a2c, 'vacht'), 0.94, 0.3, 0.6, 0, 0.82, 0);                             // lendendoek
+  part(g, huid, 0.6, 0.3, 0.44, 0, 1.56, -0.2);                                           // bochel
+  const head = new THREE.Group(); head.position.set(0, 1.84, 0.1); g.add(head); a.head = head;
+  part(head, faceMats(c, 'vacht', '#ffd040', true, false), 0.52, 0.44, 0.48, 0, 0, 0);
+  part(head, huid, 0.2, 0.16, 0.14, 0, -0.06, 0.28);                                       // neus
+  for (const s of [-1, 1]) {
+    const oor = part(head, huid, 0.26, 0.12, 0.06, s * 0.36, 0.06, -0.04); oor.rotation.z = s * 0.4;
+    part(head, mat(0xf2ead0, 'glad'), 0.06, 0.16, 0.06, s * 0.14, -0.16, 0.24);            // slagtanden
+  }
+  a.arms = [limb(g, huid, 0.3, 1.0, 0.32, -0.6, 1.6, 0), limb(g, huid, 0.3, 1.0, 0.32, 0.6, 1.6, 0)];
+  // een knots met spijkers
+  part(a.arms[1], mat(0x6a4a2c, 'glad'), 0.1, 0.1, 0.9, 0, -0.94, 0.36);
+  part(a.arms[1], mat(0x8a6238, 'vacht'), 0.26, 0.26, 0.46, 0, -0.94, 0.8);
+  for (const [x, y] of [[0.14, 0], [-0.14, 0], [0, 0.14], [0, -0.14]]) part(a.arms[1], mat(0xd8d8de, 'metaal'), 0.07, 0.07, 0.07, x, -0.94 + y, 0.84);
+  return root;
+}
+
+// Boomwachter (groen, met lichtgevende blaadjes) of doornwachter (dor en donker, met doorns).
+function boomwachter(tint, friendly) {
+  const root = base('biped'), g = root.userData.a.inner, a = root.userData.a;
+  const bast = mat(friendly ? 0x7a5a38 : 0x3a302c, 'rots'), blad = friendly ? mat(0x5ac83a, 'vacht', { emissive: 0x3aa02a, emissiveIntensity: 0.5 }) : mat(0x3a2a34, 'vacht');
+  const licht = glowMat(friendly ? 0x9dff7a : 0xff3a8a);
+  a.legs = [limb(g, bast, 0.34, 0.9, 0.34, -0.24, 0.9, 0), limb(g, bast, 0.34, 0.9, 0.34, 0.24, 0.9, 0)];
+  part(g, bast, 0.84, 0.9, 0.52, 0, 1.36, 0);
+  part(g, licht, 0.2, 0.26, 0.04, 0, 1.4, 0.27);                                           // het hart gloeit door de bast
+  const head = new THREE.Group(); head.position.set(0, 2.02, 0.04); g.add(head); a.head = head;
+  part(head, bast, 0.5, 0.42, 0.46, 0, 0, 0);
+  for (const s of [-1, 1]) part(head, licht, 0.1, 0.08, 0.03, s * 0.12, 0.02, 0.24);
+  // een kruin van bladeren (of kale takken met doorns)
+  if (friendly) { part(head, blad, 0.8, 0.36, 0.76, 0, 0.36, 0); part(head, blad, 0.5, 0.26, 0.5, 0, 0.64, 0); part(g, blad, 0.4, 0.2, 0.4, -0.5, 1.9, 0); part(g, blad, 0.4, 0.2, 0.4, 0.5, 1.9, 0); }
+  else for (let i = 0; i < 5; i++) { const t = part(head, bast, 0.07, 0.5, 0.07, -0.2 + i * 0.1, 0.4, (i % 2) * 0.16 - 0.08); t.rotation.z = (i - 2) * 0.3; part(head, licht, 0.05, 0.1, 0.05, -0.26 + i * 0.13, 0.66, (i % 2) * 0.16 - 0.08); }
+  a.arms = [limb(g, bast, 0.26, 1.1, 0.28, -0.56, 1.76, 0), limb(g, bast, 0.26, 1.1, 0.28, 0.56, 1.76, 0)];
+  for (const arm of a.arms) { for (let i = 0; i < 3; i++) { const t = part(arm, bast, 0.06, 0.26, 0.06, -0.1 + i * 0.1, -1.2, 0); t.rotation.z = (i - 1) * 0.4; } }
+  void tint;
+  return root;
+}
+
 // ---------- kuddedieren ----------
 
 function schaap(wol) {
@@ -521,6 +564,10 @@ export function buildModel(kind, opts) {
     case 'mens': m = mens(opts.job, opts.variant || 0); break;
     case 'ridder': m = ridder(false); break;
     case 'skelet': m = skelet(''); break;
+    case 'skeletridder': m = skelet('ridder'); break;
+    case 'skeletkoning': m = skelet('koning'); break;
+    case 'trol': m = trol(def.tint); break;
+    case 'boomwachter': m = boomwachter(def.tint, kind === 'boomwachter'); break;
     case 'schaap': m = schaap(SCHAAP_COLOR[opts.world] || SCHAAP_COLOR.groen); break;
     case 'koe': m = koe(); break;
     case 'beer': m = beer(BEER_COLOR[opts.world] || BEER_COLOR.groen); break;
