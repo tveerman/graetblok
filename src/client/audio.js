@@ -1,5 +1,21 @@
 // Geluid: alles wordt ter plekke gemaakt met de Web Audio API (geen geluidsbestanden).
 
+// De muziek: elke wereld heeft een eigen toonsoort, tempo en klank. Het liedje wordt
+// tijdens het spelen gemaakt: vier maten met akkoorden, een bas en een melodietje dat
+// zich herhaalt en af en toe verandert.
+const SONGS = {
+  groen: { root: 261.63, minor: false, bpm: 96, lead: 'triangle' },
+  ijs: { root: 293.66, minor: false, bpm: 80, lead: 'sine' },
+  vuur: { root: 220.0, minor: true, bpm: 104, lead: 'triangle' },
+  schaduw: { root: 164.81, minor: true, bpm: 72, lead: 'sine' },
+  wolken: { root: 349.23, minor: false, bpm: 100, lead: 'triangle' },
+};
+// akkoorden en toonladders in halve tonen boven de grondtoon
+const CHORDS_MAJ = [[0, 4, 7], [7, 11, 14], [9, 12, 16], [5, 9, 12]];
+const CHORDS_MIN = [[0, 3, 7], [8, 12, 15], [3, 7, 10], [10, 14, 17]];
+const PENTA_MAJ = [0, 2, 4, 7, 9], PENTA_MIN = [0, 3, 5, 7, 10];
+const MUSIC_VOL = 0.7;      // de muziek blijft op de achtergrond, onder de geluidseffecten
+
 export class Sound {
   constructor() {
     this.ctx = null;
@@ -7,31 +23,50 @@ export class Sound {
     this.musicOn = true;
     this.noiseBuf = null;
     this.amb = null;
-    this.world = 'groen';
-    this.musicT = 0;
     this.ambT = 0;
-    this.note = 0;
+    this.kicked = false;
+    this.mus = { world: '', next: 0, step: 0, phrase: null, idx: 5, on: true };
   }
 
-  // moet na een tik of toets worden aangeroepen (zo willen browsers dat)
+  // Moet na een tik of toets worden aangeroepen: browsers laten pas daarna geluid toe.
+  // We proberen het bij elke tik opnieuw tot het geluid echt loopt (nodig op iPad en in Safari).
   unlock() {
-    if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; }
     const AC = window.AudioContext || window.webkitAudioContext;
     if (!AC) return;
-    this.ctx = new AC();
-    this.master = this.ctx.createGain();
-    this.master.gain.value = this.vol;
-    this.master.connect(this.ctx.destination);
-    const len = this.ctx.sampleRate;
-    this.noiseBuf = this.ctx.createBuffer(1, len, len);
-    const d = this.noiseBuf.getChannelData(0);
-    for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
-    // wind die altijd zachtjes waait
-    const src = this.ctx.createBufferSource(); src.buffer = this.noiseBuf; src.loop = true;
-    const f = this.ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 380;
-    const g = this.ctx.createGain(); g.gain.value = 0.0;
-    src.connect(f); f.connect(g); g.connect(this.master); src.start();
-    this.amb = { f, g };
+    if (!this.ctx) {
+      const c = this.ctx = new AC();
+      this.master = c.createGain();
+      this.master.gain.value = this.vol;
+      this.master.connect(c.destination);
+      const len = c.sampleRate;
+      this.noiseBuf = c.createBuffer(1, len, len);
+      const d = this.noiseBuf.getChannelData(0);
+      for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+      // wind die altijd zachtjes waait
+      const src = c.createBufferSource(); src.buffer = this.noiseBuf; src.loop = true;
+      const f = c.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 380;
+      const g = c.createGain(); g.gain.value = 0.0;
+      src.connect(f); f.connect(g); g.connect(this.master); src.start();
+      this.amb = { f, g };
+      // muziek: eigen volumeknop en een zachte echo
+      this.musicGain = c.createGain(); this.musicGain.gain.value = MUSIC_VOL; this.musicGain.connect(this.master);
+      this.echo = c.createDelay(1); this.echo.delayTime.value = 0.34;
+      const fb = c.createGain(); fb.gain.value = 0.3;
+      const wet = c.createGain(); wet.gain.value = 0.35;
+      this.echo.connect(fb); fb.connect(this.echo); this.echo.connect(wet); wet.connect(this.musicGain);
+    }
+    const c = this.ctx;
+    if (c.state !== 'running') {
+      try { const pr = c.resume(); if (pr && pr.catch) pr.catch(() => {}); } catch (e) { /* nog niet toegestaan */ }
+    }
+    if (!this.kicked) {
+      // een onhoorbaar geluidje binnen de tik maakt het geluid op iPad en iPhone wakker
+      try {
+        const s = c.createBufferSource(); s.buffer = c.createBuffer(1, 1, 22050);
+        s.connect(c.destination); s.start(0);
+      } catch (e) { /* geeft niet */ }
+      this.kicked = c.state === 'running';
+    }
   }
 
   setVolume(v) { this.vol = v; if (this.master) this.master.gain.value = v; }
@@ -150,17 +185,88 @@ export class Sound {
       else if (w === 'vuur') { this.noise(0.5, 'lowpass', 200, 0.12, 80); }
       else if (w === 'schaduw') { this.tone(55 + Math.random() * 10, 2.5, 'sine', 0.07, 0, 0, 0.8); this.tone(82, 2.5, 'sine', 0.03, 78, 0, 0.8); }
     }
-    if (!this.musicOn) return;
-    this.musicT -= dt;
-    if (this.musicT <= 0) {
-      const scales = { groen: [262, 294, 330, 392, 440, 523, 587, 659], ijs: [294, 330, 370, 440, 494, 587, 659, 740], vuur: [220, 262, 294, 330, 392, 440, 523, 587], schaduw: [208, 247, 277, 311, 370, 415, 494, 554], wolken: [349, 392, 440, 523, 587, 698, 784, 880] };
-      const sc = scales[w] || scales.groen;
-      this.note = Math.max(0, Math.min(sc.length - 1, this.note + Math.floor(Math.random() * 5) - 2));
-      const f = sc[this.note];
-      this.tone(f, 2.2, 'sine', 0.045, 0, 0, 0.25);
-      this.tone(f * 2, 1.6, 'sine', 0.012, 0, 0, 0.3);
-      if (Math.random() < 0.3) this.tone(f / 2, 3, 'triangle', 0.03, 0, 0, 0.5);
-      this.musicT = Math.random() < 0.25 ? 3 + Math.random() * 4 : 0.7 + Math.random() * 0.9;
+    this.music(env);
+  }
+
+  // een muzieknoot op een afgesproken moment
+  note(freq, when, dur, type, vol, attack, echo) {
+    const c = this.ctx;
+    const o = c.createOscillator(), g = c.createGain();
+    o.type = type; o.frequency.setValueAtTime(freq, when);
+    g.gain.setValueAtTime(0.0001, when);
+    g.gain.linearRampToValueAtTime(vol, when + attack);
+    g.gain.setValueAtTime(vol, when + Math.max(attack, dur * 0.55));
+    g.gain.exponentialRampToValueAtTime(0.0001, when + dur);
+    o.connect(g); g.connect(this.musicGain);
+    if (echo) g.connect(this.echo);
+    o.start(when); o.stop(when + dur + 0.05);
+  }
+
+  // een nieuw melodietje van vier maten (32 achtste noten); -1 = rust
+  makePhrase(minor) {
+    const penta = minor ? PENTA_MIN : PENTA_MAJ, chords = minor ? CHORDS_MIN : CHORDS_MAJ;
+    const scale = [];
+    for (let o = 0; o < 2; o++) for (const p of penta) scale.push(p + 12 * o);
+    scale.push(24);
+    const out = [];
+    let idx = this.mus.idx;
+    for (let bar = 0; bar < 4; bar++) {
+      const chord = chords[bar];
+      for (let st = 0; st < 8; st++) {
+        const strong = st === 0 || st === 4;
+        if (Math.random() < (strong ? 0.06 : (st % 2 ? 0.45 : 0.22))) { out.push(-1); continue; }
+        if (strong) {
+          // op de tel: de dichtstbijzijnde toon uit het akkoord
+          let best = idx, bd = 99;
+          for (let i = 1; i < scale.length; i++) {
+            const pc = scale[i] % 12;
+            if (!chord.some((c) => c % 12 === pc)) continue;
+            const d = Math.abs(i - idx) + Math.random() * 1.5;
+            if (d < bd) { bd = d; best = i; }
+          }
+          idx = best;
+        } else {
+          idx += [-2, -1, -1, 1, 1, 2, 0][Math.floor(Math.random() * 7)];
+          if (idx < 1) idx = 2; if (idx > scale.length - 1) idx = scale.length - 3;
+        }
+        out.push(scale[idx]);
+      }
+    }
+    this.mus.idx = Math.max(3, Math.min(7, idx));
+    return out;
+  }
+
+  // Zet steeds een klein stukje muziek vooruit klaar. Wordt een paar keer per seconde aangeroepen.
+  music(env) {
+    const c = this.ctx, m = this.mus, now = c.currentTime;
+    if (m.on !== this.musicOn) { m.on = this.musicOn; this.musicGain.gain.setTargetAtTime(m.on ? MUSIC_VOL : 0, now, 0.15); }
+    if (!this.musicOn) { m.next = 0; return; }
+    const song = SONGS[env.world] || SONGS.groen;
+    if (m.world !== env.world) { m.world = env.world; m.step = 0; m.phrase = null; m.next = now + 0.5; }
+    if (m.next < now - 0.2) m.next = now + 0.12;          // na een pauze niet alles inhalen
+    const stepDur = 60 / song.bpm / 2;
+    const chords = song.minor ? CHORDS_MIN : CHORDS_MAJ;
+    const hz = (n) => song.root * Math.pow(2, n / 12);
+    const v = (env.under ? 0.6 : 1) * (0.75 + 0.25 * (env.day === undefined ? 1 : env.day));
+    while (m.next < now + 0.4) {
+      const t = m.next, st = m.step % 8, bar = Math.floor(m.step / 8) % 4, chord = chords[bar];
+      if (!m.phrase) m.phrase = this.makePhrase(song.minor);
+      if (st === 0) {
+        this.note(hz(chord[0] - 12), t, stepDur * 7.6, 'triangle', 0.11 * v, 0.03, false);                 // bas
+        for (const n of chord) this.note(hz(n), t, stepDur * 8.2, 'sine', 0.03 * v, 0.5, false);           // akkoord
+      } else if (st === 4) {
+        this.note(hz(chord[0] - 12), t, stepDur * 3.6, 'triangle', 0.075 * v, 0.03, false);
+      } else if (st === 6) {
+        this.note(hz(chord[2] - 12), t, stepDur * 1.8, 'triangle', 0.05 * v, 0.03, false);
+      }
+      const n = m.phrase[m.step % 32];
+      if (n >= 0 && !env.under) {
+        const rest = m.phrase[(m.step + 1) % 32] < 0;
+        this.note(hz(n), t, stepDur * (rest ? 1.9 : 1.05), song.lead, 0.085 * v, 0.012, true);              // melodie
+      }
+      m.step++;
+      if (m.step % 64 === 0) m.phrase = null;              // na twee keer spelen: een nieuw melodietje
+      m.next += stepDur;
     }
   }
 }

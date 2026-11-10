@@ -57,9 +57,16 @@ class Game {
     this.frameT = 0.016; this.resT = 0; this.last = performance.now(); this.weatherT = 0; this.loadT = 0;
     this.fpsText = '';
 
-    document.addEventListener('visibilitychange', () => { if (document.hidden && this.net) this.net.send({ t: 'save' }); });
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden || !this.net) return;
+      // de tablet wordt weggelegd of er wordt naar een andere app gegaan: pauzeren en opslaan
+      if (this.state === 'play' && !this.ui.modalOpen()) this.ui.openPause();
+      this.syncPause();
+      this.net.send({ t: 'save' });
+    });
     window.addEventListener('pagehide', () => { if (this.net) this.net.send({ t: 'save' }); });
-    for (const ev of ['touchend', 'mousedown', 'keydown']) window.addEventListener(ev, () => this.sound.unlock(), { passive: true });
+    // geluid mag pas na een tik of toets; in de "capture"-fase zodat geen enkele knop dit tegenhoudt
+    for (const ev of ['touchend', 'click', 'mousedown', 'pointerup', 'keydown']) document.addEventListener(ev, () => this.sound.unlock(), { passive: true, capture: true });
 
     this.buildMenu();
     setupOffline(this);
@@ -101,6 +108,17 @@ class Game {
     this.state = 'loading';
     if (!this.net) this.net = await connect((m) => this.onMsg(m));
     this.net.send({ t: 'hello', name: 'speler', view: this.settings.view, look: this.look, reset: !!reset, debug: this.debug });
+  }
+
+  // Staat er een venster open (rugzak, opdrachten, pauze...)? Dan staat het spel stil.
+  isPaused() { return this.state === 'play' && this.ui.modalOpen(); }
+
+  // vertel de server of de wereld stil moet staan
+  syncPause() {
+    const on = this.isPaused();
+    if (on === this.pausedSent || !this.net) return;
+    this.pausedSent = on;
+    this.net.send({ t: 'pause', on });
   }
 
   // Terug naar het beginscherm. De pagina wordt niet opnieuw geladen (dat zou mislukken
@@ -157,6 +175,7 @@ class Game {
         this.trees = m.trees || {};
         setTreeTiles(this.trees);
         this.R.setWorld(m.world, this.trees);
+        this.pausedSent = false;
         p.dead = false; p.frozen = true; p.mount = 0; this.ents.ridden = 0;
         if (ui.modal === 'death') { ui.modal = null; document.getElementById('modal').classList.add('hidden'); }
         p.teleport(m.x, m.y, m.z, m.yaw);
@@ -315,8 +334,11 @@ class Game {
     if (real > 0.25) real = 0.25;
     if (!(real > 0.001)) real = 0.001;
     const dt = Math.min(real, 0.05);
-    this.time += dt; this.gameTime += dt;
     const p = this.player;
+    this.syncPause();
+    const paused = this.isPaused();
+    this.time += dt;
+    if (!paused) this.gameTime += dt;
 
     if (this.state === 'menu') {
       p.yaw += dt * 0.05;
@@ -354,11 +376,15 @@ class Game {
       }
     }
 
-    p.update(dt);
-    this.ents.update(dt, this.time, p);
-    this.weather(dt);
-    this.particles.update(dt, window.innerHeight);
-    this.R.update(this.gameTime, dt, { water: p.headIn === 1, lava: p.headIn === 2, nightEyes: !!this.trees.schaduw });
+    if (paused) {
+      this.input.takeLook();                     // niet rondkijken of lopen terwijl een venster open staat
+    } else {
+      p.update(dt);
+      this.ents.update(dt, this.time, p);
+      this.weather(dt);
+      this.particles.update(dt, window.innerHeight);
+    }
+    this.R.update(this.gameTime, paused ? 0 : dt, { water: p.headIn === 1, lava: p.headIn === 2, nightEyes: !!this.trees.schaduw });
     this.ui.setTint(p.headIn === 1 ? 'water' : p.headIn === 2 ? 'lava' : '');
     this.hudT = (this.hudT || 0) + real;
     if (this.state === 'play' && this.hudT > 0.07) {

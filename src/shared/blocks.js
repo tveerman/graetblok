@@ -44,7 +44,7 @@ function def(id, key, name, p = {}) {
 }
 
 const CROSS = { shape: SHAPE_CROSS, pass: 1, solid: false, opaque: false, hard: 0.15, snd: 'leaf', support: true };
-const LEAF = { pass: 1, opaque: false, hard: 0.3, snd: 'leaf', drop: null };
+const LEAF = { pass: 1, opaque: false, hard: 0.3, snd: 'leaf' };
 const LOG = { hard: 2.2, tool: 'axe', snd: 'wood' };
 
 def(0, 'lucht', 'Lucht', { shape: SHAPE_AIR, solid: false, opaque: false, tiles: 'aarde', replace: true });
@@ -115,7 +115,7 @@ def(64, 'ei_schaduw', 'Schaduwdrakenei', { ...EGG });
 def(65, 'ei_robot', 'Robotdrakenei', { ...EGG });
 def(66, 'ei_goud', 'Gouden drakenei', { ...EGG });
 def(67, 'ei_kristal', 'Kristaldrakenei', { ...EGG });
-def(68, 'hoog_gras', 'Hoog gras', { ...CROSS, drop: null, replace: true });
+def(68, 'hoog_gras', 'Hoog gras', { ...CROSS, replace: true });
 def(69, 'bloem_rood', 'Rode bloem', { ...CROSS });
 def(70, 'bloem_geel', 'Gele bloem', { ...CROSS });
 def(71, 'bloem_blauw', 'Blauwe bloem', { ...CROSS });

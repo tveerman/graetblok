@@ -307,14 +307,12 @@ export class GameServer {
 
   dropFor(p, def) {
     const rnd = this.rnd;
-    if (def.drop === null) {
-      // bladeren geven soms een stok of een appel
-      if (def.key.startsWith('blad_')) {
-        const r = rnd();
-        if (r < 0.1) this.giveLoot(p, I.stok, 1);
-        else if (r < 0.16 && (def.key === 'blad_eik' || def.key === 'blad_goud')) this.giveLoot(p, I.appel, 1);
-      }
-      return;
+    if (def.drop === null) return;
+    if (def.key.startsWith('blad_')) {
+      // bladeren geven het blad zelf, en soms ook een stok of een appel
+      const r = rnd();
+      if (r < 0.1) this.giveLoot(p, I.stok, 1);
+      else if (r < 0.16 && (def.key === 'blad_eik' || def.key === 'blad_goud')) this.giveLoot(p, I.appel, 1);
     }
     if (def.drop === undefined) { this.giveLoot(p, def.id, 1); return; }
     const [id, a, b] = def.drop;
@@ -615,23 +613,31 @@ export class GameServer {
     this.last = t;
     if (dt > 0.25) dt = 0.25;
     if (!this.players.size) return;
-    this.meta.time += dt;
 
-    const active = new Set();
-    for (const p of this.players.values()) active.add(p.world);
-    for (const wid of active) {
-      const w = this.worlds[wid];
-      this.updateEntities(w, dt);
-      this.updateProjectiles(w, dt);
-    }
+    // Pauze: als elke speler een venster open heeft (of de tablet weglegt), staat de wereld
+    // stil: geen tijd, geen monsters. Chunks versturen en opslaan gaan wel door.
+    // (Met meer spelers pauzeert de wereld dus alleen als iedereen op pauze staat.)
+    let paused = true;
+    for (const p of this.players.values()) if (!p.paused) { paused = false; break; }
 
-    this.acc.snap += dt;
-    if (this.acc.snap >= 0.1) { this.acc.snap = 0; this.snapshots(); }
+    if (!paused) {
+      this.meta.time += dt;
+      const active = new Set();
+      for (const p of this.players.values()) active.add(p.world);
+      for (const wid of active) {
+        const w = this.worlds[wid];
+        this.updateEntities(w, dt);
+        this.updateProjectiles(w, dt);
+      }
 
-    this.acc.sec += dt;
-    if (this.acc.sec >= 1) {
-      this.acc.sec = 0;
-      this.everySecond(active);
+      this.acc.snap += dt;
+      if (this.acc.snap >= 0.1) { this.acc.snap = 0; this.snapshots(); }
+
+      this.acc.sec += dt;
+      if (this.acc.sec >= 1) {
+        this.acc.sec = 0;
+        this.everySecond(active);
+      }
     }
 
     const until = now() + 12;
@@ -668,6 +674,8 @@ export class GameServer {
   }
 
   on_save() { this.save(); }
+
+  on_pause(p, m) { p.paused = !!m.on; }
 
   // De speler gaat terug naar het hoofdmenu: opslaan en de wereld stilzetten.
   // (Zonder spelers doet de klok niets meer, dus er gebeurt niets terwijl je weg bent.)

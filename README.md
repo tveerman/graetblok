@@ -100,6 +100,10 @@ you left off.
 | Mount / dismount dragon | "🐉 Vliegen" / "Afstappen" | `R` |
 | Hotbar | tap a slot | `1`–`9` or scroll |
 
+While any window is open (backpack, quest log, a dialog or the pause menu) the world stands
+still: no time passes and nothing attacks. The game also opens the pause menu by itself when
+the tablet is put away or the tab is hidden.
+
 ## What is in this first version
 
 From Jorian's design document (`spel.txt`), following development phases 1–4, 7, 8 and part of 9:
