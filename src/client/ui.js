@@ -2,7 +2,7 @@
 import { RANKS, HOTBAR, INV_SIZE } from '../shared/constants.js';
 import { B, BLOCKS } from '../shared/blocks.js';
 import { ITEMS, RECIPES, GROUPS, GROUP_NAMES, matches, itemName } from '../shared/items.js';
-import { WORLDS, WORLD_ORDER } from '../shared/worlds.js';
+import { WORLDS, WORLD_ORDER, CRASH } from '../shared/worlds.js';
 import { DRAGONS, dragonStage, STAGE_NAMES } from '../shared/mobs.js';
 import { iconURL } from './textures.js';
 
@@ -149,10 +149,24 @@ export class UI {
     if (!this.cmp) {
       this.cmp = ['N', 'O', 'Z', 'W'].map((t) => { const n = el('span', 'cdir' + (t === 'N' ? ' north' : ''), t); strip.appendChild(n); return n; });
       this.cmpMark = el('span', 'cmark', '◆'); strip.appendChild(this.cmpMark);
+      this.cmpShip = el('span', 'cship', '🚀'); strip.appendChild(this.cmpShip);
     }
     for (let i = 0; i < 4; i++) place(this.cmp[i], i * Math.PI / 2);
-    const mk = this.quest && this.quest.marker && this.quest.marker.w === worldId ? this.quest.marker : null;
     let extra = '';
+    // het ruimteschip (alleen in de groene wereld): het raketje wijst altijd de weg terug.
+    // Ligt het schip achter je, dan staat het raketje aan de rand van het kompas.
+    const ship = worldId === 'groen';
+    this.cmpShip.style.display = ship ? '' : 'none';
+    if (ship) {
+      const dx = CRASH.x + 0.5 - pos.x, dz = CRASH.z + 0.5 - pos.z;
+      let rel = Math.atan2(dx, -dz) - heading;
+      while (rel > Math.PI) rel -= 2 * Math.PI; while (rel < -Math.PI) rel += 2 * Math.PI;
+      const c = Math.max(-1.66, Math.min(1.66, rel));
+      this.cmpShip.style.left = (W / 2 + (c / 1.75) * (W / 2)) + 'px';
+      extra += '  🚀 ' + Math.round(Math.hypot(dx, dz)) + ' m';
+    }
+    let mk = this.quest && this.quest.marker && this.quest.marker.w === worldId ? this.quest.marker : null;
+    if (mk && ship && mk.x === CRASH.x && mk.z === CRASH.z) mk = null;      // de opdracht wijst al naar het schip
     if (mk) {
       const dx = mk.x - pos.x, dz = mk.z - pos.z;
       let rel = Math.atan2(dx, -dz) - heading;
@@ -160,7 +174,7 @@ export class UI {
       const c = Math.max(-1.7, Math.min(1.7, rel));
       this.cmpMark.style.display = '';
       this.cmpMark.style.left = (W / 2 + (c / 1.75) * (W / 2)) + 'px';
-      extra = '  ◆ ' + Math.round(Math.hypot(dx, dz)) + ' m';
+      extra += '  ◆ ' + Math.round(Math.hypot(dx, dz)) + ' m';
     } else this.cmpMark.style.display = 'none';
     const txt = Math.floor(pos.x) + ', ' + Math.floor(pos.y) + ', ' + Math.floor(pos.z) + extra;
     if (this._coord !== txt) { this._coord = txt; $('coords').textContent = txt; }
