@@ -78,6 +78,11 @@ How "newer" is decided depends on how the game was opened:
 
 Pressing play without reloading keeps the current version for that session.
 
+To get back to this menu while playing, open the pause menu (⚙️) and choose
+**🏠 Terug naar het beginscherm**. The game saves, stops the world and shows the menu again
+without reloading the page, so it also works while the server is off; "Spelen" continues where
+you left off.
+
 ## Controls
 
 | | Touch (iPad) | Keyboard + mouse |
@@ -90,6 +95,7 @@ Pressing play without reloading keeps the current version for that session.
 | Sprint / fly down | push the stick all the way / ⬇ | `Shift` |
 | Backpack + crafting | 🎒 | `E` |
 | Quest log | 📜 | `Q` |
+| Pause menu (settings, back to the home screen) | ⚙️ | `Esc` |
 | Camera (first / third person) | 📷 | `V` |
 | Mount / dismount dragon | "🐉 Vliegen" / "Afstappen" | `R` |
 | Hotbar | tap a slot | `1`–`9` or scroll |

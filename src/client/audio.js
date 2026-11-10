@@ -36,6 +36,9 @@ export class Sound {
 
   setVolume(v) { this.vol = v; if (this.master) this.master.gain.value = v; }
 
+  // stil worden (bijv. in het hoofdmenu)
+  quiet() { if (this.ctx && this.amb) this.amb.g.gain.setTargetAtTime(0, this.ctx.currentTime, 0.3); }
+
   tone(freq, dur, type = 'sine', vol = 0.2, slide = 0, delay = 0, attack = 0.005) {
     const c = this.ctx; if (!c) return;
     const t = c.currentTime + delay;

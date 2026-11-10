@@ -103,6 +103,25 @@ class Game {
     this.net.send({ t: 'hello', name: 'speler', view: this.settings.view, look: this.look, reset: !!reset, debug: this.debug });
   }
 
+  // Terug naar het beginscherm. De pagina wordt niet opnieuw geladen (dat zou mislukken
+  // als de server uit staat): het spel slaat op, stopt, en laat het hoofdmenu weer zien.
+  toMenu() {
+    if (this.state !== 'play') return;
+    const p = this.player, ui = this.ui;
+    ui.close();
+    this.net.send({ t: 'leave' });
+    this.state = 'menu';
+    p.frozen = true; p.mount = 0; this.ents.ridden = 0;
+    p.model.visible = false; p.held.visible = false; p.hl.visible = false; p.crack.visible = false;
+    this.input.exitLock(); this.input.breakHeld = false;
+    ui.showHud(false); ui.setMounted(false); ui.setBoss(null); ui.setTint(''); ui.fade(false); ui.loading(null);
+    this.world.clear(); this.ents.clear(); this.particles.clear();
+    this.R.setWorld('groen', this.trees);
+    this.sound.quiet();
+    $('menu').classList.remove('hidden');
+    if (this.checkServer) this.checkServer();
+  }
+
   newWorld() {
     this.state = 'loading';
     this.player.frozen = true;
@@ -129,6 +148,7 @@ class Game {
 
   onMsg(m) {
     const p = this.player, ui = this.ui;
+    if (this.state === 'menu') return;          // nog onderweg zijnde berichten van een gestopt spel
     switch (m.t) {
       case 'welcome':
       case 'world': {

@@ -384,6 +384,9 @@ export class UI {
     const go = el('button', 'btn big', '▶ Verder spelen');
     tap(go, () => this.close());
     b.appendChild(go);
+    const home = el('button', 'btn home', '🏠 Terug naar het beginscherm');
+    tap(home, () => g.toMenu());
+    b.appendChild(home);
     slider('Kijkafstand', 'view', 2, 8, 1, (v) => v + ' stukken');
     slider('Geluid', 'volume', 0, 1, 0.05, (v) => Math.round(v * 100) + '%');
     slider('Kijksnelheid', 'sens', 0.4, 2.5, 0.1, (v) => v.toFixed(1) + '×');

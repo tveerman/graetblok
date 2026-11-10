@@ -117,6 +117,7 @@ body.touch #crosshair { opacity: .6; }
 .btn.active { background: #2f7a34; border-color: #8fe07a; }
 .btn.danger { background: #6a2a2a; border-color: #b06060; }
 .btn.gold { background: #8a6410; border-color: #ffe27a; }
+.btn.home { display: block; margin: 4px auto 10px; }
 .btnrow { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin: 8px 0; }
 .hint { font-size: 13px; opacity: .75; margin: 6px 0; }
 

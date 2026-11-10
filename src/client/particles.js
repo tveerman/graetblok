@@ -69,6 +69,13 @@ export class Particles {
     }
   }
 
+  clear() {
+    this.life.fill(0); this.size.fill(0);
+    for (let i = 0; i < MAX; i++) this.col[i * 4 + 3] = 0;
+    this.geo.attributes.pcolor.needsUpdate = true;
+    this.geo.attributes.size.needsUpdate = true;
+  }
+
   update(dt, height) {
     this.U.pscale.value = height * 0.9;
     const { pos, vel, life, col, grav, maxLife, size, base } = this;

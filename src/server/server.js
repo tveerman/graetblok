@@ -89,6 +89,13 @@ export class GameServer {
     if (rec) for (const f of SAVE_FIELDS) if (rec[f] !== undefined) p[f] = rec[f];
     if (m.look) p.look = m.look;
     if (!WORLDS[p.world]) p.world = 'groen';
+    if (p.hp <= 0) {
+      // het spel werd afgesloten terwijl je verslagen was: begin weer bij je bed of het ruimteschip
+      p.hp = this.maxHp(p);
+      const s = p.spawn && WORLDS[p.spawn.w] ? p.spawn : { w: 'groen', x: SPAWN.x, y: -1, z: SPAWN.z };
+      p.world = s.w; p.x = s.x; p.y = s.y; p.z = s.z;
+      for (const d of p.dragons) if (d.mode === 'follow') { d.world = s.w; d.x = s.x; d.y = Math.max(s.y, 1) + 1; d.z = s.z + 1.5; d.far = 1; }
+    }
     this.players.set(conn, p);
     this.enterWorld(p, true);
   }
@@ -661,6 +668,15 @@ export class GameServer {
   }
 
   on_save() { this.save(); }
+
+  // De speler gaat terug naar het hoofdmenu: opslaan en de wereld stilzetten.
+  // (Zonder spelers doet de klok niets meer, dus er gebeurt niets terwijl je weg bent.)
+  on_leave(p) {
+    if (p.mount) this.on_dismount(p);
+    this.save();                                   // legt de speler meteen vast
+    this.removeOwned(p, this.worlds[p.world]);
+    this.players.delete(p.conn);
+  }
 
   on_look(p, m) { if (m.look && typeof m.look === 'object') p.look = m.look; }
 
