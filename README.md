@@ -31,10 +31,9 @@ device), so once the files are on the iPad it can start without the machine that
 
 - On the first visit it stores all game files on the device. From then on every load is
   answered from that copy, so a reload works even when the server is unreachable.
-- Each time the page loads it quietly asks the server whether anything changed. If so it
-  downloads a complete new set and switches to it on the next load — on the main menu the page
-  reloads itself straight away; during play a small message appears and the new version
-  starts next time. Old and new files are never mixed.
+- Each time the page loads it asks the server whether anything changed. If so it downloads a
+  complete new set and keeps it ready; the switch happens on the next load, so old and new
+  files are never mixed.
 - The main menu shows the state at the bottom: "Zonder server spelen: klaar ✔" means the
   copy is complete.
 
@@ -54,10 +53,30 @@ Practical notes for the iPad:
 - Use "Add to Home Screen" **before** starting a world, and open the game once from that icon
   while the server is up. Safari may clear data of sites that have not been visited for a
   while; Home Screen apps are treated more kindly, but they keep their own separate storage.
-- When you add a file to the game, also add it to the `PRECACHE` list at the top of `sw.js`.
-  (Files that are missing from the list are still stored the first time they are loaded.)
+- When you add a file to the game, also add it to `files.json`. (Files that are missing from
+  the list are still stored the first time they are loaded.)
 - Add `?nosw` (or `?debug`) to the address to switch the service worker off and always load
   straight from the server — useful while changing code.
+
+## Server check and "new version" button
+
+The main menu checks whether the server the game came from is reachable and whether it has a
+newer version. The result is shown at the bottom ("Server: bereikbaar ✔" or
+"Server: niet bereikbaar"). When a newer version exists, a button **🔄 Opnieuw laden** appears
+under the play button with the text "Er is een nieuwe versie van het spel!". The check runs
+when the menu opens, when you come back to the tab, and once a minute while the menu is open.
+
+How "newer" is decided depends on how the game was opened:
+
+- **With the service worker** (https or localhost): it compares the contents of every file in
+  `files.json` with its stored copy and keeps the new set ready; the button simply reloads.
+- **Without it** (plain http, or `?nosw` / `?debug`): the page compares each file's
+  `Last-Modified` date (or `ETag`) on the server with the copy the browser loaded. The button
+  first re-downloads all files so the browser cannot reuse an old copy, then reloads. If the
+  server turns out to be unreachable it says so and does not reload — without the service
+  worker a reload would fail.
+
+Pressing play without reloading keeps the current version for that session.
 
 ## Controls
 
@@ -105,6 +124,7 @@ real multiplayer.
 ```
 index.html, css/          the page and HUD styling
 sw.js                     service worker: offline copy of the game (see above)
+files.json                the list of game files, used by sw.js and the menu's version check
 vendor/                   three.js (unmodified)
 src/shared/               game data used by both sides: blocks, items, recipes, creatures, worlds
 src/server/               the game server: world generation, block edits, inventory, crafting,
