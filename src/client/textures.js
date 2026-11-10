@@ -1023,6 +1023,19 @@ Object.assign(PX, {
   },
 });
 
+// ---------- dorpen, kastelen en spoorwegen ----------
+
+const wolTex = (base, seed) => (x, y, u, v) => {
+  const pluis = fbm(u, v, 8, 8, 3, seed), krul = Math.sin((u + pluis * 0.2) * 44) * Math.sin((v + pluis * 0.2) * 44);
+  if (HQ) HH = 0.4 + pluis * 0.4 + krul * 0.2;
+  return mul(base, 0.8 + pluis * 0.26 + krul * 0.06);
+};
+Object.assign(PX, {
+  wol: wolTex([238, 236, 228], 509),
+  wol_rood: wolTex([198, 44, 40], 510),
+  wol_blauw: wolTex([54, 94, 200], 511),
+});
+
 // welke plaatjes niet naadloos herhalen (losse sprites)
 const NO_WRAP = new Set(Object.keys(DRAW));
 
@@ -1301,6 +1314,35 @@ function shadeHex(h, f) {
 }
 
 const ICONS = {
+  bone: (g) => {
+    g.save(); g.translate(32, 32); g.rotate(-0.75);
+    g.fillStyle = '#efe8d2'; g.strokeStyle = 'rgba(0,0,0,0.6)'; g.lineWidth = 2;
+    g.beginPath(); g.rect(-20, -5, 40, 10); g.fill(); g.stroke();
+    for (const [x, y] of [[-22, -6], [-22, 6], [22, -6], [22, 6]]) { g.beginPath(); g.arc(x, y, 7, 0, 6.3); g.fill(); g.stroke(); }
+    g.fillRect(-21, -4, 42, 8);
+    g.fillStyle = 'rgba(255,255,255,0.6)'; g.fillRect(-16, -3, 30, 2);
+    g.restore();
+  },
+  hide: (g, c) => {
+    g.fillStyle = c; g.strokeStyle = 'rgba(0,0,0,0.6)'; g.lineWidth = 2; g.lineJoin = 'round';
+    g.beginPath(); g.moveTo(14, 8); g.lineTo(26, 14); g.lineTo(38, 14); g.lineTo(50, 8); g.lineTo(46, 24); g.lineTo(56, 34); g.lineTo(46, 40); g.lineTo(50, 56); g.lineTo(36, 50); g.lineTo(28, 50); g.lineTo(14, 56); g.lineTo(18, 40); g.lineTo(8, 34); g.lineTo(18, 24); g.closePath(); g.fill(); g.stroke();
+    g.fillStyle = 'rgba(255,255,255,0.22)'; g.beginPath(); g.ellipse(30, 30, 8, 12, 0.3, 0, 6.3); g.fill();
+  },
+  thread: (g) => {
+    g.fillStyle = '#8a5a30'; g.strokeStyle = 'rgba(0,0,0,0.6)'; g.lineWidth = 2;
+    g.fillRect(22, 8, 20, 6); g.strokeRect(22, 8, 20, 6); g.fillRect(22, 50, 20, 6); g.strokeRect(22, 50, 20, 6);
+    g.fillStyle = '#f2f2f6'; g.fillRect(18, 14, 28, 36); g.strokeRect(18, 14, 28, 36);
+    g.strokeStyle = 'rgba(120,120,140,0.7)'; g.lineWidth = 1.2;
+    for (let y = 18; y < 50; y += 4) { g.beginPath(); g.moveTo(18, y); g.lineTo(46, y + 3); g.stroke(); }
+    g.strokeStyle = '#f2f2f6'; g.lineWidth = 2; g.beginPath(); g.moveTo(46, 44); g.quadraticCurveTo(58, 46, 54, 58); g.stroke();
+  },
+  bucket: (g, c) => {
+    g.strokeStyle = 'rgba(0,0,0,0.65)'; g.lineWidth = 2;
+    g.fillStyle = '#9aa6b2'; g.beginPath(); g.moveTo(12, 20); g.lineTo(52, 20); g.lineTo(46, 56); g.lineTo(18, 56); g.closePath(); g.fill(); g.stroke();
+    g.fillStyle = c; g.beginPath(); g.ellipse(32, 20, 20, 7, 0, 0, 6.3); g.fill(); g.stroke();
+    g.fillStyle = 'rgba(255,255,255,0.3)'; g.fillRect(18, 26, 5, 26);
+    g.strokeStyle = '#5a646e'; g.lineWidth = 3; g.beginPath(); g.moveTo(12, 20); g.quadraticCurveTo(32, -8, 52, 20); g.stroke();
+  },
   boots: (g, c) => {
     g.lineWidth = 2; g.strokeStyle = 'rgba(0,0,0,0.65)'; g.lineJoin = 'round';
     const een = (ox) => {

@@ -165,6 +165,11 @@ def(115, 'dynamiet_aan', 'Brandend dynamiet', { tiles: ['dynamiet_top', 'dynamie
 def(116, 'koperblok', 'Koperblok', { hard: 5, tool: 'pick', tier: 2, snd: 'metal' });
 def(117, 'zilverblok', 'Zilverblok', { hard: 5, tool: 'pick', tier: 2, snd: 'metal' });
 
+// ---- dorpen, kastelen en spoorwegen ----
+def(147, 'wol', 'Wol', { hard: 0.5, snd: 'snow' });
+def(148, 'wol_rood', 'Rode wol', { hard: 0.5, snd: 'snow' });
+def(149, 'wol_blauw', 'Blauwe wol', { hard: 0.5, snd: 'snow' });
+
 // ---- rond de levensbomen: alles geeft licht in het donker ----
 // Lichtranken hangen uit de kruin, lichtvruchten zitten er als lampionnen tussen. Ze horen
 // bij de boom (je kunt ze niet weghakken). Zwammen, zwamhoeden, mos en bloemen kun je wel

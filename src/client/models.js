@@ -239,6 +239,116 @@ export function playerModel(look) {
   return root;
 }
 
+
+// Een skelet. soort: '' (boogschutter), 'ridder' (helm en zwaard) of 'koning' (kroon en mantel).
+function skelet(soort) {
+  const root = base('biped'), g = root.userData.a.inner, a = root.userData.a;
+  const bone = mat(0xe8e2cc, 'glad'), dark = mat(0x26222a, 'glad');
+  a.legs = [limb(g, bone, 0.12, 0.78, 0.12, -0.13, 0.78, 0), limb(g, bone, 0.12, 0.78, 0.12, 0.13, 0.78, 0)];
+  part(g, bone, 0.36, 0.1, 0.2, 0, 0.82, 0);                                              // bekken
+  part(g, bone, 0.1, 0.62, 0.1, 0, 1.14, -0.04);                                          // ruggengraat
+  for (let i = 0; i < 4; i++) part(g, bone, 0.46 - i * 0.03, 0.06, 0.26, 0, 1.42 - i * 0.13, 0);      // ribben
+  a.arms = [limb(g, bone, 0.1, 0.62, 0.1, -0.32, 1.46, 0), limb(g, bone, 0.1, 0.62, 0.1, 0.32, 1.46, 0)];
+  const head = new THREE.Group(); head.position.set(0, 1.7, 0); g.add(head); a.head = head;
+  part(head, bone, 0.4, 0.38, 0.4, 0, 0.02, 0);
+  part(head, bone, 0.3, 0.12, 0.3, 0, -0.2, 0.03);                                        // kaak
+  const eye = glowMat(soort === 'koning' ? 0x5aff8a : (soort ? 0xff3020 : 0x101010));
+  for (const s of [-1, 1]) { part(head, dark, 0.12, 0.12, 0.03, s * 0.1, 0.04, 0.2); part(head, eye, 0.06, 0.06, 0.03, s * 0.1, 0.04, 0.21); }
+  part(head, dark, 0.05, 0.07, 0.03, 0, -0.07, 0.2);
+  for (let i = 0; i < 4; i++) part(head, dark, 0.02, 0.07, 0.03, -0.09 + i * 0.06, -0.19, 0.18);
+  if (soort === 'ridder' || soort === 'koning') {
+    part(a.arms[1], mat(soort === 'koning' ? 0xffe680 : 0x9a9aa6, 'metaal'), 0.06, 0.06, 0.95, 0, -0.56, 0.44);
+    part(a.arms[1], mat(0x5a3a1c, 'glad'), 0.24, 0.06, 0.06, 0, -0.56, 0.02);
+    part(g, mat(0x5a5a66, 'metaal'), 0.5, 0.3, 0.3, 0, 1.36, 0);                           // roestig borststuk
+  } else {
+    // een boog in de linkerhand
+    const b1 = part(a.arms[0], mat(0x6a4a2c, 'glad'), 0.05, 0.5, 0.05, 0, -0.5, 0.2); b1.rotation.x = 0.5;
+    const b2 = part(a.arms[0], mat(0x6a4a2c, 'glad'), 0.05, 0.5, 0.05, 0, -0.5, -0.02); b2.rotation.x = -0.5; b2.position.z = 0.2; b2.position.y = -0.86;
+  }
+  if (soort === 'ridder') { part(head, mat(0x5a5a66, 'metaal'), 0.46, 0.2, 0.46, 0, 0.2, 0); part(head, mat(0x5a5a66, 'metaal'), 0.06, 0.2, 0.06, 0, 0.0, 0.22); }
+  if (soort === 'koning') {
+    part(head, glowMat(0xcfd6e6), 0.46, 0.1, 0.46, 0, 0.26, 0);
+    for (let i = 0; i < 5; i++) part(head, glowMat(0xcfd6e6), 0.07, 0.2, 0.07, -0.18 + i * 0.09, 0.4, 0.18);
+    part(head, glowMat(0x5aff8a), 0.08, 0.08, 0.04, 0, 0.27, 0.24);
+    part(g, mat(0x4a1a5a, 'glad'), 0.66, 1.2, 0.06, 0, 0.9, -0.2);                         // gescheurde mantel
+    part(g, mat(0x4a1a5a, 'glad'), 0.7, 0.14, 0.36, 0, 1.52, -0.04);
+  }
+  return root;
+}
+
+// ---------- kuddedieren ----------
+
+function schaap(wol) {
+  const root = base('quad'), g = root.userData.a.inner, a = root.userData.a;
+  const vacht = mat(wol, 'vacht'), kop = mat(0x3a332e, 'vacht');
+  part(g, vacht, 0.74, 0.62, 1.04, 0, 0.72, 0);
+  part(g, vacht, 0.6, 0.2, 0.8, 0, 1.06, -0.02);                                            // extra bol wol op de rug
+  const head = new THREE.Group(); head.position.set(0, 0.86, 0.62); g.add(head); a.head = head;
+  part(head, faceMats(0x3a332e, 'vacht', '#101010', false, false), 0.34, 0.34, 0.36, 0, 0, 0.04);
+  part(head, vacht, 0.4, 0.16, 0.26, 0, 0.2, -0.06);
+  for (const s of [-1, 1]) { const o = part(head, kop, 0.18, 0.08, 0.1, s * 0.24, 0.04, -0.06); o.rotation.z = -s * 0.5; }
+  for (const [x, z] of [[-0.22, 0.36], [0.22, 0.36], [-0.22, -0.36], [0.22, -0.36]]) a.legs.push(limb(g, kop, 0.14, 0.44, 0.14, x, 0.44, z));
+  const tail = limb(g, vacht, 0.14, 0.18, 0.12, 0, 0.84, -0.56); a.tail.push(tail);
+  return root;
+}
+
+function koe() {
+  const root = base('quad'), g = root.userData.a.inner, a = root.userData.a;
+  const wit = mat(0xf2f0ea, 'vacht'), zwart = mat(0x2a2622, 'vacht'), roze = mat(0xf0a8b0, 'glad');
+  part(g, wit, 0.78, 0.74, 1.36, 0, 1.0, 0);
+  // zwarte vlekken
+  part(g, zwart, 0.8, 0.4, 0.44, 0, 1.12, 0.36); part(g, zwart, 0.8, 0.5, 0.36, 0, 0.94, -0.36); part(g, zwart, 0.5, 0.06, 0.5, 0.1, 1.38, -0.04);
+  part(g, roze, 0.3, 0.16, 0.34, 0, 0.58, -0.3);                                             // uier
+  const head = new THREE.Group(); head.position.set(0, 1.22, 0.8); g.add(head); a.head = head;
+  part(head, faceMats(0xf2f0ea, 'vacht', '#101010', false, false), 0.44, 0.42, 0.46, 0, 0, 0.06);
+  part(head, roze, 0.36, 0.2, 0.16, 0, -0.1, 0.34);
+  for (const s of [-1, 1]) {
+    part(head, zwart, 0.18, 0.2, 0.3, s * 0.14, 0.12, 0.0);
+    const o = part(head, zwart, 0.2, 0.1, 0.1, s * 0.3, 0.1, -0.1); o.rotation.z = -s * 0.3;
+    const h = part(head, mat(0xe8dcc0, 'glad'), 0.06, 0.2, 0.06, s * 0.2, 0.3, -0.08); h.rotation.z = -s * 0.5;
+  }
+  for (const [x, z] of [[-0.26, 0.5], [0.26, 0.5], [-0.26, -0.5], [0.26, -0.5]]) a.legs.push(limb(g, x < 0 === z < 0 ? zwart : wit, 0.18, 0.64, 0.18, x, 0.64, z));
+  const tail = limb(g, wit, 0.07, 0.6, 0.07, 0, 1.3, -0.7); tail.rotation.x = -0.25; a.tail.push(tail);
+  part(tail, zwart, 0.1, 0.14, 0.1, 0, -0.62, 0);
+  return root;
+}
+
+function beer(kleur) {
+  const root = base('quad'), g = root.userData.a.inner, a = root.userData.a;
+  const vacht = mat(kleur, 'vacht'), licht = mat(kleur, 'vacht', { color: 0xffe8d0 });
+  part(g, vacht, 0.96, 0.84, 1.5, 0, 0.98, 0);
+  part(g, vacht, 0.8, 0.3, 0.7, 0, 1.44, 0.3);                                               // schoft
+  const head = new THREE.Group(); head.position.set(0, 1.14, 0.9); g.add(head); a.head = head;
+  part(head, faceMats(kleur, 'vacht', '#101010', false, false), 0.56, 0.5, 0.48, 0, 0, 0.06);
+  part(head, licht, 0.3, 0.24, 0.26, 0, -0.1, 0.4);
+  part(head, mat(0x1a1410, 'glad'), 0.12, 0.08, 0.06, 0, -0.03, 0.54);
+  for (const s of [-1, 1]) part(head, vacht, 0.16, 0.16, 0.08, s * 0.22, 0.3, -0.04);
+  for (const [x, z] of [[-0.32, 0.5], [0.32, 0.5], [-0.32, -0.5], [0.32, -0.5]]) a.legs.push(limb(g, vacht, 0.28, 0.6, 0.3, x, 0.6, z));
+  const tail = limb(g, vacht, 0.14, 0.14, 0.12, 0, 1.2, -0.78); a.tail.push(tail);
+  return root;
+}
+
+function reuzenspin() {
+  const root = base('spin'), g = root.userData.a.inner, a = root.userData.a;
+  const lijf = mat(0x2a2220, 'vacht'), poot = mat(0x4a3a30, 'vacht');
+  part(g, lijf, 0.56, 0.36, 0.5, 0, 0.5, 0.16);                                              // kopborststuk
+  part(g, lijf, 0.8, 0.56, 0.86, 0, 0.6, -0.5);                                              // achterlijf
+  part(g, glowMat(0xd0362f), 0.3, 0.05, 0.36, 0, 0.89, -0.5);                                // rode zandloper
+  for (const [x, y, s] of [[-0.16, 0.6, 0.1], [0.16, 0.6, 0.1], [-0.07, 0.52, 0.07], [0.07, 0.52, 0.07], [-0.24, 0.52, 0.06], [0.24, 0.52, 0.06]]) part(g, glowMat(0xff3020), s, s, 0.04, x, y, 0.42);
+  for (const s of [-1, 1]) part(g, mat(0xe8dcc0, 'glad'), 0.06, 0.16, 0.06, s * 0.1, 0.34, 0.42);      // gifkaken
+  for (const s of [-1, 1]) for (const z of [-0.2, 0.0, 0.2, 0.38]) {
+    const l = limb(g, poot, 0.07, 0.9, 0.07, s * 0.28, 0.6, z);
+    l.rotation.z = s * 1.05;
+    l.userData.rz = s * 1.05; l.userData.ph = (z + 0.3) * 3.7 + (s > 0 ? Math.PI : 0);
+    const onder = part(l, poot, 0.06, 0.6, 0.06, s * -0.2, -1.1, 0); onder.rotation.z = s * -0.9;
+    a.legs.push(l);
+  }
+  return root;
+}
+
+
+const BEER_COLOR = { groen: 0x6a4428, ijs: 0xf2f2ee, vuur: 0x3a2a26, schaduw: 0x3a2a4a, wolken: 0xe8d8c0 };
+const SCHAAP_COLOR = { groen: 0xf2efe6, ijs: 0xf8fbff, vuur: 0x6a5a56, schaduw: 0x9a86c0, wolken: 0xffe6f2 };
 const PLUIZEL_COLOR = { groen: 0xf2e2c4, ijs: 0xdff2ff, vuur: 0xffb080, schaduw: 0xc8a0f0, wolken: 0xffd0e4 };
 
 export function buildModel(kind, opts) {
@@ -255,6 +365,12 @@ export function buildModel(kind, opts) {
     case 'geest': m = geest(def.tint || 0xffffff, !!def.boss); break;
     case 'vleugel': m = vleugel(def.boss ? 0x3a4a8a : 0x6a86b0); break;
     case 'draak': m = draak(def.dragon || opts.dtype || 'vuur', opts.growth); break;
+    case 'skelet': m = skelet(''); break;
+    case 'schaap': m = schaap(SCHAAP_COLOR[opts.world] || SCHAAP_COLOR.groen); break;
+    case 'koe': m = koe(); break;
+    case 'beer': m = beer(BEER_COLOR[opts.world] || BEER_COLOR.groen); break;
+    case 'grijzewolf': m = quad(opts.world === 'schaduw' ? 0x2a2434 : 0x7a7e88, 'vacht', '#ffd040', true, 0); break;
+    case 'reuzenspin': m = reuzenspin(); break;
     default: m = pluizel(0xff00ff);
   }
   return m;

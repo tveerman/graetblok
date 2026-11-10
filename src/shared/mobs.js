@@ -27,6 +27,17 @@ export const MOBS = {
     drops: [[I.drakenkroon, 1, 1, 1], [I.drakenschub, 8, 8, 1], [B.ei_goud, 1, 1, 1]] },
 
   draak: { name: 'Draak', model: 'draak', hp: 60, speed: 6, w: 0.9, h: 0.9, ai: 'dragon', fly: true, xp: 0, drops: [] },
+
+  // ---- kuddes: schapen, koeien, wolven en beren ----
+  // herd: [min, max] = hoeveel dieren er samen rondlopen
+  schaap: { name: 'Schaap', model: 'schaap', hp: 8, speed: 1.9, w: 0.8, h: 1.0, ai: 'passive', herd: [4, 7], tap: true, xp: 2, drops: [[B.wol, 1, 1, 1], [I.rauw_vlees, 1, 1, 0.6]] },
+  koe: { name: 'Koe', model: 'koe', hp: 12, speed: 1.6, w: 0.9, h: 1.3, ai: 'passive', herd: [3, 5], tap: true, xp: 3, drops: [[I.rauw_vlees, 1, 3, 1], [I.leer, 1, 2, 0.9]] },
+  wolf: { name: 'Wolf', model: 'grijzewolf', hp: 16, dmg: 3, speed: 4.3, w: 0.8, h: 0.9, ai: 'wolf', herd: [3, 5], xp: 9, drops: [[I.bot, 1, 1, 0.5], [I.leer, 1, 1, 0.4]] },
+  beer: { name: 'Beer', model: 'beer', hp: 40, dmg: 6, speed: 3.5, w: 1.1, h: 1.4, ai: 'neutral', herd: [1, 2], xp: 18, drops: [[I.rauw_vlees, 2, 3, 1], [I.leer, 2, 3, 1]] },
+
+  // ---- meer monsters ----
+  spin: { name: 'Reuzenspin', model: 'reuzenspin', hp: 14, dmg: 3, speed: 4.4, w: 1.0, h: 0.7, ai: 'melee', leap: true, xp: 9, drops: [[I.draad, 1, 2, 0.9]] },
+  skelet: { name: 'Skelet', model: 'skelet', hp: 18, dmg: 4, speed: 2.6, w: 0.6, h: 1.8, ai: 'ranged', proj: 'pijl', xp: 11, drops: [[I.bot, 1, 2, 0.9], [I.pijl, 1, 3, 0.6]] },
 };
 
 // De acht drakensoorten uit het ontwerp

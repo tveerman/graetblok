@@ -72,6 +72,7 @@ export class Entities {
     if (m.s !== undefined) { e.scale = m.s; e.group.scale.setScalar(m.s); this.resize(e); if (e.tag) e.tag.scale.set(1.6 / e.scale, 0.4 / e.scale, 1); }
     if (m.g !== undefined) { e.growth = m.g; setDragonGrowth(e.group, m.g); }
     if (m.n !== undefined) this.setName(e, m.n);
+    if (m.o !== undefined) e.owner = m.o;
   }
 
   despawn(id) {

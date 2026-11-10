@@ -151,6 +151,10 @@ From Jorian's design document (`spel.txt`), following development phases 1–4, 
   blizzards in the ice world, showers in the cloud world, and snow instead of rain high in
   the mountains. The sky turns grey, you hear the rain (muffled under a roof), and lightning
   strikes near you with thunder that arrives later the further away it was.
+- **More creatures** – herds of sheep (tap for wool) and cows (tap with a bucket for milk),
+  wolf packs that hunt at night (three bones tame a wolf, which then fights for you), bears
+  that only attack when you come close, giant spiders that leap, skeleton archers, and troll
+  camps: a palisade with tents, a treasure chest, four trolls and the Trollenhoofdman.
 - **Story quests** – 18 steps from "chop a tree" to "defeat the Drakenkoning", shown top-left,
   with a compass marker for the early ones.
 
@@ -256,6 +260,7 @@ game.net.send({ t: 'debug', c: 'time', v: 0 })             // morning
 game.net.send({ t: 'debug', c: 'god', v: 1 })              // cannot be hurt
 game.net.send({ t: 'debug', c: 'grow' })                   // all your dragons become adults
 game.net.send({ t: 'debug', c: 'weather', k: 'onweer' })   // 'zon', 'regen', 'onweer', 'sneeuw', 'storm'
+game.net.send({ t: 'debug', c: 'herd', kind: 'schaap' })   // a herd next to you ('koe', 'wolf', 'beer')
 ```
 
 Add `&save=test` (any short name) to play in a separate world that does not touch the real

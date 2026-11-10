@@ -1,7 +1,7 @@
 // Wezens op de server: dieren, monsters, bazen, draken en projectielen.
 // Deze functies worden aan GameServer geplakt (zie onderaan server.js).
 import { CH, clamp, isNight } from '../shared/constants.js';
-import { B, B_SHAPE, SHAPE_LIQUID, EGG_TYPE } from '../shared/blocks.js';
+import { B, BLOCKS, B_SHAPE, SHAPE_LIQUID, EGG_TYPE } from '../shared/blocks.js';
 import { I, ITEMS } from '../shared/items.js';
 import { WORLDS } from '../shared/worlds.js';
 import { MOBS, DRAGONS, DRAGON_NAMES, dragonStage, dragonScale, STAGE_NAMES } from '../shared/mobs.js';
@@ -9,11 +9,12 @@ import { FOODS } from './quests.js';
 
 // [soort, maximum in de buurt, wanneer]
 const SPAWNS = {
-  groen: [['pluizel', 3, 'day'], ['hert', 3, 'day'], ['pluizel', 2, 'any'], ['kruiper', 3, 'night'], ['robotspin', 2, 'night'], ['golem', 1, 'cave'], ['kruiper', 2, 'cave']],
-  ijs: [['ijswolf', 3, 'any'], ['pluizel', 2, 'day'], ['ijswolf', 4, 'night'], ['hert', 2, 'day']],
-  vuur: [['vuurgeest', 4, 'any'], ['golem', 2, 'any']],
-  schaduw: [['schim', 3, 'any'], ['kruiper', 3, 'any'], ['pluizel', 2, 'any']],
-  wolken: [['stormvleugel', 3, 'any'], ['pluizel', 3, 'any'], ['hert', 2, 'any']],
+  groen: [['pluizel', 3, 'day'], ['hert', 3, 'day'], ['pluizel', 2, 'any'], ['kruiper', 3, 'night'], ['robotspin', 2, 'night'], ['golem', 1, 'cave'], ['kruiper', 2, 'cave'],
+    ['schaap', 1, 'day'], ['koe', 1, 'day'], ['wolf', 1, 'any'], ['beer', 1, 'day'], ['spin', 2, 'night'], ['skelet', 2, 'night'], ['spin', 2, 'cave'], ['skelet', 2, 'cave']],
+  ijs: [['ijswolf', 3, 'any'], ['pluizel', 2, 'day'], ['ijswolf', 4, 'night'], ['hert', 2, 'day'], ['beer', 1, 'day'], ['schaap', 1, 'day'], ['skelet', 2, 'night']],
+  vuur: [['vuurgeest', 4, 'any'], ['golem', 2, 'any'], ['skelet', 2, 'any']],
+  schaduw: [['schim', 3, 'any'], ['kruiper', 3, 'any'], ['pluizel', 2, 'any'], ['spin', 3, 'any'], ['skelet', 2, 'any'], ['wolf', 1, 'any']],
+  wolken: [['stormvleugel', 3, 'any'], ['pluizel', 3, 'any'], ['hert', 2, 'any'], ['schaap', 1, 'any']],
 };
 
 const r2 = (v) => Math.round(v * 100) / 100;
@@ -128,6 +129,8 @@ export const entityMethods = {
       else if (ai === 'boss') this.aiBoss(w, e, dt);
       else if (ai === 'passive') this.aiPassive(w, e, dt);
       else if (ai === 'melee') this.aiMelee(w, e, dt);
+      else if (ai === 'wolf') this.aiWolf(w, e, dt);
+      else if (ai === 'neutral') this.aiNeutral(w, e, dt);
       else this.aiRanged(w, e, dt);
       if (e.dead) continue;
       if (e.fly) this.moveFly(w, e, dt); else this.moveWalk(w, e, dt);
@@ -143,6 +146,12 @@ export const entityMethods = {
       e.wt = 2 + this.rnd() * 4;
       if (this.rnd() < 0.4) { e.dirx = 0; e.dirz = 0; }
       else { const a = this.rnd() * 6.283; e.dirx = Math.sin(a); e.dirz = Math.cos(a); }
+      // een kudde blijft bij elkaar: wie te ver afdwaalt loopt terug naar de voorste;
+      // en wie bij een kamp of kasteel hoort, blijft daar in de buurt
+      let tx = 0, tz = 0, far = 0;
+      if (e.herd && e.herd !== e.id) { const L = w.ents.get(e.herd); if (L) { tx = L.x; tz = L.z; far = 5; } }
+      else if (e.home && e.def.ai !== 'npc' && e.def.ai !== 'guard') { tx = e.home.x; tz = e.home.z; far = e.home.r; }
+      if (far) { const dx = tx - e.x, dz = tz - e.z, d = Math.hypot(dx, dz); if (d > far) { e.dirx = dx / d; e.dirz = dz / d; e.wt = Math.min(4, d / (e.def.speed * 0.45)); } }
     }
     const sp = e.def.speed * 0.45;
     e.vx = e.dirx * sp; e.vz = e.dirz * sp;
@@ -189,6 +198,9 @@ export const entityMethods = {
       e.cd = 1.3; e.atk = 0.4;
       this.hurtPlayer(p, e.def.dmg, e);
     }
+    // spinnen springen op je af
+    if (e.def.leap && e.onGround && h > 3 && h < 7 && e.cd2 <= 0) { e.cd2 = 2.5; e.vy = 8.5; e.kx = dx / h * 9; e.kz = dz / h * 9; }
+    if (e.cd2 > 0) e.cd2 -= dt;
   },
 
   aiRanged(w, e, dt) {
@@ -200,7 +212,7 @@ export const entityMethods = {
     if (h > 10) { e.vx = dx / h * sp; e.vz = dz / h * sp; }
     else if (h < 5) { e.vx = -dx / h * sp; e.vz = -dz / h * sp; }
     else { const s = Math.sin(e.t * 0.5 + e.id) > 0 ? 1 : -1; e.vx = -dz / h * sp * 0.5 * s; e.vz = dx / h * sp * 0.5 * s; }
-    e.vy = clamp(p.y + 2.2 - e.y, -2.5, 2.5);
+    if (e.fly) e.vy = clamp(p.y + 2.2 - e.y, -2.5, 2.5);
     if (e.cd <= 0 && n.d < 18) {
       e.cd = 2.6; e.atk = 0.4;
       this.shootAt(w, e, p.x, p.y + 1, p.z, e.def.proj, e.def.dmg, 13, 'm', e.id, 0);
@@ -412,6 +424,14 @@ export const entityMethods = {
   damageEntity(w, e, dmg, p, dx, dz, duid) {
     if (e.owner || e.dead) return;
     e.hp -= dmg; e.hurtT = 0.3;
+    const ai = e.def.ai;
+    if (ai === 'wolf' || ai === 'neutral' || ai === 'wilddragon') {
+      // wie een wolf slaat krijgt de hele roedel achter zich aan
+      e.angry = 14;
+      if (e.herd) for (const m of w.ents.values()) if (m.herd === e.herd && !m.owner) m.angry = 14;
+    } else if (ai === 'passive' && p && e.herd) {
+      for (const m of w.ents.values()) if (m.herd === e.herd && m !== e) { m.flee = 4; m.fx = p.x; m.fz = p.z; }
+    }
     this.fx(w.id, 'hit', e.x, e.y + e.h * 0.6, e.z);
     if (!e.def.boss) {
       const l = Math.hypot(dx, dz) || 1;
@@ -528,6 +548,7 @@ export const entityMethods = {
     const e = w.ents.get(m.id);
     if (!e || Math.hypot(e.x - p.x, e.y - p.y, e.z - p.z) > 7 + e.w) return;
     if (e.kind === 'draak' && e.owner === p.name) { this.send(p, { t: 'dragonMenu', uid: e.dragon.uid }); return; }
+    if (e.kind !== 'pluizel') { if (!p.dead && this.useNpc(p, w, e)) this.checkQuests(p); return; }
     if (e.kind === 'pluizel') {
       if (e.owner === p.name) {
         e.mode = e.mode === 'stay' ? 'follow' : 'stay';
@@ -701,19 +722,22 @@ export const entityMethods = {
     const [kind, cap, when] = table[Math.floor(this.rnd() * table.length)];
     if (when === 'day' && night) return;
     if (when === 'night' && !night) return;
-    const under = when === 'cave';
+    const under = when === 'cave', sky = when === 'sky';
     if (under && p.y > 34) return;
+    if (sky && this.rnd() > 0.12) return;                   // wilde draken zijn zeldzaam
     const def = MOBS[kind];
-    let n = 0, total = 0;
+    // tellen: bewoners van dorpen en kastelen tellen niet mee, en een kudde telt als één
+    let n = 0, total = 0, herds = 0;
     for (const e of w.ents.values()) {
-      if (e.owner) continue;
+      if (e.owner || e.site || e.keep) continue;
+      if (e.herd) { if (e.herd !== e.id) continue; herds++; if (e.kind === kind && Math.hypot(e.x - p.x, e.z - p.z) < 90) n++; continue; }
       total++;
-      if (e.kind === kind && Math.hypot(e.x - p.x, e.z - p.z) < 70) n++;
+      if (e.kind === kind && Math.hypot(e.x - p.x, e.z - p.z) < (sky ? 160 : 70)) n++;
     }
-    if (n >= cap || total >= 14) return;
+    if (n >= cap || (def.herd ? herds >= 3 : total >= 14)) return;
     const a = this.rnd() * 6.283, r = 22 + this.rnd() * 20;
     const x = Math.floor(p.x + Math.cos(a) * r), z = Math.floor(p.z + Math.sin(a) * r);
-    const hostile = def.ai !== 'passive';
+    const hostile = def.ai === 'melee' || def.ai === 'ranged' || def.ai === 'wolf';
     if (hostile && p.spawn && p.spawn.w === p.world && Math.hypot(p.spawn.x - x, p.spawn.z - z) < 28) return;
     const T = WORLDS[p.world].tree;
     if (Math.hypot(T.x - x, T.z - z) < 30) return;
@@ -730,9 +754,11 @@ export const entityMethods = {
       else {
         if (w.liquid(x, top + 1, z)) return;
         y = top + 1 + (def.fly ? 3 + this.rnd() * 4 : 0);
+        if (def.herd && def.ai !== 'wolf') { const snd = BLOCKS[w.get(x, top, z)].snd; if (snd !== 'grass' && snd !== 'snow') return; }      // kuddes grazen op gras
       }
     }
-    this.spawnEnt(w, kind, x + 0.5, y, z + 0.5);
+    if (def.herd) this.spawnHerd(w, kind, x, y, z);
+    else this.spawnEnt(w, kind, x + 0.5, y, z + 0.5);
   },
 
   cleanup(w) {
@@ -742,7 +768,7 @@ export const entityMethods = {
       let near = false;
       for (const p of this.players.values()) if (p.world === w.id && Math.hypot(p.x - e.x, p.z - e.z) < 90) { near = true; break; }
       if (!near) { w.ents.delete(e.id); continue; }
-      if (day && w.id === 'groen' && (e.kind === 'kruiper' || e.kind === 'robotspin') && e.y > 36 && this.rnd() < 0.2) {
+      if (day && w.id === 'groen' && (e.kind === 'kruiper' || e.kind === 'robotspin' || e.kind === 'spin' || e.kind === 'skelet') && e.y > 36 && this.rnd() < 0.2) {
         this.fx(w.id, 'poof', e.x, e.y + 0.5, e.z, 1);
         w.ents.delete(e.id);
       }

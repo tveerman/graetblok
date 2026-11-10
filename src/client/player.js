@@ -2,7 +2,7 @@
 import * as THREE from '../../vendor/three.module.min.js';
 import { EYE, REACH, CH, clamp } from '../shared/constants.js';
 import { B, BLOCKS, B_SHAPE, SHAPE_LIQUID, PORTAL_TO, TILE_CRACK } from '../shared/blocks.js';
-import { ITEMS } from '../shared/items.js';
+import { ITEMS, I } from '../shared/items.js';
 import { playerModel, animate } from './models.js';
 import { iconCanvas } from './textures.js';
 
@@ -434,7 +434,8 @@ export class Player {
     const it = ITEMS[id];
     if (tgt.ent) {
       const e = tgt.ent;
-      const friendly = e.owner || e.def.ai === 'passive';
+      // dieren, dorpelingen, ridders en treinen tik je aan; een wolf alleen met een bot in je hand
+      const friendly = e.owner || e.def.ai === 'passive' || e.def.tap || (e.kind === 'wolf' && id === I.bot);
       if (friendly) { g.net.send({ t: 'useEnt', id: e.id }); this.swing = 0.2; return; }
       if (it && it.ranged) { this.shoot(tgt.dir); return; }
       if (this.atkCd <= 0) { this.atkCd = 0.36; this.swing = 0.3; g.net.send({ t: 'attack', id: e.id }); g.sound.play('swing'); }

@@ -258,6 +258,9 @@ export class Sound {
         this.noise(2.6, 'lowpass', 300, 0.6 * v, 50, 0.04); this.noise(1.8, 'lowpass', 140, 0.5 * v, 40, 0.5);
         this.tone(52, 1.6, 'triangle', 0.3 * v, 30, 0.06);
         break;
+      case 'baa': this.tone(430 * r, 0.42, 'sawtooth', 0.05 * v, 380 * r, 0, 0.05); this.tone(436 * r, 0.42, 'square', 0.02 * v, 330 * r, 0.02, 0.05); break;
+      case 'boe': this.tone(150 * r, 0.8, 'sawtooth', 0.07 * v, 108 * r, 0, 0.12); this.tone(300 * r, 0.7, 'sine', 0.03 * v, 216 * r, 0, 0.12); break;
+      case 'huil': this.tone(330 * r, 1.3, 'sine', 0.07 * v, 560 * r, 0, 0.25); this.tone(335 * r, 1.0, 'triangle', 0.04 * v, 420 * r, 0.6, 0.2); break;
       case 'sleep': [523, 440, 349, 262].forEach((f, i) => this.tone(f, 0.6, 'sine', 0.12 * v, 0, i * 0.3, 0.1)); break;
     }
   }

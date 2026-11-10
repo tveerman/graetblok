@@ -323,6 +323,7 @@ class Game {
       case 'slam': P.burst(x, y + 0.3, z, 26, [0.6, 0.5, 0.4], { speed: 5, size: 0.4, life: 0.8, grav: 6, spread: 2 }); s.play('boom', v); break;
       case 'roar': s.play('roar', Math.max(0.3, v)); break;
       case 'breath': s.play('breath', Math.max(0.4, v)); break;
+      case 'wool': P.burst(x, y, z, 12, [1, 1, 1], { speed: 1.6, size: 0.3, life: 0.7, grav: 2, up: 1 }); s.play('baa', Math.max(0.4, v)); break;
       case 'bolt': {
         this.sky.bolt(x, y, z);
         P.burst(x, y + 0.3, z, 30, [1, 1, 0.8], { speed: 8, size: 0.3, life: 0.5, grav: 6, up: 2 });
@@ -511,6 +512,7 @@ class Game {
       this.ui.frame(p.yaw, p.pos, this.worldId);
       const own = p.mount ? null : this.nearDragon();
       this.ui.setRide(!own ? '' : (dragonStage(own.growth) >= 2 ? '🐉 Vliegen' : '🐉 ' + (own.name || 'Draak')));
+      this.animalSounds(hd);
       const surf = this.world.get(Math.floor(p.pos.x) >> 4, Math.floor(p.pos.z) >> 4);
       const under = surf ? p.pos.y < surf.hm[(Math.floor(p.pos.x) & 15) * 16 + (Math.floor(p.pos.z) & 15)] - 6 : false;
       this.sound.ambience(hd, { world: this.worldId, under, day: this.R.dayF, flying: !!p.mount && p.mountKind !== 'trein' && p.speedNow > 4, rain: Math.max(this.sky.rain, this.sky.snow * 0.25), roof: this.sky.roof });
@@ -528,6 +530,20 @@ class Game {
         else if (this.frameT < 1 / 50 && this.R.scale < 1) this.R.setScale(this.R.scale + 0.05);
       }
     }
+  }
+
+  // af en toe hoor je een dier in de buurt: een schaap blaat, een koe loeit, een wolf huilt
+  animalSounds(dt) {
+    this.zooT = (this.zooT || 3) - dt;
+    if (this.zooT > 0) return;
+    this.zooT = 4 + Math.random() * 7;
+    const list = [];
+    for (const e of this.ents.map.values()) if (!e.owner && (e.kind === 'schaap' || e.kind === 'koe' || e.kind === 'wolf' || e.kind === 'beer')) list.push(e);
+    if (!list.length) return;
+    const e = list[Math.floor(Math.random() * list.length)], v = this.vol(e.x, e.y, e.z);
+    if (v < 0.1) return;
+    if (e.kind === 'wolf' && this.R.dayF > 0.4) return;                // wolven huilen 's nachts
+    this.sound.play(e.kind === 'schaap' ? 'baa' : e.kind === 'koe' ? 'boe' : e.kind === 'wolf' ? 'huil' : 'growl', v * 0.8);
   }
 
   // sneeuw, as, sporen en vuurvliegjes rond de speler

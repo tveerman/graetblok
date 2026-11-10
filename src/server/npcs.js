@@ -25,6 +25,141 @@ export const npcMethods = {
     return ai === 'melee' || ai === 'ranged' || ai === 'boss' || ((ai === 'wolf' || ai === 'neutral' || ai === 'wilddragon') && m.angry > 0);
   },
 
+  // zoek de dichtstbijzijnde vijand (af en toe, niet elke tik)
+  findFoe(w, e, cx, cy, cz, range, dt) {
+    e.scan = (e.scan || 0) - dt;
+    if (e.scan <= 0) {
+      e.scan = 0.5; e.foe = 0;
+      let bd = range;
+      for (const m of w.ents.values()) {
+        if (!this.hostile(m) || m.fly) continue;
+        const d = Math.hypot(m.x - cx, m.y - cy, m.z - cz);
+        if (d < bd) { bd = d; e.foe = m.id; }
+      }
+    }
+    const m = e.foe ? w.ents.get(e.foe) : null;
+    return m && !m.dead ? m : null;
+  },
+
+  chase(w, e, m, dmg, cd) {
+    const dx = m.x - e.x, dz = m.z - e.z, d = Math.hypot(dx, dz) || 1;
+    const reach = e.w / 2 + m.w / 2;
+    e.yaw = Math.atan2(dx, dz);
+    if (d > reach + 0.5) { e.vx = dx / d * e.def.speed; e.vz = dz / d * e.def.speed; } else { e.vx = 0; e.vz = 0; }
+    if (d < reach + 1.3 && Math.abs(m.y - e.y) < 3 && e.cd <= 0) {
+      e.cd = cd; e.atk = 0.4;
+      this.damageEntity(w, m, dmg, null, dx, dz);
+    }
+  },
+
+  // Wolven: overdag schuw (tenzij je ze slaat), 's nachts jagen ze in een roedel.
+  aiWolf(w, e, dt) {
+    if (e.owner) { this.aiPet(w, e, dt); return; }
+    if (e.angry > 0) e.angry -= dt;
+    const night = !WORLDS[w.id].cycle || isNight(this.meta.time);
+    const n = this.nearest(w, e, night ? 15 : 8);
+    if (n && night && !n.p.god) e.angry = Math.max(e.angry || 0, 5);
+    if (e.angry > 0 && n) { this.aiMelee(w, e, dt); return; }
+    this.aiPassive(w, e, dt);
+  },
+
+  // Een tamme wolf: loopt mee en bijt monsters die bij je in de buurt komen.
+  aiPet(w, e, dt) {
+    const o = this.playerByName(e.owner);
+    if (!o || o.world !== w.id || e.mode === 'stay') { e.vx = 0; e.vz = 0; return; }
+    const m = this.findFoe(w, e, o.x, o.y, o.z, 10, dt);
+    if (m) { this.chase(w, e, m, 4 + Math.floor(o.level / 4), 0.9); return; }
+    const dx = o.x - e.x, dz = o.z - e.z, h = Math.hypot(dx, dz);
+    if (h > 28 || Math.abs(o.y - e.y) > 14) { e.x = o.x + 1; e.y = o.y + 0.2; e.z = o.z - 1; e.vy = 0; return; }
+    if (h > 3.2) { const sp = e.def.speed * 1.5; e.vx = dx / h * sp; e.vz = dz / h * sp; e.yaw = Math.atan2(dx, dz); }
+    else { e.vx = 0; e.vz = 0; }
+  },
+
+  // Beren: laat ze met rust en ze doen niets. Kom je te dichtbij (of sla je ze), dan worden ze boos.
+  aiNeutral(w, e, dt) {
+    if (e.angry > 0) e.angry -= dt;
+    const n = this.nearest(w, e, 14);
+    if (n && n.d < 3.2 && !n.p.god) e.angry = Math.max(e.angry || 0, 7);
+    if (e.angry > 0 && n) { this.aiMelee(w, e, dt); return; }
+    this.aiPassive(w, e, dt);
+  },
+
+  // ---------- praten, ruilen, scheren en melken ----------
+
+  space(p, id) {
+    const max = maxStack(id);
+    let n = 0;
+    for (const s of p.inv) { if (!s) n += max; else if (s.id === id) n += max - s.n; }
+    return n;
+  },
+
+  // Tik op een wezen dat geen draak of Pluizel is. Geeft true als er iets mee gedaan is.
+  useNpc(p, w, e) {
+    const held = p.inv[p.sel], hid = held ? held.id : 0;
+    const ai = e.def.ai;
+    if (e.kind === 'schaap') {
+      if (e.sheared !== undefined && this.meta.time - e.sheared < 90) { this.toast(p, 'Dit schaap is net geschoren. De wol moet nog groeien.'); return true; }
+      e.sheared = this.meta.time;
+      this.giveLoot(p, B.wol, 1 + (this.rnd() < 0.4 ? 1 : 0));
+      this.fx(w.id, 'wool', e.x, e.y + 0.7, e.z);
+      this.sendInv(p);
+      return true;
+    }
+    if (e.kind === 'koe') {
+      if (hid !== I.emmer) { this.toast(p, 'Boe! Met een emmer in je hand kun je de koe melken.'); return true; }
+      if (this.space(p, I.melk) < 1 && held.n > 1) { this.toast(p, 'Je rugzak is vol!', 'warn'); return true; }
+      held.n--; if (held.n <= 0) p.inv[p.sel] = null;
+      this.giveLoot(p, I.melk, 1);
+      this.fx(w.id, 'hearts', e.x, e.y + 1, e.z);
+      this.sendInv(p);
+      return true;
+    }
+    if (e.kind === 'wolf') {
+      if (e.owner === p.name) {
+        e.mode = e.mode === 'stay' ? 'follow' : 'stay';
+        if (e.pet) e.pet.mode = e.mode;
+        this.fx(w.id, 'hearts', e.x, e.y + 0.8, e.z);
+        this.toast(p, e.mode === 'stay' ? 'Je wolf blijft hier wachten.' : 'Je wolf loopt weer met je mee.');
+        return true;
+      }
+      if (e.owner) return true;
+      if (hid !== I.bot) { this.toast(p, 'Wolven zijn dol op botten. Houd een bot vast en tik op de wolf.'); return true; }
+      held.n--; if (held.n <= 0) p.inv[p.sel] = null;
+      e.tameN = (e.tameN || 0) + 1; e.angry = 0;
+      this.fx(w.id, 'hearts', e.x, e.y + 0.8, e.z);
+      if (e.tameN >= 3) {
+        e.owner = p.name; e.mode = 'follow'; e.herd = 0;
+        e.pet = { uid: this.meta.nextId++, kind: 'wolf', world: w.id, x: e.x, y: e.y, z: e.z, mode: 'follow' };
+        p.pets.push(e.pet);
+        this.broadcast(w.id, { t: 'entMeta', id: e.id, o: p.name });
+        this.toast(p, 'De wolf is nu je vriend! Hij vecht voor je.', 'good');
+        this.addXp(p, 20);
+      } else this.toast(p, 'De wolf kwispelt. Geef hem nog een bot!');
+      this.sendInv(p);
+      return true;
+    }
+    return false;
+  },
+
+  // ---------- kuddes ----------
+
+  // Zet een kudde (of roedel) neer rond een plek. Geeft het aantal dieren.
+  spawnHerd(w, kind, x, y, z) {
+    const def = MOBS[kind];
+    const [a, b] = def.herd;
+    const n = a + Math.floor(this.rnd() * (b - a + 1));
+    const lead = this.spawnEnt(w, kind, x + 0.5, y, z + 0.5);
+    lead.herd = lead.id;
+    for (let i = 1; i < n; i++) {
+      const hx = Math.floor(x + (this.rnd() - 0.5) * 9), hz = Math.floor(z + (this.rnd() - 0.5) * 9);
+      const top = w.topY(hx, hz, Math.min(127, Math.floor(y) + 8));
+      if (top < 2 || Math.abs(top + 1 - y) > 5 || w.liquid(hx, top + 1, hz)) continue;
+      const e = this.spawnEnt(w, kind, hx + 0.5, top + 1, hz + 0.5);
+      e.herd = lead.id;
+    }
+    return n;
+  },
+
   // ---------- het weer ----------
 
   weatherOf(wid) { const s = this.meta.weather && this.meta.weather[wid]; return s ? s.k : 'zon'; },

@@ -92,6 +92,14 @@ item(321, 'vuurhart', 'Vuurhart', { icon: ['heart', '#ff6a2a'], stack: 1 });
 item(322, 'schaduwhart', 'Schaduwhart', { icon: ['heart', '#9b4dff'], stack: 1 });
 item(323, 'hemelhart', 'Hemelhart', { icon: ['heart', '#ffe98a'], stack: 1 });
 
+// ---- dorpen, dieren en treinen ----
+item(299, 'bot', 'Bot', { icon: ['bone'] });
+item(324, 'leer', 'Leer', { icon: ['hide', '#9a6a3c'] });
+item(325, 'draad', 'Spinnendraad', { icon: ['thread'] });
+item(328, 'emmer', 'Emmer', { icon: ['bucket', '#7a8894'], stack: 16 });
+item(329, 'melk', 'Emmer melk', { icon: ['bucket', '#ffffff'], food: 6, stack: 1, leaves: 328 });
+item(339, 'harnas_leer', 'Leren harnas', { icon: ['armor', '#9a6a3c'], armor: 0.15, stack: 1 });
+
 export const isBlock = (id) => id > 0 && id < 256;
 export function itemName(id) {
   if (id < 256) return BLOCKS[id] ? BLOCKS[id].name : '?';
@@ -193,6 +201,14 @@ recipe(B.marmerblok, 4, [[B.marmer, 4]], 'werkbank');
 recipe(B.marmerzuil, 2, [[B.marmerblok, 2]], 'werkbank');
 recipe(B.granietblok, 4, [[B.graniet, 4]], 'werkbank');
 recipe(B.lamp, 2, [[B.zwamhoed_blauw, 1], [B.glas, 1]], 'werkbank');
+
+// ---- recepten voor rails, treinen, boerderij en huizenbouw ----
+recipe(I.emmer, 1, [[I.ijzerstaaf, 3]], 'werkbank');
+recipe(B.bed, 1, [[B.planken, 3], [B.wol, 2]], 'werkbank');
+recipe(B.wol_rood, 1, [[B.wol, 1], [B.bloem_rood, 1]]);
+recipe(B.wol_blauw, 1, [[B.wol, 1], [B.bloem_blauw, 1]]);
+recipe(I.boog, 1, [[I.stok, 3], [I.draad, 2]], 'werkbank');
+recipe(I.harnas_leer, 1, [[I.leer, 5]], 'werkbank');
 
 export function matches(need, id) {
   return typeof need === 'string' ? GROUPS[need].includes(id) : need === id;

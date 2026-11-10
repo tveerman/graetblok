@@ -263,6 +263,7 @@ export class GameServer {
     if (p.hp >= max) { this.toast(p, 'Je bent al helemaal gezond.'); return; }
     p.hp = Math.min(max, p.hp + ITEMS[s.id].food);
     s.n--; if (s.n <= 0) p.inv[p.sel] = null;
+    if (ITEMS[s.id].leaves) this.give(p, ITEMS[s.id].leaves, 1);        // de lege emmer houd je over
     this.send(p, { t: 'ate' });
     this.sendInv(p); this.sendStats(p);
   }
@@ -830,6 +831,7 @@ export class GameServer {
     else if (m.c === 'god') p.god = !!m.v;
     else if (m.c === 'egg') { for (const k in this.meta.eggs) this.meta.eggs[k].prog = 0.95; }
     else if (m.c === 'weather') this.setWeather(p.world, m.k || 'zon', m.dur || 120);
+    else if (m.c === 'herd') { const top = w.topY(Math.floor(p.x) + 6, Math.floor(p.z)); this.spawnHerd(w, m.kind, Math.floor(p.x) + 6, top + 1, Math.floor(p.z)); }
     else if (m.c === 'tp') { p.x = m.x; p.y = m.y; p.z = m.z; this.send(p, { t: 'tp', x: m.x, y: m.y, z: m.z }); }
     else if (m.c === 'grow') { for (const d of p.dragons) { d.growth = 100; const e = w.ents.get(d.eid); if (e) { this.applyDragon(e); this.broadcast(w.id, { t: 'entMeta', id: e.id, s: e.scale, g: 100 }); } } this.sendDragons(p); this.checkQuests(p); }
   }
