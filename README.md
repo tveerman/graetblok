@@ -48,6 +48,9 @@ device), so once the files are on the iPad it can start without the machine that
 
 Practical notes for the iPad:
 
+- If the browser kept a few old game files that no longer match the new ones, the game cannot
+  start. `index.html` catches that: it fetches every file again and reloads once, and shows the
+  error at the bottom of the screen. (Seen in Safari over plain http after an update.)
 - Keep the address the same. Saved worlds and the offline copy belong to one exact address
   (scheme, host and port); a different IP looks like a different, empty game.
 - Use "Add to Home Screen" **before** starting a world, and open the game once from that icon
@@ -111,7 +114,7 @@ still: no time passes and nothing attacks. The game also opens the pause menu by
 the tablet is put away or the tab is hidden.
 
 The pause menu has separate switches for music ("Muziek") and sound effects
-("Geluidseffecten"). Its last line reports what the audio is doing on that device, for example
+("Geluidseffecten"), and a slider "Regen en wind" for rain, wind, thunder, birds and animals. Its last line reports what the audio is doing on that device, for example
 "Geluid: aan · muziek: 57 noten, sterkte 9%, als lusje · effecten: aan" — useful when a device
 stays silent. "als lusje" means the music is rendered ahead of time and played as a loop (see
 "Sprites and sound"); "noot voor noot" means the browser could not do that and every note is
@@ -200,8 +203,11 @@ From Jorian's design document (`spel.txt`), following development phases 1–4, 
   egg kinds. The **Dierenboek** (🐾) shows all of them by number, unknown ones as a dark egg,
   and gives coins and a title at 5, 10, 25... animals. Hatched animals follow you; tap one to
   make it wait. At most four walk around at once, the rest wait in the book, where you can
-  call, store and name them. Not in yet: riding, fighting alongside you, clothes, breeding,
-  the animal school and wild animals.
+  call, store and name them. **Riding**: next to one of your own mounts (horse, elephant, big
+  wolves and lions, large dinosaurs...) the ride button (or `R`) says "🐎 Rijden"; a few can
+  fly ("🪽 Vliegen": pegasus, griffins, pteranodon, phoenixes). **Guards** (dog, wolf, lion,
+  T-rex...) bite monsters that come near you; you get the XP and loot. Not in yet: clothes,
+  breeding, the animal school and wild animals.
 - **Story quests** – 18 steps from "chop a tree" to "defeat the Drakenkoning", shown top-left,
   with a compass marker for the early ones.
 
@@ -340,6 +346,7 @@ game.net.send({ t: 'debug', c: 'site', kind: 'dorp' })     // jump to the neares
 game.net.send({ t: 'debug', c: 'weather', k: 'onweer' })   // 'zon', 'regen', 'onweer', 'sneeuw', 'storm'
 game.net.send({ t: 'debug', c: 'herd', kind: 'schaap' })   // a herd next to you ('koe', 'wolf', 'beer')
 game.net.send({ t: 'debug', c: 'hatch' })                  // every egg in an incubator hatches now
+game.net.send({ t: 'debug', c: 'pet', a: 'paard' })        // an animal of your own without an egg (optional sh: 'golden')
 game.net.send({ t: 'debug', c: 'spawn', kind: 'd_eenhoorn', dx: 3 })   // any animal from src/shared/animals.js
 ```
 

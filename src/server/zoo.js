@@ -170,6 +170,29 @@ export const zooMethods = {
     this.sendZoo(p);
   },
 
+  // Opstappen. Op de meeste rijdieren rijd je over de grond; een paar kunnen vliegen.
+  on_rideEnt(p, m) {
+    const w = this.worlds[p.world], e = w.ents.get(m.id);
+    if (!e || p.dead || p.mount || e.rider || e.owner !== p.name || !e.def.ride) return;
+    if (Math.hypot(e.x - p.x, e.y - p.y, e.z - p.z) > 6 + e.w) return;
+    p.mount = e.id; e.rider = p.id; e.mode = 'follow'; e.vx = e.vy = e.vz = 0;
+    if (e.pet) e.pet.mode = 'follow';
+    this.send(p, { t: 'mount', id: e.id, s: e.scale, k: e.def.rideFly ? 'vlieg' : 'dier', seat: e.def.seat, sp: e.def.rideSp });
+    this.sendZoo(p);
+  },
+
+  // voor het uitproberen (ontwikkelaarsmodus): een eigen dier naast je, zonder ei
+  debugPet(p, key, sh) {
+    const A = ANIMALS[key];
+    if (!A) return;
+    const pet = { uid: this.meta.nextId++, kind: A.kind, a: key, sh, name: '', world: p.world, x: p.x + 1.5, y: p.y + 0.2, z: p.z + 1.5, mode: 'follow' };
+    p.pets.push(pet);
+    this.spawnEnt(this.worlds[p.world], A.kind, pet.x, pet.y, pet.z, { owner: p.name, pet, mode: 'follow' });
+    const rec = this.zooOf(p)[key] || (this.zooOf(p)[key] = { n: 0 });
+    rec.n++;
+    this.sendZoo(p);
+  },
+
   // tik op je eigen dier: wachten of weer meelopen
   useAnimal(p, w, e) {
     if (e.owner !== p.name) return;

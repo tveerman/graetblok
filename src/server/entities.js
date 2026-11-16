@@ -188,6 +188,18 @@ export const entityMethods = {
     if (e.owner) {
       const o = this.playerByName(e.owner);
       if (!o || o.world !== w.id || e.mode === 'stay') { e.vx = 0; e.vz = 0; return; }
+      if (e.def.guard) {
+        // een beschermer (hond, wolf, leeuw, T-rex...): bijt monsters die bij jou in de buurt komen
+        const m = this.findFoe(w, e, o.x, o.y, o.z, 10, dt);
+        if (m) {
+          const fx = m.x - e.x, fz = m.z - e.z, d = Math.hypot(fx, fz) || 1, reach = e.w / 2 + m.w / 2;
+          e.yaw = Math.atan2(fx, fz);
+          const sp = Math.max(4.6, e.def.speed * 1.7);
+          if (d > reach + 0.5) { e.vx = fx / d * sp; e.vz = fz / d * sp; } else { e.vx = 0; e.vz = 0; }
+          if (d < reach + 1.3 && Math.abs(m.y - e.y) < 3 && e.cd <= 0) { e.cd = 0.9; e.atk = 0.4; this.damageEntity(w, m, e.def.dmg, o, fx, fz); }
+          return;
+        }
+      }
       const dx = o.x - e.x, dz = o.z - e.z, h = Math.hypot(dx, dz);
       if (h > 28 || Math.abs(o.y - e.y) > 14) { e.x = o.x + 1; e.y = o.y + 0.2; e.z = o.z + 1; e.vy = 0; return; }
       if (h > 3) { const sp = e.def.speed * 1.9; e.vx = dx / h * sp; e.vz = dz / h * sp; e.yaw = Math.atan2(dx, dz); }

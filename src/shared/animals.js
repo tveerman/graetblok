@@ -172,10 +172,15 @@ const LIST = [
   [400, 'kosmische_feniks', 'Kosmische feniks', 'secret', 'sterren', 'roofvogel', 0x2a1a6a, 0xff7ad0, { wings: 0x6a3af0, tail: 'waaier', glow: 0xff9af0, eye: '#ffffff', s: 1.7, guard: 1 }],
 ];
 
+// Extra rijdieren uit Jorians lijst (naast paarden, olifanten en grote dino's): 1 = rijden, 2 = vliegen
+const RIDE_EXTRA = { sterrenwolf: 1, vuurwolf: 1, oerwolf: 1, spookwolf: 1, donderleeuw: 1, oerleeuw: 1, ijsleeuw: 1, schaduwleeuw: 1, oerbeer: 1, yeti: 1, cerberus: 1, kosmische_feniks: 2, gouden_feniks: 2 };
+
 export const ANIMALS = {};        // sleutel -> dier
 export const ANIMAL_LIST = [];    // op nummer
 for (const [nr, key, name, rarity, egg, shape, c, c2, extra] of LIST) {
   const spec = Object.assign({ c, c2 }, P[shape], extra);
+  if (RIDE_EXTRA[key]) { spec.ride = 1; if (RIDE_EXTRA[key] === 2) spec.fly = 1; }
+  if (!spec.ride) spec.fly = spec.fly && 0;             // 'fly' telt alleen voor dieren waar je op kunt zitten
   const s = spec.s || 1;
   const a = { nr, key, name, rarity, egg, spec, kind: 'd_' + key };
   ANIMALS[key] = a;
@@ -186,6 +191,11 @@ for (const [nr, key, name, rarity, egg, shape, c, c2, extra] of LIST) {
     name, model: 'dier', animal: key, scale: s, ai: 'passive', pet: true, tap: true, xp: 0, drops: [],
     hp: Math.round(10 + s * 14 + RARITY[rarity].i * 4), speed: spec.t === 'vogel' ? 2.6 : 2.2 + Math.min(1.4, spec.legH * 1.6),
     w: Math.max(0.5, spec.body[0] * s), h: Math.max(0.5, tall * s),
+    // meevechten: hoe hard hij bijt (grotere en zeldzamere dieren bijten harder)
+    guard: !!spec.guard, dmg: Math.round(3 + s * 2 + RARITY[rarity].i * 1.5),
+    // rijden: seat = hoe hoog je zit, rideSp = hoe hard hij loopt met jou erop
+    ride: !!spec.ride, rideFly: !!(spec.ride && spec.fly), seat: (spec.legH + spec.body[1]) * s,
+    rideSp: Math.min(11, 6.2 + spec.legH * s * 3.2),
   };
 }
 ANIMAL_LIST.sort((a, b) => a.nr - b.nr);

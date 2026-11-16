@@ -588,6 +588,7 @@ export class UI {
     b.appendChild(home);
     slider('Kijkafstand', 'view', 2, 8, 1, (v) => v + ' stukken');
     slider('Geluid', 'volume', 0, 1, 0.05, (v) => Math.round(v * 100) + '%');
+    slider('Regen en wind', 'amb', 0, 1, 0.05, (v) => Math.round(v * 100) + '%');
     slider('Kijksnelheid', 'sens', 0.4, 2.5, 0.1, (v) => v.toFixed(1) + '×');
     const row = el('div', 'btnrow');
     row.appendChild(toggle('Muziek', 'music'));

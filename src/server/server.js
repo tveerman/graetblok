@@ -726,6 +726,9 @@ export class GameServer {
         const r = e.train;
         e.x = r.x = p.x; e.y = r.y = p.y - 0.9; e.z = r.z = p.z;
         if (typeof m.ry === 'number') e.yaw = r.yaw = m.ry;
+      } else if (e && e.def.animal) {
+        // op een dier: op de grond staat het dier waar jij staat, in de lucht hangt het onder je
+        e.x = p.x; e.y = p.y - (e.def.rideFly ? e.def.seat : 0); e.z = p.z; e.yaw = p.yaw; e.vx = e.vy = e.vz = 0;
       } else if (e) { e.x = p.x; e.y = p.y - 0.2 - 1.15 * e.scale; e.z = p.z; e.yaw = p.yaw; e.vx = e.vy = e.vz = 0; }
       else p.mount = 0;
     }
@@ -867,6 +870,7 @@ export class GameServer {
     else if (m.c === 'xp') this.addXp(p, m.n || 100);
     else if (m.c === 'god') p.god = !!m.v;
     else if (m.c === 'egg') { for (const k in this.meta.eggs) this.meta.eggs[k].prog = 0.95; }
+    else if (m.c === 'pet') this.debugPet(p, m.a, m.sh || '');      // meteen een eigen dier, bijv. { c: 'pet', a: 'paard' }
     else if (m.c === 'hatch') { const all = this.incubs(); for (const k in all) for (const e of all[k].eggs) e.left = 1; }      // alle eieren in de broedmachines komen meteen uit
     else if (m.c === 'weather') this.setWeather(p.world, m.k || 'zon', m.dur || 120);
     else if (m.c === 'herd') { const top = w.topY(Math.floor(p.x) + 6, Math.floor(p.z)); this.spawnHerd(w, m.kind, Math.floor(p.x) + 6, top + 1, Math.floor(p.z)); }

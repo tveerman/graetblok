@@ -26,9 +26,13 @@ const MUSIC_VOL = 0.8;      // de muziek blijft op de achtergrond, onder de gelu
 const UA = typeof navigator !== 'undefined' ? navigator.userAgent || '' : '';
 const IS_IOS = /iP(hone|ad|od)/.test(UA) || (/Macintosh/.test(UA) && typeof navigator !== 'undefined' && navigator.maxTouchPoints > 1);
 
-// een kwart seconde stilte als WAV-bestandje (44,1 kHz, 16 bits) in een data-adres
-function silentWav() {
-  const rate = 44100, n = rate >> 2, bytes = new Uint8Array(44 + n * 2), v = new DataView(bytes.buffer);
+// Een paar seconden stilte als WAV-bestandje (16 bits) in een data-adres. Het bestandje heeft
+// dezelfde snelheid als het geluid van het spel en duurt een paar tellen. Eerst was het een
+// kwart seconde op 44,1 kHz: dan begint de speler vier keer per seconde opnieuw, en als het
+// spel zelf op 48 kHz draait moet de iPad steeds tussen twee snelheden kiezen. Allebei kunnen
+// het geluid laten haperen.
+function silentWav(rate, secs) {
+  const n = Math.round(rate * secs), bytes = new Uint8Array(44 + n * 2), v = new DataView(bytes.buffer);
   const str = (o, t) => { for (let i = 0; i < t.length; i++) bytes[o + i] = t.charCodeAt(i); };
   str(0, 'RIFF'); v.setUint32(4, 36 + n * 2, true); str(8, 'WAVEfmt ');
   v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
@@ -49,6 +53,8 @@ export class Sound {
     this.ambT = 0;
     this.kicked = false;
     this.sfxOn = true;
+    this.ambVol = 1;         // hoe hard regen, wind en andere geluiden van de omgeving klinken (0..1)
+    this.dest = null;        // waar een los geluidje naartoe gaat (leeg = de gewone geluidseffecten)
     this.notes = 0;          // hoeveel muzieknoten er zijn ingepland (voor de controle in het pauzemenu)
     // src = het stukje dat nu speelt, prev = het vorige (speelt nog tot de wissel), job = er wordt
     // een nieuw stukje uitgerekend, ready = dat stukje is klaar en wacht op de wissel
@@ -73,7 +79,7 @@ export class Sound {
         a.setAttribute('x-webkit-airplay', 'deny');
         a.setAttribute('playsinline', '');
         a.controls = false; a.disableRemotePlayback = true; a.preload = 'auto'; a.loop = true;
-        a.src = silentWav();
+        a.src = silentWav(this.ctx ? this.ctx.sampleRate : 44100, 4);
         a.load();
       }
       if (this.tag.paused && !document.hidden) {
@@ -94,7 +100,7 @@ export class Sound {
   unlock() {
     const AC = window.AudioContext || window.webkitAudioContext;
     if (!AC) return;
-    this.channel();
+    if (this.ctx) this.channel();
     if (!this.ctx) {
       const c = this.ctx = new AC();
       this.master = c.createGain();
@@ -109,14 +115,16 @@ export class Sound {
       // wind die altijd zachtjes waait
       const src = c.createBufferSource(); src.buffer = this.noiseBuf; src.loop = true;
       const f = c.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 380;
+      // regen, wind en de geluidjes van de omgeving hebben samen een eigen schuif
+      this.ambGain = c.createGain(); this.ambGain.gain.value = this.ambVol; this.ambGain.connect(this.sfxGain);
       const g = c.createGain(); g.gain.value = 0.0;
-      src.connect(f); f.connect(g); g.connect(this.sfxGain); src.start();
+      src.connect(f); f.connect(g); g.connect(this.ambGain); src.start();
       this.amb = { f, g };
       // regen: een tweede ruis die pas klinkt als het regent
       // (de ruis zelf wordt pas aangezet als het echt regent, zie ambience)
       const rf = c.createBiquadFilter(); rf.type = 'highpass'; rf.frequency.value = 1800;
       const rg = c.createGain(); rg.gain.value = 0.0;
-      rf.connect(rg); rg.connect(this.sfxGain);
+      rf.connect(rg); rg.connect(this.ambGain);
       this.rain = { f: rf, g: rg, src: null, dry: 0, roof: false };
       // muziek: eigen volumeknop en een meter (voor de controle)
       this.musicGain = c.createGain(); this.musicGain.gain.value = this.musicOn ? MUSIC_VOL : 0; this.musicGain.connect(this.master);
@@ -131,6 +139,7 @@ export class Sound {
       this.echo = null;
     }
     const c = this.ctx;
+    if (!this.tag) this.channel();          // de eerste keer: pas nu, zodat de stille speler de snelheid van het spel kent
     if (c.state !== 'running') {
       try { const pr = c.resume(); if (pr && pr.catch) pr.catch(() => {}); } catch (e) { /* nog niet toegestaan */ }
     }
@@ -145,6 +154,12 @@ export class Sound {
   }
 
   setVolume(v) { this.vol = v; if (this.master) this.master.gain.value = v; }
+
+  // hoe hard de omgeving klinkt: regen, wind, onweer, vogels en dieren
+  setAmb(v) {
+    this.ambVol = Math.max(0, Math.min(1, +v));
+    if (this.ambGain) this.ambGain.gain.setTargetAtTime(this.ambVol, this.ctx.currentTime, 0.05);
+  }
 
   // geluidseffecten aan of uit (de muziek heeft zijn eigen knop)
   setSfx(on) {
@@ -184,7 +199,7 @@ export class Sound {
     g.gain.setValueAtTime(0.0001, t);
     g.gain.linearRampToValueAtTime(vol, t + attack);
     g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    o.connect(g); g.connect(this.sfxGain);
+    o.connect(g); g.connect(this.dest || this.sfxGain);
     o.start(t); o.stop(t + dur + 0.02);
   }
 
@@ -197,7 +212,7 @@ export class Sound {
     const g = c.createGain();
     g.gain.setValueAtTime(vol, t);
     g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    s.connect(f); f.connect(g); g.connect(this.sfxGain);
+    s.connect(f); f.connect(g); g.connect(this.dest || this.sfxGain);
     s.start(t, Math.random() * 0.5); s.stop(t + dur + 0.02);
   }
 
@@ -329,10 +344,12 @@ export class Sound {
     this.ambT -= dt;
     if (this.ambT <= 0 && this.sfxOn) {
       this.ambT = 2 + Math.random() * 5;
+      this.dest = this.ambGain;              // vogeltjes, druppels en gerommel horen bij de omgeving
       if (env.under) { this.tone(1300 + Math.random() * 600, 0.08, 'sine', 0.05, 700); }
       else if (w === 'groen' || w === 'wolken') { if (env.day > 0.5) this.play('chirp', 0.5); else { for (let i = 0; i < 4; i++) this.tone(4200, 0.03, 'sine', 0.025, 0, i * 0.07); } }
       else if (w === 'vuur') { this.noise(0.5, 'lowpass', 200, 0.12, 80); }
       else if (w === 'schaduw') { this.tone(55 + Math.random() * 10, 2.5, 'sine', 0.07, 0, 0, 0.8); this.tone(82, 2.5, 'sine', 0.03, 78, 0, 0.8); }
+      this.dest = null;
     }
     this.music(env);
   }

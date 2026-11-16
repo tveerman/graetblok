@@ -189,6 +189,12 @@ export class Entities {
           const px = e.x + Math.sin(e.yaw) * 0.84, pz = e.z + Math.cos(e.yaw) * 0.84;
           for (let i = 0; i < 3; i++) this.particles.add(px, e.y + 2.05, pz, (Math.random() - 0.5) * 0.5, 1.6 + Math.random(), (Math.random() - 0.5) * 0.5, 0.92, 0.92, 0.94, 0.5 + Math.random() * 0.3, 1.4, -0.6);
         }
+      } else if (e.id === this.ridden && e.def.animal) {
+        // het dier waar je op zit: op de grond staat het waar jij staat, in de lucht hangt het onder je
+        const air = player.mountKind === 'vlieg';
+        e.x = player.pos.x; e.z = player.pos.z; e.y = player.pos.y - (air ? player.seatH : 0); e.yaw = player.yaw + Math.PI;
+        e.speed = air ? 5 : player.speedNow; e.flags = air ? 2 : 0;
+        e.group.rotation.x = air ? -player.pitch * 0.4 : 0;
       } else if (e.id === this.ridden) {
         // de draak waar je op zit volgt jou precies
         e.x = player.pos.x; e.z = player.pos.z; e.y = player.pos.y - 0.2 - 1.15 * e.scale; e.yaw = player.yaw + Math.PI;

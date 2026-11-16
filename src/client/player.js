@@ -20,7 +20,8 @@ export class Player {
     this.yaw = 0; this.pitch = 0;
     this.onGround = false; this.inWater = false; this.headIn = 0;
     this.mount = 0; this.mountScale = 1;
-    this.mountKind = '';          // 'trein' als je op een trein zit, anders een draak
+    this.mountKind = '';          // 'trein' = op een trein, 'dier' = rijden over de grond, 'vlieg' = op een vliegend dier, '' = op een draak
+    this.seatH = 0; this.rideSp = 0;      // hoe hoog je op je rijdier zit en hoe hard het loopt
     this.rail = null;             // waar de trein op het spoor is: { x, y, z, din, dout, t, v, end }
     this.railV = 0; this.trainYaw = 0; this.trainPitch = 0; this.rev = false;
     this.cam = 0;
@@ -78,11 +79,14 @@ export class Player {
     this.dig = null; this.portalT = 0; this.portalLock = 3;
   }
 
-  setMount(id, scale, kind) {
+  setMount(id, scale, kind, seat, sp) {
     if (id) {
       this.mount = id; this.mountScale = scale || 1; this.mountKind = kind || '';
+      this.seatH = seat || 0; this.rideSp = sp || 7;
       this.vel.set(0, 0, 0);
       if (kind === 'trein') this.startRail(this.g.ents.map.get(id));
+      else if (kind === 'dier') { const e = this.g.ents.map.get(id); if (e) { this.pos.x = e.x; this.pos.z = e.z; this.pos.y = Math.max(this.pos.y, e.y) + 0.1; } }      // je staat nu waar het dier staat
+      else if (kind === 'vlieg') this.pos.y += this.seatH + 0.6;
       else this.pos.y += 1.3 * this.mountScale + 0.4;
     } else if (this.mount) {
       if (this.mountKind === 'trein') {
@@ -174,7 +178,7 @@ export class Player {
 
     const ready = !this.frozen && !this.dead && w.isLoaded(this.pos.x, this.pos.z);
     if (ready) {
-      if (!this.mount) this.walk(dt); else if (this.mountKind === 'trein') this.ride(dt); else this.fly(dt);
+      if (!this.mount || this.mountKind === 'dier') this.walk(dt); else if (this.mountKind === 'trein') this.ride(dt); else this.fly(dt);
       this.environment(dt);
     } else { this.vel.set(0, 0, 0); this.speedNow = 0; }
 
@@ -207,6 +211,7 @@ export class Player {
     this.inWater = feet > 0 && B_SHAPE[feet] === SHAPE_LIQUID;
     if (this.inWater && !wasWater && this.vel.y < -3) g.sound.play('splash');
     let speed = this.inWater ? 2.9 : (inp.sprint ? 6.3 : 4.5);
+    if (this.mountKind === 'dier') speed = this.inWater ? 3.6 : this.rideSp * (inp.sprint ? 1.3 : 1);      // op een rijdier ga je harder
     if (g.trees.ijs) speed *= 1.25;
     const acc = Math.min(1, (this.onGround ? 14 : (this.inWater ? 6 : 4)) * dt);
     this.vel.x += (wx * speed - this.vel.x) * acc;
@@ -365,7 +370,7 @@ export class Player {
   updateCamera(dt) {
     const g = this.g, cam = g.R.camera, w = g.world;
     const third = this.cam === 1 || this.mount || this.dead;
-    const eyeY = this.pos.y + (this.mount ? 1.25 : EYE);
+    const eyeY = this.pos.y + (this.mount ? 1.25 : EYE) + (this.mountKind === 'dier' ? this.seatH : 0);
     const hx = Math.floor(this.pos.x), hz = Math.floor(this.pos.z);
     if (!third) {
       const bob = this.onGround ? Math.sin(this.bobPh) * 0.035 * Math.min(1, this.speedNow / 4) : 0;
@@ -403,6 +408,8 @@ export class Player {
     m.visible = third;
     if (third) {
       m.position.copy(this.pos);
+      if (this.mountKind === 'dier') m.position.y += this.seatH - 0.62;      // je zit op zijn rug
+      else if (this.mountKind === 'vlieg') m.position.y -= 0.62;
       m.rotation.y = this.yaw + Math.PI;
       const a = m.userData.a;
       a.pose = this.mount ? 'ride' : '';
@@ -449,7 +456,7 @@ export class Player {
 
     if (!inp.breakHeld || g.ui.modalOpen()) { this.dig = null; this.crack.visible = false; return; }
 
-    if (this.mount) { if (this.mountKind !== 'trein') this.shoot(tgt.dir); return; }
+    if (this.mount) { if (this.mountKind === '') this.shoot(tgt.dir); return; }      // alleen een draak kan spuwen
     if (tgt.ent) {
       this.dig = null; this.crack.visible = false;
       if (this.atkCd <= 0 && !tgt.ent.owner) {
@@ -504,7 +511,7 @@ export class Player {
     if (this.frozen || this.dead || this.useCd > 0) return;
     this.useCd = 0.16;
     const tgt = this.aim(ndc);
-    if (this.mount) { if (this.mountKind !== 'trein') this.shoot(tgt.dir); return; }
+    if (this.mount) { if (this.mountKind === '') this.shoot(tgt.dir); return; }      // alleen een draak kan spuwen
     const id = this.heldItem();
     const it = ITEMS[id];
     if (tgt.ent) {
