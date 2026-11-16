@@ -111,8 +111,10 @@ the tablet is put away or the tab is hidden.
 
 The pause menu has separate switches for music ("Muziek") and sound effects
 ("Geluidseffecten"). Its last line reports what the audio is doing on that device, for example
-"Geluid: aan · muziek: 262 noten gespeeld, sterkte 9% · effecten: aan" — useful when a device
-stays silent. On iPad and iPhone the line ends with "stille stand omzeild: ja/nee": Web Audio
+"Geluid: aan · muziek: 57 noten, sterkte 9%, als lusje · effecten: aan" — useful when a device
+stays silent. "als lusje" means the music is rendered ahead of time and played as a loop (see
+"Sprites and sound"); "noot voor noot" means the browser could not do that and every note is
+scheduled live, which is much heavier. On iPad and iPhone the line ends with "stille stand omzeild: ja/nee": Web Audio
 is silenced there by the device's silent mode (the bell in Control Centre, or the side switch
 on older iPads), so the game keeps a silent `<audio>` element looping, which makes iOS route
 all of the page's sound through the media channel instead. The landing screen shows which version is running ("versie van 10 nov, 18:40",
@@ -250,6 +252,13 @@ function built from seamless noise, or a small canvas drawing (plants, eggs, tor
 are packed into one atlas with padding so they do not bleed into each other. Item icons, creature
 skins, the sun, moon and clouds are made the same way. `src/client/audio.js` synthesises all
 sound effects, ambience and the soft background music with the Web Audio API.
+
+The music is not scheduled note by note while playing: four bars are rendered in one go with an
+`OfflineAudioContext` (off the main thread, at half the sample rate, backing and melody in
+separate channels) and then played as a single looping buffer. After two plays a new melody is
+rendered and swapped in on the bar. Scheduling dozens of live oscillators made sound and game
+stutter on an old iPad, and every frame hitch was audible in the music. Wind and rain are only
+adjusted four times a second, and the rain noise only runs while it rains.
 
 `sprites.html` shows every tile and icon; `sprites.html?hq` also builds the high-quality set.
 

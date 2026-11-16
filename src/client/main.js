@@ -133,7 +133,7 @@ class Game {
     const d = this.sound.diag();
     if (!d) return 'Geluid: nog niet gestart (tik ergens op het scherm)';
     const run = d.state === 'running' ? 'aan' : 'staat stil (' + d.state + ')';
-    const mus = !this.settings.music ? 'uit' : d.notes + ' noten gespeeld, sterkte ' + Math.round(d.level * 100) + '%';
+    const mus = !this.settings.music ? 'uit' : d.notes + ' noten, sterkte ' + Math.round(d.level * 100) + '%, ' + (d.loop ? 'als lusje' : 'noot voor noot');
     return 'Geluid: ' + run + ' · muziek: ' + mus + ' · effecten: ' + (this.settings.sfx ? 'aan' : 'uit') + (d.ios ? ' · stille stand omzeild: ' + (d.channel ? 'ja' : 'nee') : '');
   }
 

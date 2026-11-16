@@ -50,7 +50,11 @@ export class Sound {
     this.kicked = false;
     this.sfxOn = true;
     this.notes = 0;          // hoeveel muzieknoten er zijn ingepland (voor de controle in het pauzemenu)
-    this.mus = { world: '', next: 0, step: 0, phrase: null, idx: 5, on: true };
+    // src = het stukje dat nu speelt, prev = het vorige (speelt nog tot de wissel), job = er wordt
+    // een nieuw stukje uitgerekend, ready = dat stukje is klaar en wacht op de wissel
+    this.mus = { world: '', next: 0, step: 0, phrase: null, idx: 5, on: true, src: null, prev: null, job: null, ready: null, t0: 0, loopDur: 0, v: -1, mel: -1 };
+    this.canRender = typeof window !== 'undefined' && !!(window.OfflineAudioContext || window.webkitOfflineAudioContext);
+    this.ambP = 0;           // de wind en de regen worden maar een paar keer per seconde bijgesteld
     this.tag = null;         // de stille <audio>-speler voor iPad en iPhone (zie bovenaan)
     this.channelMode = '';   // hoe we het geluid op het afspeel-kanaal hebben gezet (voor het pauzemenu)
   }
@@ -80,7 +84,10 @@ export class Sound {
   }
 
   // het spel verdwijnt naar de achtergrond: de stille speler hoeft dan niet door te lopen
-  sleep() { try { if (this.tag && !this.tag.paused) this.tag.pause(); } catch (e) { /* geeft niet */ } }
+  sleep() {
+    this.stopMusic();
+    try { if (this.tag && !this.tag.paused) this.tag.pause(); } catch (e) { /* geeft niet */ }
+  }
 
   // Moet na een tik of toets worden aangeroepen: browsers laten pas daarna geluid toe.
   // We proberen het bij elke tik opnieuw tot het geluid echt loopt (nodig op iPad en in Safari).
@@ -106,26 +113,22 @@ export class Sound {
       src.connect(f); f.connect(g); g.connect(this.sfxGain); src.start();
       this.amb = { f, g };
       // regen: een tweede ruis die pas klinkt als het regent
-      const rs = c.createBufferSource(); rs.buffer = this.noiseBuf; rs.loop = true;
+      // (de ruis zelf wordt pas aangezet als het echt regent, zie ambience)
       const rf = c.createBiquadFilter(); rf.type = 'highpass'; rf.frequency.value = 1800;
       const rg = c.createGain(); rg.gain.value = 0.0;
-      rs.connect(rf); rf.connect(rg); rg.connect(this.sfxGain); rs.start(0, 0.37);
-      this.rain = { f: rf, g: rg };
-      // muziek: eigen volumeknop, een meter (voor de controle) en een zachte echo
+      rf.connect(rg); rg.connect(this.sfxGain);
+      this.rain = { f: rf, g: rg, src: null, dry: 0, roof: false };
+      // muziek: eigen volumeknop en een meter (voor de controle)
       this.musicGain = c.createGain(); this.musicGain.gain.value = this.musicOn ? MUSIC_VOL : 0; this.musicGain.connect(this.master);
       this.mus.on = this.musicOn;
       try {
         this.meter = c.createAnalyser(); this.meter.fftSize = 1024; this.musicGain.connect(this.meter);
         this.meterBuf = new Uint8Array(this.meter.fftSize);
       } catch (e) { this.meter = null; }
-      this.echo = this.musicGain;
-      try {
-        const echo = c.createDelay(1); echo.delayTime.value = 0.34;
-        const fb = c.createGain(); fb.gain.value = 0.3;
-        const wet = c.createGain(); wet.gain.value = 0.35;
-        echo.connect(fb); fb.connect(echo); echo.connect(wet); wet.connect(this.musicGain);
-        this.echo = echo;
-      } catch (e) { /* dan maar zonder echo */ }
+      // de begeleiding en de melodie hebben elk een eigen schuif (onder de grond zwijgt de melodie)
+      this.mus.gBack = c.createGain(); this.mus.gBack.gain.value = 0; this.mus.gBack.connect(this.musicGain);
+      this.mus.gMel = c.createGain(); this.mus.gMel.gain.value = 0; this.mus.gMel.connect(this.musicGain);
+      this.echo = null;
     }
     const c = this.ctx;
     if (c.state !== 'running') {
@@ -153,7 +156,7 @@ export class Sound {
   diag() {
     if (!this.ctx) return null;
     this.measure();
-    return { state: this.ctx.state, rate: this.ctx.sampleRate, notes: this.notes, level: this.level || 0, ios: IS_IOS, channel: this.channelMode };
+    return { state: this.ctx.state, rate: this.ctx.sampleRate, notes: this.notes, level: this.level || 0, ios: IS_IOS, channel: this.channelMode, loop: this.canRender };
   }
 
   // hoe sterk is het muzieksignaal op dit moment? (de hoogste waarde van de laatste paar seconden)
@@ -166,7 +169,11 @@ export class Sound {
   }
 
   // stil worden (bijv. in het hoofdmenu)
-  quiet() { if (this.ctx && this.amb) this.amb.g.gain.setTargetAtTime(0, this.ctx.currentTime, 0.3); }
+  quiet() {
+    if (!this.ctx || !this.amb) return;
+    this.amb.g.gain.setTargetAtTime(0, this.ctx.currentTime, 0.3);
+    this.stopMusic();
+  }
 
   tone(freq, dur, type = 'sine', vol = 0.2, slide = 0, delay = 0, attack = 0.005) {
     const c = this.ctx; if (!c) return;
@@ -283,19 +290,41 @@ export class Sound {
     o.start(t); lfo.start(t); o.stop(t + dur + 0.05); lfo.stop(t + dur + 0.05);
   }
 
-  // sfeergeluiden en een zacht muziekje; elke frame aanroepen
+  // sfeergeluiden en een zacht muziekje; een paar keer per seconde aanroepen
   ambience(dt, env) {
     if (!this.ctx) return;
-    const w = env.world;
-    const a = this.amb;
-    const windVol = env.under ? 0.01 : (w === 'ijs' ? 0.09 : w === 'wolken' ? 0.08 : w === 'vuur' ? 0.05 : 0.035) * (0.6 + 0.4 * Math.sin(this.ctx.currentTime * 0.3));
-    a.g.gain.setTargetAtTime(this.sfxOn ? windVol + (env.flying ? 0.08 : 0) : 0, this.ctx.currentTime, 0.5);
-    a.f.frequency.setTargetAtTime(env.flying ? 900 : (w === 'ijs' ? 600 : 380), this.ctx.currentTime, 0.5);
-    // regen: zachter als je onder een dak staat of onder de grond zit
-    if (this.rain) {
-      const rv = (env.rain || 0) * (env.under ? 0.04 : env.roof ? 0.35 : 1) * 0.11;
-      this.rain.g.gain.setTargetAtTime(this.sfxOn ? rv : 0, this.ctx.currentTime, 0.4);
-      this.rain.f.frequency.setTargetAtTime(env.roof ? 900 : 1800, this.ctx.currentTime, 0.4);
+    const w = env.world, now = this.ctx.currentTime;
+    // Wind en regen bijstellen kost de geluidsdraad elke keer een beetje werk, dus dat doen we
+    // maar vier keer per seconde (ze veranderen toch heel langzaam).
+    this.ambP -= dt;
+    if (this.ambP <= 0) {
+      this.ambP = 0.25;
+      const a = this.amb;
+      const windVol = env.under ? 0.01 : (w === 'ijs' ? 0.09 : w === 'wolken' ? 0.08 : w === 'vuur' ? 0.05 : 0.035) * (0.6 + 0.4 * Math.sin(now * 0.3));
+      a.g.gain.setTargetAtTime(this.sfxOn ? windVol + (env.flying ? 0.08 : 0) : 0, now, 0.5);
+      const wf = env.flying ? 900 : (w === 'ijs' ? 600 : 380);
+      if (wf !== a.wf) { a.wf = wf; a.f.frequency.setTargetAtTime(wf, now, 0.5); }
+      // regen: zachter als je onder een dak staat of onder de grond zit
+      const r = this.rain;
+      if (r) {
+        const rv = this.sfxOn ? (env.rain || 0) * (env.under ? 0.04 : env.roof ? 0.35 : 1) * 0.11 : 0;
+        if (rv > 0.0005) {
+          r.dry = 0;
+          if (!r.src) {          // het begint te regenen: de ruis aanzetten
+            const rs = r.src = this.ctx.createBufferSource(); rs.buffer = this.noiseBuf; rs.loop = true;
+            rs.connect(r.f); rs.start(0, 0.37);
+          }
+          r.g.gain.setTargetAtTime(rv, now, 0.4);
+          if (!!env.roof !== r.roof) { r.roof = !!env.roof; r.f.frequency.setTargetAtTime(r.roof ? 900 : 1800, now, 0.4); }
+        } else if (r.src) {
+          if (r.dry === 0) r.g.gain.setTargetAtTime(0, now, 0.4);
+          r.dry += 0.25;
+          if (r.dry > 3) {       // al een tijdje droog: de ruis hoeft niet door te lopen
+            try { r.src.stop(); r.src.disconnect(); } catch (e) { /* geeft niet */ }
+            r.src = null;
+          }
+        }
+      }
     }
     this.ambT -= dt;
     if (this.ambT <= 0 && this.sfxOn) {
@@ -308,18 +337,41 @@ export class Sound {
     this.music(env);
   }
 
-  // een muzieknoot op een afgesproken moment
-  note(freq, when, dur, type, vol, attack, echo) {
-    const c = this.ctx;
+  // een muzieknoot op een afgesproken moment; c = waar hij klinkt (live of in een stukje dat
+  // vooruit wordt uitgerekend), out = de uitgang, echo = de echo (of niets)
+  note(c, out, echo, freq, when, dur, type, vol, attack) {
     const o = c.createOscillator(), g = c.createGain();
     o.type = type; o.frequency.setValueAtTime(freq, when);
     g.gain.setValueAtTime(0.0001, when);
     g.gain.linearRampToValueAtTime(vol, when + attack);
     g.gain.exponentialRampToValueAtTime(0.0001, when + dur);
-    o.connect(g); g.connect(this.musicGain);
-    if (echo && this.echo !== this.musicGain) g.connect(this.echo);
+    o.connect(g); g.connect(out);
+    if (echo) g.connect(echo);
     o.start(when); o.stop(when + dur + 0.05);
     this.notes++;
+  }
+
+  // De noten van één achtste tel. emit(melodie?, toon, wanneer, duur, klank, sterkte, aanzet).
+  songStep(song, phrase, step, t, v, emit) {
+    const stepDur = 60 / song.bpm / 2;
+    const chords = song.minor ? CHORDS_MIN : CHORDS_MAJ;
+    const hz = (n) => song.root * Math.pow(2, n / 12);
+    const st = step % 8, chord = chords[Math.floor(step / 8) % 4];
+    if (st === 0) {
+      emit(false, hz(chord[0] - 12), t, stepDur * 7.6, 'triangle', 0.1 * v, 0.03);                  // bas
+      emit(false, hz(chord[0]), t, stepDur * 7.6, 'sine', 0.05 * v, 0.03);                           // dezelfde toon hoger: kleine speakers geven lage tonen slecht weer
+      for (const n of chord) emit(false, hz(n + 12), t, stepDur * 8.2, 'triangle', 0.035 * v, 0.4);  // akkoord
+    } else if (st === 4) {
+      emit(false, hz(chord[0] - 12), t, stepDur * 3.6, 'triangle', 0.07 * v, 0.03);
+      emit(false, hz(chord[0]), t, stepDur * 3.6, 'sine', 0.035 * v, 0.03);
+    } else if (st === 6) {
+      emit(false, hz(chord[2] - 12), t, stepDur * 1.8, 'triangle', 0.05 * v, 0.03);
+    }
+    const n = phrase[step % 32];
+    if (n >= 0) {
+      const rest = phrase[(step + 1) % 32] < 0;
+      emit(true, hz(n), t, stepDur * (rest ? 1.9 : 1.05), song.lead, 0.13 * v, 0.012);               // melodie
+    }
   }
 
   // een nieuw melodietje van vier maten (32 achtste noten); -1 = rust
@@ -356,37 +408,131 @@ export class Sound {
     return out;
   }
 
-  // Zet steeds een klein stukje muziek vooruit klaar. Wordt een paar keer per seconde aangeroepen.
+  // De muziek. Vroeger werd elke noot los gemaakt terwijl je speelde: tientallen toontjes
+  // tegelijk, die de geluidsdraad allemaal moest uitrekenen, en als het beeld even haperde
+  // haperde het liedje mee. Op een oude iPad stotterden daardoor het geluid en het spel.
+  // Nu rekenen we vier maten in één keer vooruit uit (op een eigen draad, los van het beeld)
+  // en spelen dat stukje als een lusje af. Dat kost bijna niets. Na twee keer spelen komt er
+  // een nieuw melodietje, dat precies op de maat wordt ingewisseld.
   music(env) {
     const c = this.ctx, m = this.mus, now = c.currentTime;
-    this.measure();
     if (m.on !== this.musicOn) { m.on = this.musicOn; this.musicGain.gain.setTargetAtTime(m.on ? MUSIC_VOL : 0, now, 0.15); }
-    if (!this.musicOn) { m.next = 0; return; }
+    if (!this.musicOn) { m.next = 0; this.stopMusic(); return; }
+    if (!this.canRender) { this.musicLive(env); return; }
+    if (m.world !== env.world) { this.stopMusic(); m.world = env.world; }
+    if (m.ready && m.ready.world !== m.world) m.ready = null;
+    if (m.ready) {
+      const r = m.ready; m.ready = null;
+      let at = now + 0.1;
+      if (m.src) {
+        // wisselen aan het eind van een lusje, op zijn vroegst na twee keer spelen
+        at = m.t0 + m.loopDur * Math.max(2, Math.ceil((now + 0.25 - m.t0) / m.loopDur));
+        try { m.src.stop(at); } catch (e) { /* geeft niet */ }
+        m.prev = m.src;
+      } else { m.v = -1; m.mel = -1; }
+      const src = c.createBufferSource(); src.buffer = r.buf; src.loop = true; src.loopStart = 0; src.loopEnd = r.loopDur;
+      const split = c.createChannelSplitter(2);
+      src.connect(split); split.connect(m.gBack, 0); split.connect(m.gMel, 1);
+      src.onended = () => { try { split.disconnect(); } catch (e) { /* geeft niet */ } if (m.prev === src) m.prev = null; };
+      src.start(at);
+      m.src = src; m.t0 = at; m.loopDur = r.loopDur;
+    }
+    if (!m.src) { if (!m.job) this.renderSong(m.world); return; }
+    // tijdens de tweede keer spelen: het volgende melodietje alvast uitrekenen
+    if (!m.job && now > m.t0 + m.loopDur) this.renderSong(m.world);
+    // overdag iets harder dan 's nachts; onder de grond zachter en zonder melodie
+    const v = (env.under ? 0.6 : 1) * (0.75 + 0.25 * (env.day === undefined ? 1 : env.day)), mel = env.under ? 0 : 1;
+    if (Math.abs(v - m.v) > 0.02 || mel !== m.mel) {
+      const t = Math.max(now, m.v < 0 ? m.t0 : 0);
+      m.v = v; m.mel = mel;
+      m.gBack.gain.setTargetAtTime(v, t, 0.3);
+      m.gMel.gain.setTargetAtTime(v * mel, t, 0.3);
+    }
+  }
+
+  // de muziek stilzetten (muziek uit, een andere wereld, het hoofdmenu, de tablet weggelegd)
+  stopMusic() {
+    const m = this.mus;
+    m.job = null; m.ready = null;
+    if (!this.ctx || (!m.src && !m.prev)) return;
+    const now = this.ctx.currentTime;
+    m.gBack.gain.cancelScheduledValues(now); m.gMel.gain.cancelScheduledValues(now);
+    m.gBack.gain.setTargetAtTime(0, now, 0.06); m.gMel.gain.setTargetAtTime(0, now, 0.06);
+    for (const s of [m.src, m.prev]) { if (s) { try { s.stop(now + 0.4); } catch (e) { /* was al gestopt */ } } }
+    m.src = null; m.prev = null; m.v = -1; m.mel = -1;
+  }
+
+  // Reken vier maten muziek vooruit uit: links de begeleiding, rechts de melodie met echo.
+  renderSong(world) {
+    const m = this.mus, song = SONGS[world] || SONGS.groen;
+    const OAC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+    const stepDur = 60 / song.bpm / 2;
+    const job = m.job = { world };
+    const fail = () => { if (m.job === job) m.job = null; this.canRender = false; };
+    // Op halve snelheid uitrekenen is twee keer zo weinig werk en voor dit zachte muziekje
+    // hoor je het verschil niet. Kan de browser dat niet, dan op de gewone snelheid.
+    const full = this.ctx.sampleRate, rates = [Math.max(22050, Math.round(full / 2)), full];
+    let oc = null, rate = 0;
+    for (const r of rates) {
+      try { oc = new OAC(2, Math.round(32 * stepDur * r) + Math.round(2.5 * r), r); rate = r; break; } catch (e) { oc = null; }
+    }
+    if (!oc) { fail(); return; }
+    try {
+      const loopN = Math.round(32 * stepDur * rate);
+      const merge = oc.createChannelMerger(2); merge.connect(oc.destination);
+      const back = oc.createGain(), lead = oc.createGain();
+      back.connect(merge, 0, 0); lead.connect(merge, 0, 1);
+      const echo = oc.createDelay(1); echo.delayTime.value = 0.34;
+      const fb = oc.createGain(); fb.gain.value = 0.3;
+      const wet = oc.createGain(); wet.gain.value = 0.35;
+      echo.connect(fb); fb.connect(echo); echo.connect(wet); wet.connect(lead);
+      const phrase = this.makePhrase(song.minor);
+      for (let step = 0; step < 32; step++) {
+        this.songStep(song, phrase, step, step * stepDur, 1, (isMel, f, t, dur, type, vol, attack) => this.note(oc, isMel ? lead : back, isMel ? echo : null, f, t, dur, type, vol, attack));
+      }
+      oc.oncomplete = (ev) => {
+        if (m.job !== job) return;              // intussen is de muziek gestopt of van wereld gewisseld
+        m.job = null;
+        try {
+          // Wat na de laatste maat nog naklinkt tellen we bij het begin op: zo sluit het lusje
+          // naadloos op zichzelf aan.
+          const buf = ev.renderedBuffer;
+          for (let ch = 0; ch < buf.numberOfChannels; ch++) {
+            const d = buf.getChannelData(ch);
+            for (let i = loopN; i < d.length; i++) d[(i - loopN) % loopN] += d[i];
+          }
+          m.ready = { world, buf, loopDur: loopN / rate };
+        } catch (e) { this.canRender = false; }
+      };
+      const pr = oc.startRendering();
+      if (pr && pr.catch) pr.catch(fail);
+    } catch (e) { fail(); }
+  }
+
+  // De oude manier (elke noot los, terwijl je speelt), voor browsers die niet vooruit kunnen rekenen.
+  musicLive(env) {
+    const c = this.ctx, m = this.mus, now = c.currentTime;
+    if (this.echo === null) {
+      this.echo = false;
+      try {
+        const echo = c.createDelay(1); echo.delayTime.value = 0.34;
+        const fb = c.createGain(); fb.gain.value = 0.3;
+        const wet = c.createGain(); wet.gain.value = 0.35;
+        echo.connect(fb); fb.connect(echo); echo.connect(wet); wet.connect(this.musicGain);
+        this.echo = echo;
+      } catch (e) { /* dan maar zonder echo */ }
+    }
     const song = SONGS[env.world] || SONGS.groen;
     if (m.world !== env.world) { m.world = env.world; m.step = 0; m.phrase = null; m.next = now + 0.5; }
     if (m.next < now - 0.2) m.next = now + 0.12;          // na een pauze niet alles inhalen
     const stepDur = 60 / song.bpm / 2;
-    const chords = song.minor ? CHORDS_MIN : CHORDS_MAJ;
-    const hz = (n) => song.root * Math.pow(2, n / 12);
     const v = (env.under ? 0.6 : 1) * (0.75 + 0.25 * (env.day === undefined ? 1 : env.day));
     while (m.next < now + 0.4) {
-      const t = m.next, st = m.step % 8, bar = Math.floor(m.step / 8) % 4, chord = chords[bar];
       if (!m.phrase) m.phrase = this.makePhrase(song.minor);
-      if (st === 0) {
-        this.note(hz(chord[0] - 12), t, stepDur * 7.6, 'triangle', 0.1 * v, 0.03, false);                  // bas
-        this.note(hz(chord[0]), t, stepDur * 7.6, 'sine', 0.05 * v, 0.03, false);                           // dezelfde toon hoger: kleine speakers geven lage tonen slecht weer
-        for (const n of chord) this.note(hz(n + 12), t, stepDur * 8.2, 'triangle', 0.035 * v, 0.4, false);  // akkoord
-      } else if (st === 4) {
-        this.note(hz(chord[0] - 12), t, stepDur * 3.6, 'triangle', 0.07 * v, 0.03, false);
-        this.note(hz(chord[0]), t, stepDur * 3.6, 'sine', 0.035 * v, 0.03, false);
-      } else if (st === 6) {
-        this.note(hz(chord[2] - 12), t, stepDur * 1.8, 'triangle', 0.05 * v, 0.03, false);
-      }
-      const n = m.phrase[m.step % 32];
-      if (n >= 0 && !env.under) {
-        const rest = m.phrase[(m.step + 1) % 32] < 0;
-        this.note(hz(n), t, stepDur * (rest ? 1.9 : 1.05), song.lead, 0.13 * v, 0.012, true);               // melodie
-      }
+      this.songStep(song, m.phrase, m.step, m.next, v, (isMel, f, t, dur, type, vol, attack) => {
+        if (isMel && env.under) return;
+        this.note(c, this.musicGain, isMel ? this.echo || null : null, f, t, dur, type, vol, attack);
+      });
       m.step++;
       if (m.step % 64 === 0) m.phrase = null;              // na twee keer spelen: een nieuw melodietje
       m.next += stepDur;
