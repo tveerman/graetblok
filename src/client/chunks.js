@@ -117,6 +117,7 @@ class Buf {
   }
 }
 const bufs = [new Buf(16384), new Buf(8192), new Buf(4096)];
+let DET = new Uint32Array(8192);     // de driehoeken van fijne plantonderdelen (zie de mesher)
 
 export class ChunkWorld {
   constructor(scene, atlas, materials) {
@@ -128,6 +129,8 @@ export class ChunkWorld {
     this.minLightBoost = 0;
     this._lk = -1; this._lc = null;
     this.meshCount = 0;
+    this.pcx = 0; this.pcz = 0;   // de chunk waar de speler staat
+    this.lodNear = 2;             // tot zoveel chunks afstand krijgen planten al hun onderdelen
   }
 
   clear() {
@@ -254,9 +257,13 @@ export class ChunkWorld {
 
   // Elke frame: een paar chunks (opnieuw) opbouwen, dichtbij eerst.
   update(px, pz, budgetMs) {
+    const pcx = Math.floor(px / 16), pcz = Math.floor(pz / 16);
+    if (pcx !== this.pcx || pcz !== this.pcz) {
+      this.pcx = pcx; this.pcz = pcz;
+      for (const c of this.chunks.values()) if (c.meshed) this.setDetail(c);
+    }
     if (!this.dirty.size) return 0;
     const t0 = performance.now();
-    const pcx = Math.floor(px / 16), pcz = Math.floor(pz / 16);
     let done = 0;
     // Eerst alles wat samen in één beeld moet veranderen (de chunk waar een blok weg is of bij
     // is gekomen, en op de rand ook de buur): dat gaat altijd door, ook als de tijd op is.
@@ -369,6 +376,7 @@ export class ChunkWorld {
 
     // 4. vlakken maken
     for (const b of bufs) b.reset();
+    let detN = 0;
     const uvT = this.uv;
     let loY = CH, hiY = 0;
     for (let x = 0; x < CS; x++) for (let z = 0; z < CS; z++) {
@@ -572,9 +580,18 @@ export class ChunkWorld {
               buf.light[vi * 4] = sky * ls * ao; buf.light[vi * 4 + 1] = blk * ls * ao; buf.light[vi * 4 + 2] = 242 * sh * ao;
               buf.light[vi * 4 + 3] = g4 + mf[si];
             }
-            const ni = buf.ni;
-            buf.idx[ni] = nv; buf.idx[ni + 1] = nv + 1; buf.idx[ni + 2] = nv + 2; buf.idx[ni + 3] = nv; buf.idx[ni + 4] = nv + 2; buf.idx[ni + 5] = nv + 3;
-            buf.nv += 4; buf.ni += 6;
+            if (q < M.lod) {
+              const ni = buf.ni;
+              buf.idx[ni] = nv; buf.idx[ni + 1] = nv + 1; buf.idx[ni + 2] = nv + 2; buf.idx[ni + 3] = nv; buf.idx[ni + 4] = nv + 2; buf.idx[ni + 5] = nv + 3;
+              buf.ni += 6;
+            } else {
+              // fijne onderdelen (extra sprieten, besjes): die komen achteraan in de lijst, zodat
+              // we ze voor chunks ver weg kunnen overslaan (zie setDetail)
+              if (detN + 6 > DET.length) { const d = new Uint32Array(DET.length * 2); d.set(DET); DET = d; }
+              DET[detN] = nv; DET[detN + 1] = nv + 1; DET[detN + 2] = nv + 2; DET[detN + 3] = nv; DET[detN + 4] = nv + 2; DET[detN + 5] = nv + 3;
+              detN += 6;
+            }
+            buf.nv += 4;
           }
           if (y < loY) loY = y; if (y > hiY) hiY = y;
         } else if (shape === SHAPE_LIQUID) {
@@ -618,6 +635,10 @@ export class ChunkWorld {
     if (hiY < loY) { loY = 0; hiY = 1; }
     const cyc = (loY + hiY + 1) / 2, ry = (hiY + 1 - loY) / 2;
     const radius = Math.sqrt(128 + ry * ry);
+    // de fijne plantonderdelen achteraan zetten; c.base = tot waar de lijst loopt zonder die onderdelen
+    c.base = bufs[1].ni;
+    if (detN) { bufs[1].idx.set(DET.subarray(0, detN), bufs[1].ni); bufs[1].ni += detN; }
+    c.full = bufs[1].ni;
     for (let i = 0; i < 3; i++) {
       const buf = bufs[i];
       let m = c.meshes[i];
@@ -644,6 +665,18 @@ export class ChunkWorld {
     }
     c.meshed = true;
     this.meshCount++;
+    this.setDetail(c);
+  }
+
+  // Planten dichtbij tekenen we helemaal, planten verder weg zonder de fijne onderdelen (de
+  // helft van de grassprieten, de meeste besjes). Dat scheelt de tablet heel veel hoekpunten
+  // en van die afstand zie je het verschil bijna niet. Er hoeft niets opnieuw gebouwd te
+  // worden: we tekenen alleen een korter stuk van dezelfde lijst.
+  setDetail(c) {
+    const m = c.meshes[1];
+    if (!m || c.full === undefined) return;
+    const near = Math.max(Math.abs(c.cx - this.pcx), Math.abs(c.cz - this.pcz)) <= this.lodNear;
+    m.geometry.setDrawRange(0, near ? c.full : c.base);
   }
 
   // ---------- botsen en mikken ----------

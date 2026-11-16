@@ -42,7 +42,12 @@ class Model {
     this.ao = o.ao === undefined ? 1 : (o.ao ? 1 : 0);
     this.xf = null;
     this.P = []; this.UV = []; this.N = []; this.TILE = []; this.GLOW = []; this.FL = [];
+    this.lodAt = -1;
   }
+
+  // Alles wat hierna komt is een fijn onderdeel: dat wordt alleen dichtbij getekend.
+  // (Zet dus eerst de onderdelen neer die je ook van ver moet zien.)
+  detail() { this.lodAt = this.TILE.length; }
 
   // Eén vierhoek: vier hoekpunten [x, y, z], vier plekken op het plaatje [u, v] (v = 0 is de
   // bovenkant van het plaatje). o.out = een punt binnenin de vorm (dan kijkt het vlak daar
@@ -168,6 +173,7 @@ class Model {
   finish() {
     return {
       n: this.TILE.length,
+      lod: this.lodAt < 0 ? this.TILE.length : this.lodAt,      // zoveel vlakken blijven ook ver weg staan
       pos: new Float32Array(this.P), uv: new Float32Array(this.UV), nrm: new Float32Array(this.N),
       tile: new Uint16Array(this.TILE), glow: new Int8Array(this.GLOW), flags: new Uint8Array(this.FL),
       rot: this.rot, jit: this.jit, vary: this.vary, ao: this.ao,
@@ -190,7 +196,12 @@ const T = {
 // Hoog gras: een pol met losse sprieten die alle kanten op buigen.
 function gras(seed, n) {
   const r = mulberry32(seed), M = new Model({ jit: 0.12, vary: 0.25, swayFrom: 0.04, plant: 1 });
-  for (let i = 0; i < n; i++) {
+  // eerst de even sprieten, dan de oneven: van ver tekenen we alleen de eerste helft, en die
+  // staat zo nog steeds rondom
+  const half = Math.ceil(n / 2);
+  for (let k = 0; k < n; k++) {
+    const i = k < half ? k * 2 : (k - half) * 2 + 1;
+    if (k === half) M.detail();
     const a = (i / n) * TAU + r() * 0.8, rad = 0.04 + r() * 0.15;
     M.blade(T.spriet, 0.5 + Math.cos(a) * rad, 0.5 + Math.sin(a) * rad, a + (r() - 0.5) * 1.3, 0.48 + r() * 0.45, 0.08 + r() * 0.22, 0.1 + r() * 0.05);
   }
@@ -202,15 +213,20 @@ function bloem(kleur, n, len, wid, up, seed) {
   const r = mulberry32(seed), M = new Model({ jit: 0.14, vary: 0.2, swayFrom: 0.1, plant: 1 });
   const blad = tileId('bloemblad_' + kleur);
   const top = [0.54, 0.6, 0.5];
+  const b1 = 2.5 + r() * 0.4, b2 = -0.6 + r() * 0.4;
   M.tube(T.steel, [[0.5, 0, 0.5], [0.47, 0.3, 0.5], top], [0.024, 0.02, 0.017], 4);
-  M.flat(T.blad, [0.485, 0.1, 0.5], 2.5 + r() * 0.4, 0.7, 0.3, 0.16, { up2: 0.2 });
-  M.flat(T.blad, [0.475, 0.2, 0.5], -0.6 + r() * 0.4, 0.6, 0.26, 0.14, { up2: 0.1 });
   // de bloem kijkt een beetje opzij, naar het licht
   M.xf = tilt(0.42, top, 0);
   for (let i = 0; i < n; i++) {
     const a = (i / n) * TAU + 0.3;
     M.flat(blad, [top[0] + Math.cos(a) * 0.02, top[1], top[2] + Math.sin(a) * 0.02], a, up + (i % 2) * 0.12, len, wid);
   }
+  // van ver zie je alleen de steel en de bloemblaadjes; de blaadjes aan de steel en het hart niet
+  M.detail();
+  M.xf = null;
+  M.flat(T.blad, [0.485, 0.1, 0.5], b1, 0.7, 0.3, 0.16, { up2: 0.2 });
+  M.flat(T.blad, [0.475, 0.2, 0.5], b2, 0.6, 0.26, 0.14, { up2: 0.1 });
+  M.xf = tilt(0.42, top, 0);
   M.tube(T.hart, [[top[0], top[1] - 0.012, top[2]], [top[0], top[1] + 0.03, top[2]], [top[0], top[1] + 0.055, top[2]]], [0.062, 0.05, 0], 6, { ur: 2 });
   M.xf = null;
   return M.finish();
@@ -237,8 +253,12 @@ function bessenstruik() {
   const r = mulberry32(31), M = new Model({ jit: 0.06, vary: 0.12, swayFrom: 0.22, plant: 1 });
   const ys = [0.03, 0.18, 0.4, 0.6, 0.74], rs = [0.2, 0.38, 0.43, 0.3, 0.03];
   M.tube(T.loof, ys.map((y) => [0.5, y, 0.5]), rs, 8, { ur: 2, uv: [0, 0.25, 1, 1] });
-  M.tube(T.loof, [[0.5, 0.1, 0.5], [0.5, 0.36, 0.5], [0.5, 0.6, 0.5]], [0.2, 0.3, 0.05], 6, { ur: 2, uv: [0, 0, 1, 0.6], phase: 0.5 });      // een binnenlaag, zodat je er niet doorheen kijkt
-  for (let i = 0; i < 9; i++) {
+  const binnen = () => M.tube(T.loof, [[0.5, 0.1, 0.5], [0.5, 0.36, 0.5], [0.5, 0.6, 0.5]], [0.2, 0.3, 0.05], 6, { ur: 2, uv: [0, 0, 1, 0.6], phase: 0.5 });      // een binnenlaag, zodat je er niet doorheen kijkt
+  // De besjes staan om en om (0, 3, 6, dan de rest): van ver tekenen we alleen de struik en
+  // de eerste drie besjes.
+  for (let k = 0; k < 9; k++) {
+    const i = k < 3 ? k * 3 : (k - 3) + Math.floor((k - 3) / 2) + 1;
+    if (k === 3) { M.detail(); binnen(); }
     const a = (i / 9) * TAU + r() * 0.5, y = 0.2 + r() * 0.42;
     let rad = 0.4;
     for (let k = 0; k < 4; k++) if (y >= ys[k] && y <= ys[k + 1]) rad = rs[k] + (rs[k + 1] - rs[k]) * (y - ys[k]) / (ys[k + 1] - ys[k]);
