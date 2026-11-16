@@ -113,6 +113,14 @@ item(338, 'spookkroon', 'Kroon van de Skeletkoning', { icon: ['crown', '#cfd6e6'
 item(339, 'harnas_leer', 'Leren harnas', { icon: ['armor', '#9a6a3c'], armor: 0.15, stack: 1 });
 item(340, 'trollenknots', 'Trollenknots', { icon: ['club'], dmg: 12, stack: 1, weapon: true, dur: 500 });
 
+// eieren voor de broedmachine (zie animals.js): egg = de soort ei
+item(341, 'ei_basis', 'Basis-ei', { icon: ['egg', '#f2ead8', ['#b89a6a', 'vlek']], egg: 'basis', stack: 16 });
+item(342, 'ei_bos', 'Bosei', { icon: ['egg', '#7ac058', ['#2f7a34', 'blad']], egg: 'bos', stack: 16 });
+item(343, 'ei_oceaan', 'Oceaanei', { icon: ['egg', '#58b8e8', ['#f0f8ff', 'golf']], egg: 'oceaan', stack: 16 });
+item(344, 'ei_magisch', 'Magisch ei', { icon: ['egg', '#b070f0', ['#ffe680', 'ster']], egg: 'magisch', stack: 16 });
+item(345, 'ei_oer', 'Oer-ei', { icon: ['egg', '#c8a070', ['#6a4a2a', 'barst']], egg: 'oer', stack: 16 });
+item(346, 'ei_sterren', 'Sterrenei', { icon: ['egg', '#1c2450', ['#fff6b0', 'ster']], egg: 'sterren', stack: 16 });
+
 export const isBlock = (id) => id > 0 && id < 256;
 export function itemName(id) {
   if (id < 256) return BLOCKS[id] ? BLOCKS[id].name : '?';
@@ -166,6 +174,7 @@ recipe(I.lasergeweer, 1, [[I.machineonderdeel, 3], [I.ijzerstaaf, 2], [I.kristal
 recipe(I.drankje, 1, [[I.bessen, 3], [B.gloeikristal, 1]], 'werkbank');
 recipe(B.steenblok, 4, [[B.steen, 4]], 'werkbank');
 recipe(B.lamp, 1, [[B.gloeikristal, 1], [B.glas, 1]], 'werkbank');
+recipe(B.broedmachine, 1, [[I.ijzerstaaf, 3], [B.glas, 2], [B.fakkel, 1]], 'werkbank');
 recipe(B.ijzerblok, 1, [[I.ijzerstaaf, 4]], 'werkbank');
 recipe(B.goudblok, 1, [[I.goudstaaf, 4]], 'werkbank');
 recipe(B.kristalblok, 1, [[I.kristal, 4]], 'werkbank');

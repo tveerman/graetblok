@@ -35,7 +35,7 @@ export class Entities {
   spawn(m) {
     if (this.map.has(m.id)) this.despawn(m.id);
     const def = MOBS[m.k];
-    const group = buildModel(m.k, { world: this.world, dtype: m.d, growth: m.g, job: m.j, variant: m.v });
+    const group = buildModel(m.k, { world: this.world, dtype: m.d, growth: m.g, job: m.j, variant: m.v, shiny: m.sh });
     group.scale.setScalar(m.s);
     group.position.set(m.x, m.y, m.z);
     group.rotation.y = m.yaw;

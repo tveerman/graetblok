@@ -4,7 +4,13 @@ import { B, BLOCKS } from '../shared/blocks.js';
 import { ITEMS, I, RECIPES, GROUPS, GROUP_NAMES, matches, itemName } from '../shared/items.js';
 import { WORLDS, WORLD_ORDER, CRASH } from '../shared/worlds.js';
 import { DRAGONS, dragonStage, STAGE_NAMES } from '../shared/mobs.js';
-import { iconURL } from './textures.js';
+import { iconURL, eggURL } from './textures.js';
+import { ANIMALS, ANIMAL_LIST, EGG_KINDS, EGG_ORDER, RARITY, RARITIES, SHINIES, SHINY, ZOO_REWARDS, MAX_OUT } from '../shared/animals.js';
+
+const EGG_PATS = ['vlek', 'blad', 'golf', 'ster', 'barst', 'streep'];
+const hexCol = (n) => '#' + (n | 0).toString(16).padStart(6, '0');
+// het ei van één dier: de kleuren van het dier zelf, met een patroon dat bij zijn nummer hoort
+function animalEgg(a, dark) { return eggURL(hexCol(a.spec.c), hexCol(a.spec.c2 === undefined ? a.spec.c : a.spec.c2), EGG_PATS[a.nr % EGG_PATS.length], dark); }
 
 const $ = (id) => document.getElementById(id);
 const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html !== undefined) e.innerHTML = html; return e; };
@@ -49,6 +55,7 @@ export class UI {
     }
     tap($('btnInv'), () => this.toggleInventory());
     tap($('btnQuest'), () => this.modal === 'quest' ? this.close() : this.openQuest());
+    tap($('btnZoo'), () => this.modal === 'zoo' ? this.close() : this.openZoo());
     tap($('btnCam'), () => g.toggleCam());
     tap($('btnMenu'), () => this.modal === 'pause' ? this.close() : this.openPause());
     tap($('btnFull'), () => g.toggleFullscreen());
@@ -477,6 +484,74 @@ export class UI {
     list.scrollTop = keep;
   }
 
+  // ---------- het Dierenboek ----------
+
+  // Alle dieren op nummer: wat je al hebt uitgebroed zie je met naam en ei, de rest is een
+  // donker ei met een vraagteken. Bovenaan staan de dieren die je hebt, met knoppen.
+  openZoo() {
+    const g = this.g, zoo = g.zoo || { book: {}, pets: [], titel: '' };
+    const b = el('div', 'zoo');
+    const have = Object.keys(zoo.book).length;
+    const next = ZOO_REWARDS.find((r) => have < r.n);
+    b.appendChild(el('div', 'qsec', '<h4>🐾 ' + have + ' van de ' + ANIMAL_LIST.length + ' dieren' + (zoo.titel ? ' · ' + zoo.titel : '') + '</h4>' +
+      '<p class="hint">' + (next ? 'Bij ' + next.n + ' dieren krijg je ' + next.munten + ' munten en de titel "' + next.titel + '".' : 'Je hebt ze allemaal! Jij bent de Ultimate Collector.') + '</p>'));
+
+    // jouw dieren
+    const mine = el('div', 'qsec');
+    const out = zoo.pets.filter((d) => d.mode !== 'boek').length;
+    mine.appendChild(el('h4', '', 'Jouw dieren (' + out + ' van de ' + MAX_OUT + ' lopen mee)'));
+    if (!zoo.pets.length) mine.appendChild(el('p', 'hint', 'Je hebt nog geen dieren. Koop een ei bij de boer of de marktkoopman in een dorp, maak een broedmachine op de werkbank (3 ijzerstaven, 2 glas en een fakkel) en leg het ei erin.'));
+    for (const d of zoo.pets) {
+      const a = ANIMALS[d.a];
+      if (!a) continue;
+      const R = RARITY[a.rarity], row = el('div', 'drow');
+      const waar = d.mode === 'boek' ? 'in het boek' : d.world !== g.worldId ? 'in de ' + WORLDS[d.world].name : d.mode === 'stay' ? 'wacht' : 'loopt mee';
+      row.appendChild(el('span', '', '<img class="zegg" src="' + animalEgg(a) + '"> <b>' + (d.name || a.name) + '</b>' + (d.name ? ' – ' + a.name : '') +
+        ' <span class="zrar" style="color:' + R.col + '">' + R.name + '</span>' + (d.sh ? ' <span class="zrar" style="color:' + SHINY[d.sh].col + '">✨ ' + SHINY[d.sh].name + '</span>' : '') + ' <small>(' + waar + ')</small>'));
+      const btns = el('span', 'drowbtns');
+      const name = el('button', 'btn small', 'Naam');
+      tap(name, () => { const n = window.prompt('Hoe heet je ' + a.name.toLowerCase() + '?', d.name || ''); if (n !== null) g.net.send({ t: 'zoo', c: 'name', uid: d.uid, name: n }); });
+      btns.appendChild(name);
+      const call = el('button', 'btn small', 'Roep');
+      tap(call, () => g.net.send({ t: 'zoo', c: 'out', uid: d.uid }));
+      btns.appendChild(call);
+      if (d.mode !== 'boek') { const put = el('button', 'btn small', 'Berg op'); tap(put, () => g.net.send({ t: 'zoo', c: 'in', uid: d.uid })); btns.appendChild(put); }
+      row.appendChild(btns);
+      mine.appendChild(row);
+    }
+    b.appendChild(mine);
+
+    // het boek zelf
+    const book = el('div', 'qsec');
+    book.appendChild(el('h4', '', 'Alle dieren'));
+    const grid = el('div', 'zgrid');
+    for (const a of ANIMAL_LIST) {
+      const rec = zoo.book[a.key], R = RARITY[a.rarity];
+      const card = el('div', 'zcard' + (rec ? '' : ' dark'));
+      if (rec) card.style.borderColor = R.col;
+      let sh = '';
+      if (rec) for (const s of SHINIES) if (rec[s.key]) sh += '<span style="color:' + s.col + '">✨' + rec[s.key] + '</span>';
+      card.innerHTML = '<img src="' + animalEgg(a, !rec) + '"><div class="znr">' + a.nr + '</div>' +
+        '<div class="zname">' + (rec ? a.name : '???') + '</div>' +
+        (rec ? '<div class="zrar" style="color:' + R.col + '">' + R.name + '</div><div class="zcnt">' + rec.n + '× ' + sh + '</div>' : '<div class="zrar">' + EGG_KINDS[a.egg].name + '</div>');
+      grid.appendChild(card);
+    }
+    book.appendChild(grid);
+    b.appendChild(book);
+
+    // de eieren en de kansen
+    let eggs = '<h4>De eieren</h4>';
+    for (const k of EGG_ORDER) { const E = EGG_KINDS[k]; eggs += '<p><img class="zegg" src="' + eggURL(E.c, E.c2, E.pat) + '"> <b>' + E.name + '</b> – ' + E.prijs + ' munten, ' + E.min + (E.min === 1 ? ' minuut' : ' minuten') + ' broeden. ' + E.hint + '</p>'; }
+    eggs += '<p class="hint">Kansen: ' + RARITIES.map((r) => '<span style="color:' + r.col + '">' + r.name + ' ' + String(r.p).replace('.', ',') + '%</span>').join(' · ') + '</p>';
+    eggs += '<p class="hint">Shiny: ' + SHINIES.map((s) => '<span style="color:' + s.col + '">' + s.name + ' ' + String(s.p).replace('.', ',') + '%</span>').join(' · ') + '</p>';
+    b.appendChild(el('div', 'qsec help', eggs));
+    const keep = this.modal === 'zoo' ? $('modalBody').scrollTop : 0;
+    this.open('zoo', 'Dierenboek', b, true);
+    $('modalBody').scrollTop = keep;
+  }
+
+  refreshZoo() { if (this.modal === 'zoo') this.openZoo(); }
+
   refreshDragon() { if (this.modal === 'dragon') this.openDragon(this.dragonUid); if (this.modal === 'quest') this.openQuest(); }
 
   openDeath() {
@@ -530,6 +605,7 @@ export class UI {
     row2.appendChild(nw);
     b.appendChild(row2);
     b.appendChild(el('p', 'hint', 'Het spel slaat vanzelf op. ' + (g.fpsText || '')));
+    if (g.perf && g.perf.text) b.appendChild(el('p', 'hint', g.perf.text));
     // een regel over het geluid, die zichzelf bijwerkt zolang dit venster open staat
     const diag = el('p', 'hint', g.audioText());
     b.appendChild(diag);

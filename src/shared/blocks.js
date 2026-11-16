@@ -97,6 +97,7 @@ def(42, 'drakennest', 'Drakennest', { hard: 1, snd: 'grass' });
 def(43, 'scheepswand', 'Scheepswand', { hard: 8, tool: 'pick', tier: 2, snd: 'metal' });
 def(44, 'scheepscomputer', 'Scheepscomputer', { tiles: ['scheepswand', 'scheepscomputer', 'scheepswand'], hard: Infinity, snd: 'metal', interact: true, light: 8 });
 def(45, 'machinekrat', 'Machinekrat', { hard: Infinity, snd: 'metal', interact: true });
+def(165, 'broedmachine', 'Broedmachine', { tiles: ['broedmachine_top', 'broedmachine_side', 'broedmachine_top'], hard: 2, tool: 'pick', snd: 'metal', interact: true, light: 6 });
 def(46, 'portaalsteen', 'Portaalsteen', { hard: 6, tool: 'pick', tier: 2 });
 def(47, 'portaal_groen', 'Portaal naar de Groene wereld', { pass: 2, solid: false, opaque: false, hard: Infinity, light: 12 });
 def(48, 'portaal_ijs', 'Portaal naar de IJswereld', { pass: 2, solid: false, opaque: false, hard: Infinity, light: 12 });

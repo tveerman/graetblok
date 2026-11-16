@@ -36,6 +36,9 @@ class Game {
     this.tileCol = new Map();
     this.R = new Renderer($('game'), this.atlas.tex, touch);
     this.world = new ChunkWorld(this.R.scene, this.atlas, this.R.chunkMats);
+    this.world.lodNear = touch ? 1 : 2;                             // op een tablet eerder de fijne plantonderdelen weglaten
+    // meting voor het pauzemenu: waar gaat de tijd van een beeld heen? (zie perfText)
+    this.perf = { k: 0, n: 0, bouw: 0, spel: 0, teken: 0, traag: 0, lang: 0, text: '' };
     this.particles = new Particles(this.R.scene);
     this.ents = new Entities(this.R.scene, this.particles);
     this.ents.blocks = this.world;
@@ -46,6 +49,7 @@ class Game {
     this.sel = 0;
     this.trees = {};
     this.dragons = [];
+    this.zoo = { book: {}, pets: [], titel: '' };      // het Dierenboek en je dieren (van de server)
     this.worldId = 'groen';
     this.time = 0; this.gameTime = 0;
     this.state = 'menu';
@@ -304,6 +308,7 @@ class Game {
       case 'sites': this.sites = m.l; break;
       case 'debugSite': this.debugSite = m.s; break;
       case 'dragons': this.dragons = m.l; ui.refreshDragon(); break;
+      case 'zoo': this.zoo = m; ui.refreshZoo(); break;
       case 'dragonMenu': ui.openDragon(m.uid); break;
       case 'bossDown': this.sound.play('restore', 0.7); break;
     }
@@ -471,6 +476,7 @@ class Game {
     if (code === 'Escape') { if (ui.modalOpen()) ui.close(); else ui.openPause(); return; }
     if (code === 'KeyE' || code === 'Tab') { ui.toggleInventory(); return; }
     if (code === 'KeyQ') { if (ui.modal === 'quest') ui.close(); else ui.openQuest(); return; }
+    if (code === 'KeyB') { if (ui.modal === 'zoo') ui.close(); else if (!ui.modalOpen()) ui.openZoo(); return; }
     if (ui.modalOpen()) { if (code === 'Enter' && ui.modal === 'dialog') ui.close(); return; }
     if (code.startsWith('Digit')) { const n = parseInt(code.slice(5), 10); if (n >= 1 && n <= 9) this.select(n - 1); return; }
     if (code === 'WheelDown') { this.select((this.sel + 1) % HOTBAR); return; }
@@ -507,7 +513,9 @@ class Game {
 
     this.input.update();
     const loading = this.state === 'loading';
+    const pf = this.perf, t1 = performance.now();
     this.world.update(p.pos.x, p.pos.z, loading ? 16 : (this.touch ? 5 : 7));
+    const t2 = performance.now();
 
     if (loading) {
       this.loadT += real;
@@ -557,7 +565,12 @@ class Game {
       const under = surf ? p.pos.y < surf.hm[(Math.floor(p.pos.x) & 15) * 16 + (Math.floor(p.pos.z) & 15)] - 6 : false;
       this.sound.ambience(hd, { world: this.worldId, under, day: this.R.dayF, flying: !!p.mount && p.mountKind !== 'trein' && p.speedNow > 4, rain: Math.max(this.sky.rain, this.sky.snow * 0.25), roof: this.sky.roof });
     }
+    const t3 = performance.now();
     this.R.render();
+    const t4 = performance.now();
+    pf.n++; pf.bouw += t2 - t1; pf.spel += t3 - t2; pf.teken += t4 - t3;
+    if (real > 0.1) pf.traag++;
+    if (real > pf.lang) pf.lang = real;
 
     // de scherpte aanpassen als het spel te langzaam wordt (oude iPad)
     this.frameT += (real - this.frameT) * 0.05;
@@ -565,6 +578,14 @@ class Game {
     if (this.resT > 2 && this.state === 'play') {
       this.resT = 0;
       this.fpsText = Math.round(1 / this.frameT) + ' beelden per seconde, scherpte ' + Math.round(this.R.scale * 100) + '%';
+      // De meting van de laatste twee seconden. "bouwen" = stukken wereld opbouwen, "spel" =
+      // lopen, dieren, weer en schermpje, "tekenen" = wat de browser aan het tekenen kwijt is
+      // (de videokaart zelf werkt daarna nog door: dat zit in de rest van de tijd per beeld).
+      const info = this.R.r.info.render, k = 1 / Math.max(1, pf.n);
+      pf.text = 'Meting: ' + (this.frameT * 1000).toFixed(0) + ' ms per beeld (bouwen ' + (pf.bouw * k).toFixed(1) + ', spel ' + (pf.spel * k).toFixed(1) + ', tekenen ' + (pf.teken * k).toFixed(1) + ') · ' +
+        info.calls + ' tekenopdrachten, ' + Math.round(info.triangles / 1000) + ' duizend driehoeken · ' + this.ents.map.size + ' wezens · laatste 20 tellen: langste beeld ' + Math.round(pf.lang * 1000) + ' ms, ' + pf.traag + ' haperingen';
+      pf.n = 0; pf.bouw = 0; pf.spel = 0; pf.teken = 0;
+      if (++pf.k >= 10) { pf.k = 0; pf.traag = 0; pf.lang = 0; }      // haperingen tellen we over een langere tijd
       if (this.settings.dynRes) {
         if (this.frameT > 1 / 26) this.R.setScale(this.R.scale - 0.1);
         else if (this.frameT < 1 / 50 && this.R.scale < 1) this.R.setScale(this.R.scale + 0.05);

@@ -95,6 +95,7 @@ you left off.
 | Sprint / fly down | push the stick all the way / ⬇ | `Shift` |
 | Backpack + crafting | 🎒 | `E` |
 | Quest log | 📜 | `Q` |
+| Animal book (Dierenboek) | 🐾 | `B` |
 | Pause menu (settings, back to the home screen) | ⚙️ | `Esc` |
 | Camera (first / third person) | 📷 | `V` |
 | Full screen on / off | the ⛶ button next to ⚙️ | the same button |
@@ -190,6 +191,17 @@ From Jorian's design document (`spel.txt`), following development phases 1–4, 
 - **Guards** – knights in villages and castles, trolls around their chief, skeleton knights
   around the Skeletkoning, and four thorn guards ("doornwachters") around every sick life
   tree. Once a tree is restored they are replaced by friendly tree guards ("boomwachters").
+- **The Dierenrijk (animal kingdom)** – the first part of Jorian's expansion plan
+  (`UITBREIDINGSPLAN_BEANTWOORD.md`). Buy eggs in a village (farmer, market trader, mining
+  company, dragon trader), craft or buy a **broedmachine** (incubator), hold an egg and tap the
+  machine. It holds three eggs; hatching takes 1 to 15 minutes of play time. What comes out is
+  rolled with Jorian's odds: ten rarities from Common (40%) to Secret (0.2%), plus a separate
+  chance on a shiny (Golden, Rainbow, Diamond, Shadow). There are 93 animals so far, in six
+  egg kinds. The **Dierenboek** (🐾) shows all of them by number, unknown ones as a dark egg,
+  and gives coins and a title at 5, 10, 25... animals. Hatched animals follow you; tap one to
+  make it wait. At most four walk around at once, the rest wait in the book, where you can
+  call, store and name them. Not in yet: riding, fighting alongside you, clothes, breeding,
+  the animal school and wild animals.
 - **Story quests** – 18 steps from "chop a tree" to "defeat the Drakenkoning", shown top-left,
   with a compass marker for the early ones.
 
@@ -230,6 +242,10 @@ talk through messages (plain objects such as `{ t: 'break', x, y, z }`).
   derived from the seed). The same "plan" that draws a site also lists its inhabitants.
 - `src/server/npcs.js` puts those inhabitants in the world when a player comes near, and
   holds trading, guards, herds, wolves, bears, wild dragons, dragon breath, weather and trains.
+- `src/shared/animals.js` lists every animal of the Dierenrijk (number, rarity, egg kind and a
+  shape description that `dier()` in `src/client/models.js` turns into a model), the egg kinds
+  and the odds. `src/server/zoo.js` holds the incubator, hatching, the animal book and its
+  rewards. Adding an animal is one line in the list.
 - `src/shared/rails.js` has the rules for how rails connect and how a train follows them; the
   chunk mesher, the player (who drives the train) and the server all use it.
 
@@ -296,6 +312,13 @@ unchanged and remains the default. There are still no real shadows or post-proce
 - "Mooie graphics" costs two texture lookups and per-pixel lighting for every block pixel, and
   about 50 MB of texture memory; the pause menu shows the frame rate and resolution so you
   can see what a device can handle.
+- Plants (grass, flowers, berry bushes) made up about a third of all vertices. Each plant model
+  marks its fine parts (half the blades, most berries) as "detail"; the mesher puts those
+  triangles at the end of the index list and chunks further than one chunk away (two on
+  desktop) are drawn with a shorter draw range, without rebuilding anything.
+- The pause menu shows a line "Meting: ..." with the time per frame split into building chunks,
+  game logic and drawing, the number of draw calls and triangles, and the hitches of the last
+  20 seconds. Read it on the real device before optimising further.
 - Creatures further than about 60 blocks away are not drawn (a village has some twenty
   inhabitants, each built from a dozen boxes).
 - The render resolution lowers itself automatically when the frame rate drops
@@ -316,6 +339,8 @@ game.net.send({ t: 'debug', c: 'grow' })                   // all your dragons b
 game.net.send({ t: 'debug', c: 'site', kind: 'dorp' })     // jump to the nearest village ('kasteel', 'kamp')
 game.net.send({ t: 'debug', c: 'weather', k: 'onweer' })   // 'zon', 'regen', 'onweer', 'sneeuw', 'storm'
 game.net.send({ t: 'debug', c: 'herd', kind: 'schaap' })   // a herd next to you ('koe', 'wolf', 'beer')
+game.net.send({ t: 'debug', c: 'hatch' })                  // every egg in an incubator hatches now
+game.net.send({ t: 'debug', c: 'spawn', kind: 'd_eenhoorn', dx: 3 })   // any animal from src/shared/animals.js
 ```
 
 Add `&save=test` (any short name) to play in a separate world that does not touch the real

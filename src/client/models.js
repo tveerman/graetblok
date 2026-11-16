@@ -3,6 +3,7 @@
 import * as THREE from '../../vendor/three.module.min.js';
 import { skin, faceTex, wingTex } from './textures.js';
 import { DRAGONS, MOBS } from '../shared/mobs.js';
+import { ANIMALS, SHINY } from '../shared/animals.js';
 
 const BOX = new THREE.BoxGeometry(1, 1, 1);
 const PLANE = new THREE.PlaneGeometry(1, 1);
@@ -598,6 +599,129 @@ const BEER_COLOR = { groen: 0x6a4428, ijs: 0xf2f2ee, vuur: 0x3a2a26, schaduw: 0x
 const SCHAAP_COLOR = { groen: 0xf2efe6, ijs: 0xf8fbff, vuur: 0x6a5a56, schaduw: 0x9a86c0, wolken: 0xffe6f2 };
 const PLUIZEL_COLOR = { groen: 0xf2e2c4, ijs: 0xdff2ff, vuur: 0xffb080, schaduw: 0xc8a0f0, wolken: 0xffd0e4 };
 
+// ---------- het Dierenrijk ----------
+// Eén bouwer voor alle dieren uit een ei. S = de vorm uit shared/animals.js (lijf, poten, kop,
+// oren, hoorns, vleugels...), shiny = '' of de shiny-soort: dan krijgt het dier andere kleuren
+// en gloeit het een beetje.
+function wingMat(color, extra) {
+  const key = 'wing' + color + (extra ? JSON.stringify(extra) : '');
+  if (!mats.has(key)) mats.set(key, new THREE.MeshLambertMaterial(Object.assign({ map: wingTex(color), side: THREE.DoubleSide, alphaTest: 0.5 }, extra || {})));
+  return mats.get(key);
+}
+const RAINBOW = [0xff5a5a, 0xffa53a, 0xffe14a, 0x5ad86a, 0x4aa8ff, 0xb46bff];
+
+export function dier(S, shiny) {
+  const two = S.t === 'vogel';
+  const root = base(two ? 'vogel' : 'quad'), a = root.userData.a, g = a.inner;
+  const sh = shiny ? SHINY[shiny] : null;
+  const kind = sh && shiny === 'diamond' ? 'glad' : (S.skin || 'vacht');
+  const row = sh ? sh.row : (S.rainbow ? RAINBOW : null);       // regenboog: elk onderdeel een andere kleur
+  let extra = sh ? { emissive: sh.e, emissiveIntensity: 0.6 } : undefined;
+  if (S.ghost && !sh) extra = { transparent: true, opacity: 0.72, emissive: S.glow || 0x8090a0, emissiveIntensity: 0.5 };
+  let ri = 0;
+  // K(kleur van het dier) geeft de kleur die het onderdeel echt krijgt (bij een shiny de shiny-kleur)
+  const K = (col, second) => (row ? row[ri++ % row.length] : sh ? (second ? sh.c2 : sh.c) : col);
+  const M = (col, second) => mat(K(col, second), kind, extra);
+  const c = S.c, c2 = S.c2 === undefined ? S.c : S.c2;
+  const fur = M(c), bel = M(c2, true);
+  const glow = S.glow || (sh ? sh.c2 : 0);
+  const G = (col) => (glow ? glowMat(sh ? sh.c2 : col) : M(col, true));
+
+  // lijf en buik
+  const [bw, bh, bl] = S.body, lh = S.legH, lw = S.legW || Math.min(0.2, bw * 0.34);
+  const by = lh + bh / 2;
+  part(g, fur, bw, bh, bl, 0, by, 0);
+  if (c2 !== c || sh) part(g, bel, bw * 0.86, bh * 0.3, bl * 0.88, 0, by - bh * 0.37, 0);
+  if (S.hump) part(g, fur, bw * 0.7, bh * 0.5, bl * 0.4, 0, by + bh * 0.7, -0.05);
+  if (S.shell) part(g, M(S.shellC || c2, true), bw * 1.12, bh * 0.8, bl * 0.96, 0, by + bh * 0.42, 0);
+  if (S.stripes) for (let i = 0; i < 4; i++) part(g, M(S.stripes, true), bw + 0.02, bh + 0.02, bl * 0.07, 0, by, bl * 0.36 - i * bl * 0.24);
+  if (S.spots) for (const [x, y, z] of [[1, 0.1, 0.3], [-1, -0.1, 0.05], [1, 0.05, -0.28], [-1, 0.14, -0.4]]) part(g, M(S.spots, true), 0.03, bh * 0.36, bl * 0.2, x * bw / 2, by + y * bh, z * bl);
+  if (S.plates) for (let i = 0; i < 5; i++) part(g, M(S.plates, true), 0.07, 0.16 + (i === 2 ? 0.14 : i % 2 ? 0.08 : 0), bl * 0.14, 0, by + bh / 2 + 0.1, bl * 0.38 - i * bl * 0.19);
+  if (S.spikes) for (let i = 0; i < 4; i++) part(g, G(c2), 0.07, 0.16, 0.09, 0, by + bh / 2 + 0.07, bl * 0.34 - i * bl * 0.22);
+
+  // poten
+  const legM = S.legC ? M(S.legC, true) : fur;
+  const lx = Math.max(0.04, bw / 2 - lw / 2 - 0.01), lz = bl / 2 - lw / 2 - 0.04;
+  if (two) for (const s of [-1, 1]) a.legs.push(limb(g, legM, lw, lh, lw, s * lx * 0.7, lh, 0));
+  else for (const [x, z] of [[-lx, lz], [lx, lz], [-lx, -lz], [lx, -lz]]) a.legs.push(limb(g, legM, lw, lh, lw, x, lh, z));
+  if (S.arms) for (const s of [-1, 1]) { const arm = part(g, fur, lw * 0.5, lh * 0.36, lw * 0.5, s * bw * 0.36, by - bh * 0.1, bl / 2 + 0.02); arm.rotation.x = -0.7; }
+  if (S.claws) for (const s of [-1, 1]) part(g, fur, 0.2, 0.16, 0.26, s * (bw / 2 + 0.12), by, bl / 2 + 0.06);
+
+  // nek en kop
+  const nk = S.neck || 0, [hw, hh, hd] = S.head;
+  const hy = by + bh * 0.28 + nk * 0.86, hz = bl / 2 + nk * 0.36 + (nk ? 0 : hd * 0.18);
+  if (nk) { const n = part(g, S.neckC ? M(S.neckC, true) : fur, Math.min(0.34, bw * 0.5), nk + 0.24, Math.min(0.34, bw * 0.5), 0, by + bh * 0.3 + nk * 0.44, bl / 2 - 0.1 + nk * 0.18); n.rotation.x = 0.38; }
+  const nH = S.heads || 1;
+  for (let i = 0; i < nH; i++) {
+    const head = new THREE.Group();
+    head.position.set((i - (nH - 1) / 2) * hw * 1.02, hy - (i === (nH - 1) / 2 ? 0 : 0.05), hz);
+    if (nH > 1) head.rotation.y = (i - (nH - 1) / 2) * 0.3;
+    g.add(head);
+    if (i === Math.floor(nH / 2)) a.head = head;
+    const hc = K(S.headC === undefined ? c : S.headC);
+    part(head, faceMats(hc, kind, S.eye || '#101010', !!glow, false, extra), hw, hh, hd, 0, 0, 0);
+    if (S.snout) { const [sw, ss, sd] = S.snout; part(head, bel, sw, ss, sd, 0, -hh * 0.16, hd / 2 + sd / 2 - 0.02); }
+    if (S.beak) part(head, mat(sh ? sh.c2 : S.beak, 'glad', extra), hw * 0.42, hh * 0.3, S.beakL || 0.16, 0, -hh * 0.1, hd / 2 + (S.beakL || 0.16) / 2 - 0.01);
+    const earM = S.earC ? M(S.earC, true) : fur;
+    if (S.ears === 'punt') for (const s of [-1, 1]) part(head, earM, hw * 0.26, hh * 0.42, 0.07, s * hw * 0.32, hh * 0.62, -hd * 0.2);
+    else if (S.ears === 'rond') for (const s of [-1, 1]) part(head, earM, hw * 0.34, hh * 0.32, 0.1, s * hw * 0.42, hh * 0.52, -hd * 0.15);
+    else if (S.ears === 'lang') for (const s of [-1, 1]) { const e = part(head, earM, hw * 0.24, hh * 1.1, 0.07, s * hw * 0.26, hh * 0.95, -hd * 0.2); e.rotation.z = -s * 0.12; }
+    else if (S.ears === 'flap') for (const s of [-1, 1]) { const e = part(head, earM, 0.08, hh * 0.9, hd * 0.8, s * (hw / 2 + 0.04), 0, -hd * 0.3); e.rotation.y = s * 0.5; }
+    const hornM = () => (glow || S.hornC ? glowMat(sh ? sh.c2 : (S.hornC || glow)) : mat(0xe8dcc0, 'glad'));
+    if (S.horn === 'een') { const h = part(head, hornM(), 0.07, 0.46, 0.07, 0, hh / 2 + 0.2, hd * 0.2); h.rotation.x = 0.35; }
+    else if (S.horn === 'twee') for (const s of [-1, 1]) { const h = part(head, hornM(), 0.07, 0.26, 0.07, s * hw * 0.24, hh / 2 + 0.12, -hd * 0.1); h.rotation.z = -s * 0.25; }
+    else if (S.horn === 'gewei') for (const s of [-1, 1]) {
+      const h = part(head, hornM(), 0.06, 0.44, 0.06, s * hw * 0.3, hh / 2 + 0.2, -hd * 0.1); h.rotation.z = -s * 0.4;
+      const t = part(head, hornM(), 0.05, 0.22, 0.05, s * (hw * 0.3 + 0.16), hh / 2 + 0.34, -hd * 0.1); t.rotation.z = -s * 1.0;
+      const u = part(head, hornM(), 0.05, 0.2, 0.05, s * (hw * 0.3 + 0.06), hh / 2 + 0.26, 0.04); u.rotation.x = 0.8;
+    } else if (S.horn === 'drie') {
+      part(head, M(c2, true), hw * 1.6, hh * 1.5, 0.1, 0, hh * 0.3, -hd / 2);                       // de kraag
+      for (const s of [-1, 1]) { const h = part(head, hornM(), 0.08, 0.5, 0.08, s * hw * 0.3, hh * 0.5, hd * 0.3); h.rotation.x = 1.0; }
+      const h = part(head, hornM(), 0.07, 0.22, 0.07, 0, hh * 0.1, hd / 2 + 0.2); h.rotation.x = 0.9;
+    }
+    if (S.crest) part(head, M(c2, true), 0.06, hh * 0.5, hd * 0.9, 0, hh * 0.5, -hd * 0.4);
+    if (S.mane && S.t === 'quad' && !nk) part(head, M(S.mane, true), hw * 1.5, hh * 1.5, hd * 0.5, 0, 0, -hd * 0.4);      // manen van een leeuw
+    if (S.trunk) { const t = limb(head, fur, hw * 0.24, hh * 1.1, hw * 0.24, 0, -hh * 0.1, hd / 2 + 0.04); t.rotation.x = -0.2; a.trunk = t; }
+    if (S.tusks) for (const s of [-1, 1]) { const t = part(head, mat(0xf4f0e0, 'glad'), 0.06, 0.3, 0.06, s * hw * 0.3, -hh * 0.5, hd / 2); t.rotation.x = -0.4; }
+  }
+  if (S.mane && nk) { const m = part(g, M(S.mane, true), 0.1, nk + 0.3, 0.14, 0, by + bh * 0.42 + nk * 0.44, bl / 2 - 0.26 + nk * 0.18); m.rotation.x = 0.38; }      // manen van een paard
+
+  // staart
+  const nT = S.tails || 1;
+  for (let i = 0; i < nT; i++) {
+    const off = (i - (nT - 1) / 2);
+    let t = null;
+    if (S.tail === 'lang') { t = limb(g, fur, 0.07, Math.max(0.3, bl * 0.5), 0.07, 0, by + bh * 0.2, -bl / 2); t.rotation.x = 0.7; }
+    else if (S.tail === 'pluim') {
+      t = limb(g, S.mane ? M(S.mane, true) : fur, 0.14, Math.max(0.36, bl * 0.5), 0.14, 0, by + bh * 0.25, -bl / 2); t.rotation.x = nT > 1 ? 2.0 : 0.6;
+      if (S.tipC) part(t, M(S.tipC, true), 0.16, 0.14, 0.16, 0, -Math.max(0.36, bl * 0.5) - 0.02, 0);
+    } else if (S.tail === 'dik') {
+      t = limb(g, fur, bw * 0.5, bl * 0.5, bh * 0.5, 0, by + bh * 0.1, -bl / 2 + 0.1); t.rotation.x = 1.35;
+      part(t, fur, bw * 0.28, bl * 0.4, bh * 0.28, 0, -bl * 0.66, 0);
+    } else if (S.tail === 'kort') part(g, bel, 0.14, 0.14, 0.12, 0, by + bh * 0.1, -bl / 2 - 0.04);
+    else if (S.tail === 'veer' || S.tail === 'waaier') {
+      const wide = S.tail === 'waaier';
+      const f = new THREE.Mesh(PLANE, wingMat(K(S.wings > 1 ? S.wings : c2, true), extra));
+      f.rotation.x = -Math.PI / 2 + (wide ? 0.9 : 0.15); f.rotation.z = Math.PI / 2;
+      f.scale.set(wide ? 0.9 : 0.5, wide ? 1.1 : 0.4, 1); f.position.set(0, by + (wide ? 0.4 : 0.02), -bl / 2 - (wide ? 0.2 : 0.2));
+      g.add(f);
+    }
+    if (t) { t.rotation.z = off * 0.5; a.tail.push(t); if (glow && (S.tail === 'pluim' || S.tail === 'lang')) part(t, G(c2), 0.1, 0.1, 0.1, 0, -Math.max(0.3, bl * 0.5), 0); }
+  }
+
+  // vleugels
+  if (S.wings) {
+    const wm = wingMat(K(S.wings > 1 ? S.wings : c, true), extra), span = S.wingSpan || (two ? 0.9 : bl * 1.1);
+    for (const s of [-1, 1]) {
+      const piv = new THREE.Group(); piv.position.set(s * bw * 0.42, by + bh * 0.4, 0.04); g.add(piv);
+      const w = new THREE.Mesh(PLANE, wm);
+      w.rotation.x = -Math.PI / 2; w.scale.set(s * span, bl * 0.9, 1); w.position.set(s * span / 2, 0, -0.06);
+      piv.add(w); a.wings.push(piv); piv.userData.s = s;
+    }
+  }
+  return root;
+}
+
 export function buildModel(kind, opts) {
   const def = MOBS[kind];
   const model = def ? def.model : kind;
@@ -625,6 +749,7 @@ export function buildModel(kind, opts) {
     case 'grijzewolf': m = quad(opts.world === 'schaduw' ? 0x2a2434 : 0x7a7e88, 'vacht', '#ffd040', true, 0); break;
     case 'reuzenspin': m = reuzenspin(); break;
     case 'trein': m = trein(); break;
+    case 'dier': m = dier(ANIMALS[def.animal].spec, opts.shiny || ''); break;
     default: m = pluizel(0xff00ff);
   }
   return m;
@@ -649,7 +774,19 @@ export function animate(root, time, speed, flags, dt) {
       if (a.head) a.head.rotation.x = atk ? -0.5 : Math.sin(time * 1.3 + root.id) * 0.06;
       if (a.tail[0]) a.tail[0].rotation.z = Math.sin(time * 4 + root.id) * 0.3;
       a.inner.position.z = atk ? 0.25 : 0;
+      // dieren met vleugels (pegasus, griffioen): rustig wapperen, sneller als ze lopen
+      for (const w of a.wings) w.rotation.z = w.userData.s * (0.5 + Math.sin(time * (moving ? 8 : 2.5) + root.id) * (moving ? 0.5 : 0.14));
+      if (a.trunk) a.trunk.rotation.z = Math.sin(time * 1.6 + root.id) * 0.18;
       break;
+    case 'vogel': {
+      // twee poten: vogels en dino's die rechtop lopen
+      a.legs[0].rotation.x = sw * 0.8; a.legs[1].rotation.x = -sw * 0.8;
+      if (a.head) a.head.rotation.x = Math.sin(time * 1.5 + root.id) * 0.07 + (moving ? Math.sin(ph * 2) * 0.06 : 0);
+      for (const w of a.wings) w.rotation.z = w.userData.s * (moving ? Math.sin(time * 11 + root.id) * 0.7 : -1.2 + Math.sin(time * 1.8 + root.id) * 0.04);      // stil: vleugels langs het lijf
+      if (a.tail[0]) a.tail[0].rotation.z = Math.sin(time * 2 + root.id) * 0.12;
+      a.inner.position.y = moving ? Math.abs(Math.sin(ph)) * 0.04 : 0;
+      break;
+    }
     case 'biped':
       a.legs[0].rotation.x = sw * 0.75; a.legs[1].rotation.x = -sw * 0.75;
       if (a.pose === 'ride') { a.legs[0].rotation.set(-1.25, 0, -0.5); a.legs[1].rotation.set(-1.25, 0, 0.5); a.arms[0].rotation.x = -0.9; a.arms[1].rotation.x = -0.9; break; }

@@ -543,6 +543,28 @@ const PX = {
     else if (Math.abs(u - v) < 0.04 || Math.abs(u + v - 1) < 0.04) c = mul(c, 0.7);
     return c;
   },
+  // de broedmachine: een metalen kast met een rond raampje waar een warm ei achter ligt
+  broedmachine_top: (x, y, u, v) => {
+    let c = metal([150, 158, 170], 161)(x, y, u, v);
+    const b = Math.min(u, v, 1 - u, 1 - v), d = Math.hypot(u - 0.5, v - 0.5);
+    if (b < 0.08) c = mul([84, 92, 104], 0.9 + hash2(x, y, 162) * 0.2);
+    else if (d < 0.2) c = mix([255, 190, 80], [240, 120, 40], d / 0.2);
+    else if (d < 0.26) c = [60, 66, 76];
+    return c;
+  },
+  broedmachine_side: (x, y, u, v) => {
+    let c = metal([150, 158, 170], 163)(x, y, u, v);
+    const b = Math.min(u, v, 1 - u, 1 - v), d = Math.hypot(u - 0.5, v - 0.46);
+    if (b < 0.08) return mul([84, 92, 104], 0.9 + hash2(x, y, 164) * 0.2);
+    if (d < 0.3) {
+      const e = Math.hypot((u - 0.5) / 0.13, (v - 0.5) / 0.17);
+      if (e < 1) return mix([255, 250, 232], [232, 208, 160], e);          // het ei
+      return mix([255, 196, 90], [214, 96, 30], d / 0.3);                    // warm licht
+    }
+    if (d < 0.35) return [56, 62, 72];
+    if (v > 0.86 && Math.floor(u * 8) % 2 === 0) return [40, 44, 52];         // luchtroostertje
+    return c;
+  },
   krat_leeg: (x, y, u, v) => {
     const b = Math.min(u, v, 1 - u, 1 - v);
     if (b < 0.1) return mul([70, 78, 88], 0.9 + hash2(x, y, 160) * 0.2);
@@ -1398,6 +1420,7 @@ function hqMat(name) {
   else if (is(/^(fakkel|kampvuur)$/)) emis = (r, g, b) => (r > 215 && g > 70 ? 1 : 0);
   else if (name === 'gloeipaddenstoel') emis = (r, g, b) => (g > 150 && b > 140 ? 1 : 0.1);
   else if (name === 'oven_side') emis = (r, g, b) => (r > 205 && g > 50 && b < 110 ? 1 : 0);
+  else if (is(/^broedmachine_/)) emis = (r, g, b) => (r > 205 && g > 90 && b < 170 && r - b > 60 ? 0.8 : 0);
   else if (name === 'scheepscomputer') emis = (r, g, b) => (g > 170 && r < 160 ? 1 : 0);
   else if (name === 'stam_verkoold') emis = (r, g, b) => (r > 220 && g > 90 && b < 90 ? 1 : 0);
   else if (name === 'schaduwgras_top') emis = (r, g, b) => (r > 200 && b > 240 ? 1 : 0);
@@ -1531,6 +1554,43 @@ function shadeHex(h, f) {
   return 'rgb(' + q(c[0]) + ',' + q(c[1]) + ',' + q(c[2]) + ')';
 }
 
+// Een ei tekenen (64 x 64): voor de eieren in je rugzak en voor het Dierenboek.
+// pat = het patroon: 'vlek', 'blad', 'golf', 'ster', 'barst' of 'streep'.
+function drawEgg(g, c, c2, pat) {
+  const egg = () => { g.beginPath(); g.moveTo(32, 5); g.bezierCurveTo(50, 7, 57, 34, 53, 44); g.bezierCurveTo(49, 58, 15, 58, 11, 44); g.bezierCurveTo(7, 34, 14, 7, 32, 5); g.closePath(); };
+  g.save();
+  egg(); g.fillStyle = c; g.fill();
+  g.clip();
+  const sh = g.createRadialGradient(24, 20, 4, 32, 34, 34);
+  sh.addColorStop(0, 'rgba(255,255,255,0.45)'); sh.addColorStop(0.5, 'rgba(255,255,255,0)'); sh.addColorStop(1, 'rgba(0,0,0,0.35)');
+  g.fillStyle = c2; g.strokeStyle = c2; g.lineWidth = 3; g.lineCap = 'round'; g.lineJoin = 'round';
+  if (pat === 'vlek') for (const [x, y, r] of [[22, 22, 6], [42, 30, 7], [28, 42, 5], [44, 48, 4], [16, 38, 3]]) { g.beginPath(); g.ellipse(x, y, r, r * 0.8, 0.4, 0, 6.3); g.fill(); }
+  else if (pat === 'blad') for (const [x, y, a] of [[22, 22, 0.6], [40, 26, -0.7], [30, 40, 0.3], [44, 44, -0.4], [18, 44, 1.0]]) { g.beginPath(); g.ellipse(x, y, 7, 3.2, a, 0, 6.3); g.fill(); }
+  else if (pat === 'golf') for (const y of [22, 34, 46]) { g.beginPath(); g.moveTo(6, y); for (let x = 6; x <= 58; x += 13) g.quadraticCurveTo(x + 6.5, y - 7, x + 13, y); g.stroke(); }
+  else if (pat === 'ster') for (const [x, y, r] of [[24, 20, 5], [42, 28, 6], [26, 40, 4.5], [44, 46, 4], [16, 32, 3]]) {
+    g.beginPath();
+    for (let i = 0; i < 10; i++) { const a = -1.5708 + i * 0.6283, q = i % 2 ? r * 0.42 : r; g.lineTo(x + Math.cos(a) * q, y + Math.sin(a) * q); }
+    g.closePath(); g.fill();
+  } else if (pat === 'barst') { g.beginPath(); g.moveTo(8, 30); for (const [x, y] of [[16, 24], [23, 33], [31, 23], [39, 34], [47, 25], [57, 31]]) g.lineTo(x, y); g.stroke(); g.beginPath(); g.moveTo(31, 23); g.lineTo(28, 14); g.moveTo(39, 34); g.lineTo(43, 44); g.stroke(); }
+  else for (const y of [18, 30, 42]) g.fillRect(4, y, 56, 5);
+  g.fillStyle = sh; g.fillRect(0, 0, 64, 64);
+  g.restore();
+  egg(); g.lineWidth = 2; g.strokeStyle = 'rgba(0,0,0,0.65)'; g.stroke();
+}
+// Het ei van één dier als plaatje. dark = nog niet gevonden: dan zie je alleen de vorm.
+const eggURLs = new Map();
+export function eggURL(c, c2, pat, dark) {
+  const key = c + c2 + pat + (dark ? 'd' : '');
+  if (!eggURLs.has(key)) {
+    const cv = document.createElement('canvas'); cv.width = cv.height = 64;
+    const g = cv.getContext('2d');
+    if (dark) { drawEgg(g, '#2a3040', '#2a3040', 'geen'); g.fillStyle = '#8a94a8'; g.font = 'bold 28px sans-serif'; g.textAlign = 'center'; g.fillText('?', 32, 44); }
+    else drawEgg(g, c, c2, pat);
+    eggURLs.set(key, cv.toDataURL());
+  }
+  return eggURLs.get(key);
+}
+
 const ICONS = {
   coin: (g) => {
     g.lineWidth = 2; g.strokeStyle = 'rgba(0,0,0,0.6)';
@@ -1661,6 +1721,8 @@ const ICONS = {
     g.restore();
   },
   stick: (g) => { g.strokeStyle = '#4a3018'; g.lineWidth = 9; g.lineCap = 'round'; g.beginPath(); g.moveTo(16, 50); g.lineTo(48, 14); g.stroke(); g.strokeStyle = '#9a6e3a'; g.lineWidth = 5; g.stroke(); },
+  // een ei voor de broedmachine: c = kleur, o = [tweede kleur, patroon]
+  egg: (g, c, o) => drawEgg(g, c, o ? o[0] : '#ffffff', o ? o[1] : 'vlek'),
   lump: (g, c) => { g.fillStyle = c; g.strokeStyle = '#000'; g.lineWidth = 2; g.beginPath(); g.moveTo(14, 40); g.lineTo(22, 20); g.lineTo(40, 14); g.lineTo(52, 30); g.lineTo(46, 50); g.lineTo(24, 52); g.closePath(); g.fill(); g.stroke(); g.fillStyle = 'rgba(255,255,255,0.25)'; g.beginPath(); g.moveTo(24, 24); g.lineTo(38, 18); g.lineTo(34, 30); g.closePath(); g.fill(); },
   ingot: (g, c) => {
     g.lineWidth = 2; g.strokeStyle = 'rgba(0,0,0,0.6)';

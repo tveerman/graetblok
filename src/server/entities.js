@@ -54,6 +54,7 @@ export const entityMethods = {
     else {
       if (e.dtype) m.d = e.dtype;
       if (e.name) m.n = e.name;
+      if (e.pet && e.pet.a) { if (e.pet.sh) m.sh = e.pet.sh; if (e.pet.name) m.n = e.pet.name; }
       if (e.job) { m.j = e.job; m.v = e.look || 0; }
       if (e.train) m.wg = e.train.wg;
     }
@@ -604,6 +605,7 @@ export const entityMethods = {
     const e = w.ents.get(m.id);
     if (!e || Math.hypot(e.x - p.x, e.y - p.y, e.z - p.z) > 7 + e.w) return;
     if (e.kind === 'draak' && e.owner === p.name) { this.send(p, { t: 'dragonMenu', uid: e.dragon.uid }); return; }
+    if (e.def.animal) { this.useAnimal(p, w, e); return; }                 // een dier uit een ei: wachten of meelopen
     if (e.kind !== 'pluizel') { if (!p.dead && this.useNpc(p, w, e)) this.checkQuests(p); return; }
     if (e.kind === 'pluizel') {
       if (e.owner === p.name) {
@@ -713,10 +715,11 @@ export const entityMethods = {
       d.eid = e.id;
     }
     for (const d of p.pets) {
-      if (d.world !== p.world) continue;
+      if (d.world !== p.world || d.mode === 'boek') continue;      // 'boek' = opgeborgen in het Dierenboek
       this.spawnEnt(w, d.kind, d.x, d.y, d.z, { owner: p.name, pet: d, mode: d.mode });
     }
     this.sendDragons(p);
+    this.sendZoo(p);
   },
 
   syncOwned(p) {

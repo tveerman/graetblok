@@ -18,10 +18,11 @@ import { ServerWorld } from './world.js';
 import { QUESTS, computerLines } from './quests.js';
 import { entityMethods } from './entities.js';
 import { npcMethods } from './npcs.js';
+import { zooMethods } from './zoo.js';
 import { WorldGen } from './worldgen.js';
 
 const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
-const SAVE_FIELDS = ['world', 'x', 'y', 'z', 'yaw', 'hp', 'xp', 'level', 'inv', 'sel', 'flags', 'q', 'dragons', 'pets', 'spawn', 'look', 'kills'];
+const SAVE_FIELDS = ['world', 'x', 'y', 'z', 'yaw', 'hp', 'xp', 'level', 'inv', 'sel', 'flags', 'q', 'dragons', 'pets', 'spawn', 'look', 'kills', 'zoo'];
 
 export class GameServer {
   constructor(storage) {
@@ -106,7 +107,7 @@ export class GameServer {
       conn, name, id: this.meta.nextId++,
       world: 'groen', x: SPAWN.x, y: -1, z: SPAWN.z, yaw: Math.PI, pitch: 0,
       hp: 20, xp: 0, level: 1, inv: new Array(INV_SIZE).fill(null), sel: 0,
-      flags: {}, q: 0, dragons: [], pets: [], spawn: null, look: m.look || {}, kills: 0,
+      flags: {}, q: 0, dragons: [], pets: [], zoo: {}, spawn: null, look: m.look || {}, kills: 0,
       view: clamp(m.view | 0 || 4, 2, 8), sent: new Set(), queue: [], known: new Set(),
       ccx: 1e9, ccz: 1e9, mount: 0, dead: false, lastHurt: -99, atkCd: 0, shootCd: 0, regen: 0, isNew: !rec, debug: !!m.debug,
     };
@@ -345,6 +346,7 @@ export class GameServer {
       if (other && other.head !== part.head && other.d === part.d) this.setBlock(w, ox, y, oz, 0);
     }
     if (EGG_TYPE[id]) delete this.meta.eggs[p.world + ':' + x + ',' + y + ',' + z];
+    if (id === B.broedmachine) this.breakIncubator(p, p.world, x, y, z);
     if (can) this.dropFor(p, def);
     else if (def.tier > 0) this.toast(p, 'Hiervoor heb je een beter houweel nodig.', 'warn');
     if (def.xp && can) this.addXp(p, def.xp);
@@ -479,6 +481,8 @@ export class GameServer {
       } else this.toast(p, 'Dit is nu je slaapplek. Slapen kan alleen als het donker is.');
     } else if (id === B.levenshart) {
       this.useHeart(p, w);
+    } else if (id === B.broedmachine) {
+      this.useIncubator(p, w, x, y, z);
     } else if (EGG_TYPE[id]) {
       const e = this.meta.eggs[p.world + ':' + x + ',' + y + ',' + z];
       if (!e) this.toast(p, 'Een drakenei! Hak het los om het mee te nemen.');
@@ -821,6 +825,7 @@ export class GameServer {
     }
     this.updateWeather(active);
     this.updateEggs();
+    this.updateIncubators();
     for (const wid of active) this.cleanup(this.worlds[wid]);
     // chunks vergeten waar niemand meer is
     if (Math.floor(this.meta.time) % 5 === 0) {
@@ -862,6 +867,7 @@ export class GameServer {
     else if (m.c === 'xp') this.addXp(p, m.n || 100);
     else if (m.c === 'god') p.god = !!m.v;
     else if (m.c === 'egg') { for (const k in this.meta.eggs) this.meta.eggs[k].prog = 0.95; }
+    else if (m.c === 'hatch') { const all = this.incubs(); for (const k in all) for (const e of all[k].eggs) e.left = 1; }      // alle eieren in de broedmachines komen meteen uit
     else if (m.c === 'weather') this.setWeather(p.world, m.k || 'zon', m.dur || 120);
     else if (m.c === 'herd') { const top = w.topY(Math.floor(p.x) + 6, Math.floor(p.z)); this.spawnHerd(w, m.kind, Math.floor(p.x) + 6, top + 1, Math.floor(p.z)); }
     else if (m.c === 'site') {
@@ -894,5 +900,5 @@ export class GameServer {
   }
 }
 
-Object.assign(GameServer.prototype, entityMethods, npcMethods);
+Object.assign(GameServer.prototype, entityMethods, npcMethods, zooMethods);
 export { itemName, isNight };

@@ -218,3 +218,14 @@ body.touch #crosshair { opacity: .6; }
 .trade .tbtn { background: rgba(255, 255, 255, 0.14); border-radius: 8px; padding: 6px 10px; font-weight: bold; font-size: 13px; }
 .trade .trow.can .tbtn { background: #3fa34a; color: #fff; }
 .dragon .dpower { background: rgba(255, 255, 255, 0.08); border-radius: 8px; padding: 6px 10px; }
+
+/* het Dierenboek */
+.zgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 8px; }
+.zcard { position: relative; border: 2px solid rgba(255,255,255,.14); border-radius: 10px; background: rgba(255,255,255,.06); padding: 6px 4px; text-align: center; font-size: 12px; line-height: 1.25; }
+.zcard.dark { opacity: .7; }
+.zcard img { width: 48px; height: 48px; display: block; margin: 0 auto 2px; }
+.zcard .znr { position: absolute; top: 3px; left: 6px; font-size: 10px; opacity: .6; }
+.zcard .zname { font-weight: 700; }
+.zrar { font-size: 11px; font-weight: 700; }
+.zcnt { font-size: 11px; opacity: .85; }
+.zegg { width: 26px; height: 26px; vertical-align: middle; }
