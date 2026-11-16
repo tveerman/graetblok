@@ -19,7 +19,7 @@ import { setupOffline } from './offline.js';
 import { Weather } from './weather.js';
 
 const $ = (id) => document.getElementById(id);
-const DEFAULTS = { view: 5, volume: 0.8, sens: 1, music: true, sfx: true, autoJump: true, dynRes: true, hq: false };
+const DEFAULTS = { view: 5, volume: 0.8, amb: 1, sens: 1, music: true, sfx: true, autoJump: true, dynRes: true, hq: false };
 
 class Game {
   constructor() {
@@ -136,7 +136,7 @@ class Game {
   audioText() {
     const d = this.sound.diag();
     if (!d) return 'Geluid: nog niet gestart (tik ergens op het scherm)';
-    const run = d.state === 'running' ? 'aan' : 'staat stil (' + d.state + ')';
+    const run = (d.state === 'running' ? 'aan' : 'staat stil (' + d.state + ')') + ' op ' + Math.round(d.rate / 100) / 10 + ' kHz';
     const mus = !this.settings.music ? 'uit' : d.notes + ' noten, sterkte ' + Math.round(d.level * 100) + '%, ' + (d.loop ? 'als lusje' : 'noot voor noot');
     return 'Geluid: ' + run + ' · muziek: ' + mus + ' · effecten: ' + (this.settings.sfx ? 'aan' : 'uit') + (d.ios ? ' · stille stand omzeild: ' + (d.channel ? 'ja' : 'nee') : '');
   }
@@ -191,6 +191,7 @@ class Game {
     this.R.setView(S.view);
     this.sound.setVolume(S.volume);
     this.sound.musicOn = S.music;
+    this.sound.setAmb(S.amb === undefined ? 1 : S.amb);
     this.sound.setSfx(S.sfx);
     this.input.sens = S.sens;
     this.player.autoJump = S.autoJump;
@@ -298,7 +299,12 @@ class Game {
       }
       case 'fx': this.fx(m); break;
       case 'mount':
-        p.setMount(m.id, m.s, m.k); ui.setMounted(!!m.id);
+        p.setMount(m.id, m.s, m.k, m.seat, m.sp); ui.setMounted(!!m.id);
+        if (m.id && (m.k === 'dier' || m.k === 'vlieg')) {
+          this.sound.play('chirp', 0.7);
+          ui.toast(m.k === 'vlieg' ? (this.touch ? 'Je vliegt! Stick naar voren, ⬆ omhoog, ⬇ omlaag.' : 'Je vliegt! W = vooruit · spatie omhoog · shift omlaag · R afstappen')
+            : (this.touch ? 'Je rijdt! Stuur met de stick, ⬆ om te springen. Stick helemaal naar voren = galop.' : 'Je rijdt! WASD sturen · spatie springen · shift galop · R afstappen'));
+        } else
         if (m.id && m.k === 'trein') { this.sound.play('toet', 0.8); ui.toast(this.touch ? 'Stick naar voren: rijden. Naar achteren: remmen en achteruit. Opzij: kiezen bij een wissel.' : 'W = rijden · S = remmen en achteruit · A/D = kiezen bij een wissel · shift = sneller · R uitstappen'); }
         else if (m.id) { this.sound.play('roar', 0.6); ui.toast(this.touch ? 'Duw de stick naar voren om te vliegen. ⬆ omhoog, ⬇ omlaag.' : 'W = vliegen waar je kijkt · spatie omhoog · shift omlaag · R afstappen'); }
         break;
@@ -361,7 +367,7 @@ class Game {
         P.burst(x, y + 0.3, z, 30, [1, 1, 0.8], { speed: 8, size: 0.3, life: 0.5, grav: 6, up: 2 });
         const d = Math.hypot(x - this.player.pos.x, z - this.player.pos.z);
         // de donder komt later dan de flits, net als in het echt
-        setTimeout(() => { this.sound.play('donder', Math.max(0.35, 1 - d / 90)); if (d < 26) this.player.shake = Math.max(this.player.shake || 0, 0.35 * (1 - d / 26)); }, Math.min(1800, d * 22));
+        setTimeout(() => { this.sound.play('donder', Math.max(0.35, 1 - d / 90) * this.sound.ambVol); if (d < 26) this.player.shake = Math.max(this.player.shake || 0, 0.35 * (1 - d / 26)); }, Math.min(1800, d * 22));
         break;
       }
       case 'fuse': P.burst(x, y, z, 10, [1, 0.8, 0.3], { speed: 1.6, size: 0.14, life: 0.5, grav: -1 }); s.play('fuse', Math.max(0.3, v)); break;
@@ -451,7 +457,20 @@ class Game {
     return null;
   }
 
+  // je eigen rijdier vlak bij je (paard, olifant, grote wolf, T-rex...)
+  nearRide() {
+    let best = null, bd = 5;
+    for (const e of this.ents.map.values()) {
+      if (!e.owner || !e.def.ride) continue;
+      const d = Math.hypot(e.x - this.player.pos.x, e.y - this.player.pos.y, e.z - this.player.pos.z) - e.w / 2;
+      if (d < bd) { bd = d; best = e; }
+    }
+    return best;
+  }
+
   rideNearest() {
+    const r = this.player.mount || this.nearDragon(5) ? null : this.nearRide();
+    if (r && !this.nearTrain()) { this.net.send({ t: 'rideEnt', id: r.id }); return; }
     const t = this.player.mount ? null : this.nearTrain();
     if (t && !this.nearDragon(5)) { this.net.send({ t: 'useEnt', id: t.id }); return; }
     this.dragonButton();
@@ -559,11 +578,12 @@ class Game {
       this.ui.frame(p.yaw, p.pos, this.worldId, this.sites);
       const own = p.mount ? null : this.nearDragon();
       const train = p.mount || own ? null : this.nearTrain();
-      this.ui.setRide(train ? '🚂 Instappen' : !own ? '' : (dragonStage(own.growth) >= 2 ? '🐉 Vliegen' : '🐉 ' + (own.name || 'Draak')));
+      const steed = p.mount || own || train ? null : this.nearRide();
+      this.ui.setRide(train ? '🚂 Instappen' : steed ? (steed.def.rideFly ? '🪽 Vliegen' : '🐎 Rijden') : !own ? '' : (dragonStage(own.growth) >= 2 ? '🐉 Vliegen' : '🐉 ' + (own.name || 'Draak')));
       this.animalSounds(hd);
       const surf = this.world.get(Math.floor(p.pos.x) >> 4, Math.floor(p.pos.z) >> 4);
       const under = surf ? p.pos.y < surf.hm[(Math.floor(p.pos.x) & 15) * 16 + (Math.floor(p.pos.z) & 15)] - 6 : false;
-      this.sound.ambience(hd, { world: this.worldId, under, day: this.R.dayF, flying: !!p.mount && p.mountKind !== 'trein' && p.speedNow > 4, rain: Math.max(this.sky.rain, this.sky.snow * 0.25), roof: this.sky.roof });
+      this.sound.ambience(hd, { world: this.worldId, under, day: this.R.dayF, flying: !!p.mount && p.mountKind !== 'trein' && p.mountKind !== 'dier' && p.speedNow > 4, rain: Math.max(this.sky.rain, this.sky.snow * 0.25), roof: this.sky.roof });
     }
     const t3 = performance.now();
     this.R.render();
@@ -604,7 +624,7 @@ class Game {
     const e = list[Math.floor(Math.random() * list.length)], v = this.vol(e.x, e.y, e.z);
     if (v < 0.1) return;
     if (e.kind === 'wolf' && this.R.dayF > 0.4) return;                // wolven huilen 's nachts
-    this.sound.play(e.kind === 'schaap' ? 'baa' : e.kind === 'koe' ? 'boe' : e.kind === 'wolf' ? 'huil' : 'growl', v * 0.8);
+    this.sound.play(e.kind === 'schaap' ? 'baa' : e.kind === 'koe' ? 'boe' : e.kind === 'wolf' ? 'huil' : 'growl', v * 0.8 * this.sound.ambVol);
   }
 
   // sneeuw, as, sporen en vuurvliegjes rond de speler
@@ -648,11 +668,15 @@ const MOTE_COLORS = {
   wolken: [[1, 0.95, 0.6], [1, 1, 1], [1, 0.7, 0.85]],
 };
 
-window.addEventListener('DOMContentLoaded', () => {
-  try { window.game = new Game(); }
+// Het spel starten zodra de pagina er staat. (Dit bestand wordt vanuit index.html geladen met
+// import(...); dan kan de pagina al klaar zijn voordat we hier aankomen.)
+function boot() {
+  try { window.game = new Game(); window.graetGestart = true; }      // graetGestart: het vangnet in index.html weet dan dat het gelukt is
   catch (e) {
     console.error(e);
     document.getElementById('menuError').textContent = 'Er ging iets mis bij het starten: ' + e.message;
   }
-});
+}
+if (document.readyState === 'loading') window.addEventListener('DOMContentLoaded', boot);
+else boot();
 void B; void BLOCKS;

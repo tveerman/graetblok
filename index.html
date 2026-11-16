@@ -84,6 +84,38 @@
   </div>
 </div>
 
-<script type="module" src="src/client/main.js"></script>
+<script>
+// Vangnet. Soms bewaart de browser een paar oude bestanden van het spel die niet meer bij de
+// nieuwe passen; dan start het spel niet en zie je alleen dit beginscherm zonder dat er iets
+// gebeurt. In dat geval halen we alle bestanden vers op en proberen het één keer opnieuw.
+(function () {
+  var KEY = 'graetblok.herstel', bezig = false;
+  // laat onderaan het scherm zien wat er misging (handig om door te geven)
+  function toon(tekst) {
+    var p = document.getElementById('startFout');
+    if (!p) { p = document.createElement('p'); p.id = 'startFout'; p.style.cssText = 'position:fixed;left:8px;right:8px;bottom:8px;z-index:99;margin:0;padding:8px 10px;border-radius:8px;background:rgba(0,0,0,.75);color:#ffd0d0;font:13px sans-serif;text-align:center'; document.body.appendChild(p); }
+    p.textContent = tekst;
+  }
+  function herstel(fout) {
+    if (window.graetGestart || bezig) return;      // (window.game kan hier niet: zo heet ook het tekenvlak)
+    if (fout && fout.message) toon('Het spel kon niet starten: ' + fout.message);
+    var last = 0;
+    try { last = +sessionStorage.getItem(KEY) || 0; } catch (e) { /* geeft niet */ }
+    if (Date.now() - last < 120000) { if (!fout) toon('Het spel start niet. Tik op het rondje met de pijl bovenin om de pagina opnieuw te laden.'); return; }          // niet eindeloos blijven proberen
+    bezig = true;
+    try { sessionStorage.setItem(KEY, String(Date.now())); } catch (e) { /* geeft niet */ }
+    fetch('files.json', { cache: 'reload' }).then(function (r) { return r.json(); }).then(function (list) {
+      return Promise.all(list.map(function (f) { return fetch(f, { cache: 'reload' }).then(function (r) { return r.arrayBuffer(); }); }));
+    }).then(function () { location.reload(); }).catch(function () { bezig = false; });
+  }
+  window.graetHerstel = herstel;
+  window.addEventListener('error', function (e) { var f = e && e.error; setTimeout(function () { herstel(f); }, 500); }, true);
+  window.addEventListener('load', function () { setTimeout(herstel, 20000); });
+})();
+</script>
+<script type="module">
+// Het spel starten. Lukt dat niet (een bestand ontbreekt of past niet bij de rest), dan het vangnet.
+import('./src/client/main.js').catch(function (e) { console.error('Het spel kon niet starten:', e); if (window.graetHerstel) window.graetHerstel(e); });
+</script>
 </body>
 </html>
