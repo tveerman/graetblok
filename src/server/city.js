@@ -69,6 +69,7 @@ export const cityGen = {
       npcs.push({ k: 'dorpeling', job, x: x + px + 0.5, y, z: z + pz + 0.5, r: 0.4, yaw: side === 'n' ? Math.PI : side === 'w' ? -Math.PI / 2 : Math.PI / 2 });
     }
     npcs.push({ k: 'dorpeling', job: 'hotelier', x: x + 0.5, y, z: z - 52.5, r: 0.4, yaw: 0 });
+    npcs.push({ k: 'dorpeling', job: 'uitvinder', x: x + 15.5, y, z: z + 0.5, r: 0.4, yaw: -Math.PI / 2 });      // de Uitvinder heeft zijn werkplaats op het plein
     // wandelaars op het plein en in het park
     for (const [wx, wz] of [[-8, -8], [9, 6], [-6, 12], [12, -10], [-56, 50], [-50, 62]]) npcs.push({ k: 'dorpeling', job: 'dorpeling', x: x + wx + 0.5, y, z: z + wz + 0.5, r: 9, yaw: 0 });
     // stoplichten: twee per kruispunt, schuin tegenover elkaar
@@ -186,6 +187,12 @@ export const cityGen = {
         S.fill(X + cx, y + 1, Z + cz, X + cx, y + 3, Z + cz, B.beton_donker); S.set(X + cx, y + 4, Z + cz, B.lantaarn);
       }
       for (const d of [-9, 9]) { S.fill(X + d, y + 1, Z - 2, X + d, y + 1, Z + 2, B.kruk); S.fill(X - 2, y + 1, Z + d, X + 2, y + 1, Z + d, B.kruk); }
+      // de werkplaats van de Uitvinder aan de oostkant van het plein: een afdak met zijn machines
+      for (const [px, pz] of [[14, -3], [14, 3], [20, -3], [20, 3]]) S.fill(X + px, y + 1, Z + pz, X + px, y + 3, Z + pz, B.ijzerblok);
+      S.fill(X + 14, y + 4, Z - 3, X + 20, y + 4, Z + 3, B.beton_donker);
+      S.fill(X + 15, y + 5, Z - 2, X + 19, y + 5, Z + 2, B.zonnepaneel);
+      S.set(X + 19, y + 1, Z - 2, B.fabriek); S.set(X + 19, y + 1, Z, B.batterij); S.set(X + 19, y + 1, Z + 2, B.werkbank);
+      S.fill(X + 14, y + 4, Z - 4, X + 20, y + 4, Z - 4, B.neon_blauw);
     }
     // het stadspark in de zuidwesthoek: gras, een vijver, bomen en bloemen
     if (S.hit(X - 78, Z + 34, X - 34, Z + 78)) {

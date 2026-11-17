@@ -3,7 +3,7 @@
 // Er zijn geen plaatjes-bestanden nodig.
 import * as THREE from '../../vendor/three.module.min.js';
 import { hash2 } from '../shared/noise.js';
-import { TILE_NAMES, BLOCKS, SHAPE_CUBE, SHAPE_CROSS } from '../shared/blocks.js';
+import { TILE_NAMES, BLOCKS, SHAPE_CUBE, SHAPE_CROSS, isBlock } from '../shared/blocks.js';
 import { ITEMS } from '../shared/items.js';
 
 export const TS = 64;       // pixels per plaatje
@@ -559,6 +559,7 @@ const PX = {
   melkmachine: (x, y, u, v) => { const tank = Math.hypot(u - 0.5, v - 0.42) < 0.26; const vlek = tank && Math.hypot(u - 0.42, v - 0.36) < 0.09; return vlek ? [40, 40, 44] : tank ? [246, 246, 250] : v > 0.78 ? [90, 96, 108] : mul([176, 184, 196], 0.9 + hash2(x, y, 924) * 0.14); },
   marktkraam: (x, y, u, v) => { if (v < 0.3) return (Math.floor(u * 6) & 1) ? [216, 54, 44] : [244, 244, 240]; if (v < 0.42) return [60, 40, 24]; const plank = Math.floor(v * 8) & 1; return mul([168, 120, 70], (plank ? 0.92 : 1) * (0.92 + hash2(x, y, 925) * 0.14)); },
   beton: (x, y, u, v) => { const n = fbm(u, v, 5, 5, 2, 180); const c = mul([188, 190, 194], 0.9 + n * 0.16 + hash2(x, y, 181) * 0.04); return (x % 32 === 0 || y % 32 === 0) ? mul(c, 0.82) : c; },
+  beton_rood: (x, y, u, v) => { const n = fbm(u, v, 5, 5, 2, 184); const c = mul([196, 62, 52], 0.9 + n * 0.16 + hash2(x, y, 185) * 0.04); return (x % 32 === 0 || y % 32 === 0) ? mul(c, 0.82) : c; },
   beton_donker: (x, y, u, v) => { const n = fbm(u, v, 5, 5, 2, 182); const c = mul([98, 104, 114], 0.9 + n * 0.16 + hash2(x, y, 183) * 0.04); return (x % 32 === 0 || y % 32 === 0) ? mul(c, 0.8) : c; },
   raam: (x, y, u, v) => {
     const b = Math.min(u, v, 1 - u, 1 - v);
@@ -1055,6 +1056,18 @@ function zwamDraw(dark, light) {
   PX.tempelsteen = (x, y, u, v) => { const voeg = (x % 32 < 2) || (y % 16 < 2); return mul(voeg ? [150, 126, 70] : [222, 196, 120], 0.9 + hash2(x, y, 938) * 0.16); };
   PX.tempeldeur = (x, y, u, v) => { if (Math.min(u, 1 - u) < 0.07 || Math.min(v, 1 - v) < 0.07) return [150, 110, 30]; if (Math.abs(u - 0.5) < 0.3 && Math.abs(v - 0.45) < 0.22) { const cu = Math.floor((u - 0.2) / 0.15), cv = Math.floor((v - 0.23) / 0.15); const inKnop = ((u - 0.2) % 0.15) > 0.03 && ((v - 0.23) % 0.15) > 0.03; return inKnop ? [240, 240, 230] : [40, 40, 50 + ((cu + cv) & 1) * 10]; } return mul([232, 190, 60], 0.9 + hash2(x, y, 939) * 0.16); };
   PX.kijker = (x, y, u, v) => { if (rond(u, v, 0.5, 0.42, 0.2)) return rond(u, v, 0.5, 0.42, 0.13) ? [150, 210, 250] : [200, 160, 50]; if (Math.abs(u - 0.5) < 0.06 && v > 0.6) return [120, 84, 44]; return steen(x, y, u, v); };
+  // techniek: zonnepaneel, windmolen, batterij, fabrieksmachine, teleportatiepoort en klimaatmachine
+  const staal = (x, y, k) => mul([150, 158, 170], 0.86 + hash2(x, y, k) * 0.18);
+  PX.zonnepaneel_top = (x, y, u, v) => { const lijn = (x % 16 < 2) || (y % 16 < 2); return lijn ? [190, 200, 214] : mul([28, 50, 120], 0.85 + (1 - v) * 0.4 + hash2(x >> 3, y >> 3, 981) * 0.1); };
+  PX.zonnepaneel = (x, y, u, v) => staal(x, y, 982);
+  PX.windmolen = (x, y, u, v) => { const du = u - 0.5, dv = v - 0.42, d = Math.hypot(du, dv), a = Math.atan2(dv, du); if (d < 0.07) return [216, 54, 44]; const wiek = d < 0.36 && Math.abs(((a / 1.5708) % 1 + 1) % 1 - 0.5) < 0.09 * (1.4 - d); if (wiek) return [240, 240, 236]; if (Math.abs(du) < 0.04 && dv > 0) return [90, 96, 108]; return staal(x, y, 983); };
+  PX.batterij = (x, y, u, v) => { if (v < 0.16) return [60, 64, 72]; if (Math.abs(u - 0.5) < 0.3 && v > 0.3 && v < 0.82) { const vak = Math.floor((0.82 - v) / 0.13); return ((0.82 - v) % 0.13) < 0.03 ? [30, 34, 40] : [[70, 220, 90], [70, 220, 90], [200, 230, 60], [240, 190, 50]][Math.min(3, vak)]; } return staal(x, y, 984); };
+  PX.batterij_top = (x, y, u, v) => (rond(u, v, 0.3, 0.5, 0.1) ? [216, 54, 44] : rond(u, v, 0.7, 0.5, 0.1) ? [40, 40, 46] : staal(x, y, 985));
+  PX.fabriek = (x, y, u, v) => { const d = Math.hypot(u - 0.5, v - 0.55), a = Math.atan2(v - 0.55, u - 0.5); if (d < 0.08) return [40, 44, 52]; if (d < 0.2 + (Math.floor(((a / 6.283 + 1) % 1) * 8) % 2 ? 0.06 : 0)) return [200, 160, 50]; if (v < 0.22) return (Math.floor(u * 8) & 1) ? [240, 190, 40] : [40, 40, 46]; return staal(x, y, 986); };
+  PX.teleport = (x, y, u, v) => { const d = Math.hypot(u - 0.5, v - 0.5); if (d < 0.34) { const g2 = 0.5 + 0.5 * Math.sin(d * 40 - Math.atan2(v - 0.5, u - 0.5) * 3); return mix([70, 20, 160], [200, 150, 255], g2); } return d < 0.4 ? [230, 190, 60] : staal(x, y, 987); };
+  PX.teleport_top = (x, y, u, v) => { const d = Math.hypot(u - 0.5, v - 0.5); return d < 0.36 ? mix([120, 60, 220], [230, 200, 255], 0.5 + 0.5 * Math.sin(d * 46)) : staal(x, y, 988); };
+  PX.klimaat = (x, y, u, v) => { if (rond(u, v, 0.3, 0.4, 0.14)) return [250, 210, 60]; if (rond(u, v, 0.62, 0.42, 0.13) || rond(u, v, 0.74, 0.46, 0.1) || rond(u, v, 0.52, 0.48, 0.1)) return [236, 240, 246]; if (v > 0.62 && v < 0.84 && ((u * 10) % 1) < 0.25 && u > 0.4 && u < 0.86) return [80, 150, 240]; return staal(x, y, 989); };
+  PX.klimaat_top = (x, y, u, v) => { const d = Math.hypot(u - 0.5, v - 0.5); return d < 0.3 ? (Math.abs(((Math.atan2(v - 0.5, u - 0.5) / 1.0472) % 1 + 1) % 1 - 0.5) < 0.2 ? [60, 64, 72] : [120, 190, 240]) : staal(x, y, 990); };
   PX.kijker_top = (x, y, u, v) => rond(u, v, 0.5, 0.5, 0.2) ? [200, 160, 50] : steen(x, y, u, v);
 }
 
@@ -2092,7 +2105,7 @@ export function iconCanvas(id) {
   const cv = document.createElement('canvas');
   cv.width = cv.height = 64;
   const g = cv.getContext('2d');
-  if (id < 256) {
+  if (isBlock(id)) {
     const b = BLOCKS[id];
     const tc = atlasRef.canvases;
     if (b.shape === SHAPE_CUBE) {

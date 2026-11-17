@@ -137,6 +137,8 @@ const LIST = [
   [97, 'sterrenkat', 'Sterrenkat', 'ancient', 'magisch', 'kat', 0x241a4a, 0x6a5ac0, { glow: 0xfff6b0, eye: '#fff6b0', spikes: 1 }],
   [99, 'spookkonijn', 'Spookkonijn', 'ancient', 'magisch', 'konijn', 0xe8f4ff, 0xffffff, { glow: 0x9fe8ff, eye: '#4ae0ff', ghost: 1 }],
   [100, 'regenboogvos', 'Regenboogvos', 'secret', 'magisch', 'hond', 0xff5a5a, 0xffffff, { tail: 'pluim', rainbow: 1, glow: 0xffffff }],
+  // --- de robothond krijg je van de Uitvinder (zit in geen enkel ei) ---
+  [401, 'robothond', 'Robothond', 'mythic', 'robot', 'hond', 0xa8b4c0, 0x56606c, { glow: 0x4ae0ff, eye: '#4ae0ff', guard: 1, skin: 'metaal' }],
   // --- dinosaurussen en oerdieren (oer-ei) ---
   [301, 'trex', 'T-rex', 'rare', 'oer', 'dino2', 0x6a7a3a, 0xc8c890, { s: 1.9, guard: 1, ride: 1 }],
   [302, 'velociraptor', 'Velociraptor', 'rare', 'oer', 'dino2', 0xa86a3a, 0xe8d0a0, { stripes: 0x5a3a20, s: 0.8, guard: 1, body: [0.4, 0.44, 1.0], legH: 0.6, head: [0.3, 0.3, 0.34], snout: [0.22, 0.18, 0.34] }],

@@ -379,6 +379,20 @@ From Jorian's design document (`spel.txt`), following development phases 1–4, 
   three colours grow on the bottom of water at least three blocks deep. A dragon, flying
   animal, helicopter or plane can no longer fly through water or lava: it stays just above
   the surface.
+- **Technology and factories (techniek en fabrieken)** – from Jorian's plan
+  (`src/shared/tech.js`, `src/server/tech.js`). Power without cables: everything within
+  eight blocks belongs to one grid. A solar panel gives power by day in dry weather, a
+  windmill a little day and night, a battery stores what is left over. The factory machine
+  needs power and does six jobs through one window (crush and smelt iron or gold ore into
+  two bars, saw logs into six planks, melt sand into glass, press three bars into a machine
+  part, crush cobble into gravel): load it, walk away, collect later; without power it
+  stands still. Two teleport gates take you from one to the other for 20 power, and the
+  climate machine changes the weather for 40. The Inventor has a workshop on the city
+  square, sells all of it and gives six tasks in order; the last reward is a robot dog that
+  follows and fights for you. Cables, switches for power, conveyor belts, lifts and separate
+  machines were left out because the first 255 block numbers were nearly used up (254 and
+  255 are free); since then there is a second range of block numbers, see "Block and item
+  numbers" below.
 - **Player character with a skeleton** (`src/client/rig.js`) – the human, elf and robot you
   can play are built on one rig with joints (hips, knees, ankles, spine, neck, shoulders,
   elbows). The animation computes joint angles: knees bend while the leg swings forward, the
@@ -452,7 +466,8 @@ To make it real multiplayer later, the server code can move to another machine l
 
 1. Write a Node entry point that does what `worker.js` does, but creates one `conn`
    (`{ send(msg), onmessage }`) per WebSocket connection and calls `server.connect(conn)`.
-   Chunk data is sent as a `Uint8Array`, so use binary frames (or encode it) there.
+   Chunk data is sent as a `Uint16Array` (two bytes per block), so use binary frames (or
+   encode it) there.
 2. Give `GameServer` a storage object with the same `get / set / del / entries / clear`
    methods that writes to disk instead of IndexedDB.
 3. Replace the Worker in `net.js` with a WebSocket.
@@ -524,6 +539,39 @@ unchanged and remains the default. There are still no real shadows or post-proce
   ("Scherpte aanpassen" in the pause menu), and "Kijkafstand" sets how far you can see
   (default 4 on touch devices, 5 on desktop).
 
+- A chunk stores one 16-bit number per block (it was 8 bits until the block numbers ran out):
+  64 KB instead of 32 KB per chunk. At view distance 4 the screen keeps about 100 chunks and
+  the server between 100 and 290, so that is 3 MB more on the screen side and 3 to 9 MB more
+  in the worker. Building a chunk mesh takes the same time as before (measured over 169
+  chunks, before and after: 0.45 ms per chunk in V8, 3.4 ms in the JavaScriptCore command
+  line shell, both within 2% and with identical geometry).
+
+### Block and item numbers
+
+Blocks and items share one range of numbers, because a backpack slot can hold either:
+
+| Numbers | What | Defined in |
+| --- | --- | --- |
+| 1 – 255 | blocks, first range (254 and 255 are free) | `def(id, ...)` in `src/shared/blocks.js` |
+| 256 – 1023 | items | `item(id, ...)` in `src/shared/items.js` |
+| 1024 – 4095 | blocks, second range | `def(id, ...)` at the bottom of `blocks.js` |
+
+- `isBlock(id)` (exported by `blocks.js` and `items.js`) is the only place that knows these
+  ranges; never write `id < 256` to tell a block from an item. `def` and `item` throw at
+  start-up when a number is in the wrong range.
+- Numbers never change once used: saved worlds store them (changed blocks per chunk as
+  `index -> id` under `e/<world>/<chunk>`, backpacks as `[id, count]`). Nothing was
+  renumbered when the second range was added, so old worlds load unchanged.
+- Chunks are `Uint16Array` everywhere (`BlockArray` in `blocks.js`): the world generator,
+  the server's chunk cache, the `chunk` message and the mesher's work buffer. The lookup
+  tables (`B_SHAPE`, `B_SOLID`, ...) have `NUM_BLOCKS` = 4096 entries; raise `NUM_BLOCKS`
+  (up to 65536) when the second range fills up.
+- New blocks go in the second range. The first one is a trial block, red concrete
+  (`beton_rood`, 1024; four concrete and a red flower at a workbench).
+- `node tests/blok-ids.mjs` runs the server without a browser on a `MemoryStorage`: it crafts
+  and places block 1024, saves, starts a second server on the same storage and checks the
+  world, the backpack and the `chunk` message, then breaks the block again.
+
 ### Developer mode
 
 Open the game with `?debug` in the address to enable cheat messages from the browser console,
@@ -547,4 +595,5 @@ game.net.send({ t: 'debug', c: 'spawn', kind: 'd_eenhoorn', dx: 3 })   // any an
 Add `&save=test` (any short name) to play in a separate world that does not touch the real
 one: `index.html?debug&save=test`.
 
-Block and item ids are in `src/shared/blocks.js` and `src/shared/items.js`.
+Block and item ids are in `src/shared/blocks.js` and `src/shared/items.js` (see "Block and item
+numbers" above).

@@ -734,6 +734,44 @@ export class UI {
     this.open('puzzel', '🧩 Puzzel van kamer ' + m.kamer, b);
   }
 
+  // ---------- de fabrieksmachine ----------
+
+  openFactory(m) {
+    const g = this.g, send = (o) => g.net.send(Object.assign({ t: 'fabriek' }, o));
+    const b = el('div', 'garage');
+    b.appendChild(el('div', 'qsec', '<h4>' + (m.stroom ? '⚡ De machine heeft stroom' : '🔌 Geen stroom') + '</h4>' +
+      '<p class="hint">' + (m.stroom ? 'Hij werkt door zolang er stroom is, ook als je even wegloopt.' : 'Zet een zonnepaneel, windmolen of volle batterij binnen acht blokken van de machine. Zonder stroom staat hij stil.') + '</p>' +
+      (m.bezig ? '<p><b>Bezig:</b> ' + m.bezig[0] + ' · nog ' + m.bezig[1] + ' keer · ' + m.bezig[2] + '%</p>' : '<p class="hint">De machine doet nu niets.</p>')));
+    if (m.klaar.length) {
+      const ks = el('div', 'qsec');
+      ks.appendChild(el('h4', '', 'Klaar'));
+      ks.appendChild(el('p', '', m.klaar.map(([id, n]) => '<img class="mini" src="' + iconURL(id) + '"> ' + n + ' × ' + itemName(id)).join(' &nbsp; ')));
+      const pak = el('button', 'btn small active', '📦 Alles pakken');
+      tap(pak, () => send({ c: 'pak' }));
+      ks.appendChild(pak);
+      b.appendChild(ks);
+    }
+    const rs = el('div', 'qsec');
+    rs.appendChild(el('h4', '', 'Wat moet de machine maken?'));
+    for (const [k, name, wat, per, uit, n, tijd, kan] of m.recepten) {
+      const r = el('div', 'drow');
+      r.appendChild(el('span', '', '<img class="mini" src="' + iconURL(uit) + '"> <b>' + name + '</b> <small>' + per + ' × ' + wat + ' → ' + n + ' × ' + itemName(uit) + ' · ' + tijd + ' tellen · je hebt genoeg voor ' + kan + ' keer</small>'));
+      const btns = el('span', 'drowbtns');
+      for (const aantal of [1, 8, 64]) {
+        const doe = Math.min(aantal, kan);
+        const knop = el('button', 'btn small' + (kan > 0 ? ' active' : ''), aantal === 64 ? 'Alles' : aantal + '×');
+        tap(knop, () => { if (doe > 0) send({ c: 'start', k, n: doe }); });
+        btns.appendChild(knop);
+      }
+      r.appendChild(btns); rs.appendChild(r);
+    }
+    b.appendChild(rs);
+    const ververs = el('button', 'btn small', '🔄 Kijk opnieuw');
+    tap(ververs, () => send({ c: 'kijk' }));
+    b.appendChild(ververs);
+    this.open('fabriek', 'Fabrieksmachine', b, true);
+  }
+
   // ---------- mijn werk ----------
 
   // Bovenaan welke dag het is en wat je vandaag moet doen; daaronder alle beroepen om uit te kiezen.
@@ -878,7 +916,7 @@ export class UI {
       if (rec) for (const s of SHINIES) if (rec[s.key]) sh += '<span style="color:' + s.col + '">✨' + rec[s.key] + '</span>';
       card.innerHTML = '<img src="' + animalEgg(a, !rec) + '"><div class="znr">' + a.nr + '</div>' +
         '<div class="zname">' + (rec ? a.name : '???') + '</div>' +
-        (rec ? '<div class="zrar" style="color:' + R.col + '">' + R.name + '</div><div class="zcnt">' + rec.n + '× ' + sh + '</div>' : '<div class="zrar">' + EGG_KINDS[a.egg].name + '</div>');
+        (rec ? '<div class="zrar" style="color:' + R.col + '">' + R.name + '</div><div class="zcnt">' + rec.n + '× ' + sh + '</div>' : '<div class="zrar">' + (EGG_KINDS[a.egg] || { name: 'Van de Uitvinder' }).name + '</div>');
       grid.appendChild(card);
     }
     book.appendChild(grid);

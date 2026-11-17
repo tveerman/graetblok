@@ -333,6 +333,7 @@ class Game {
       case 'garage': ui.openGarage(m); break;
       case 'farm': ui.openFarm(m); break;
       case 'werk': ui.openWork(m); break;
+      case 'fabriek': ui.openFactory(m); break;
       case 'puzzel': ui.openPuzzle(m); break;
       case 'code': { const c = window.prompt('De gouden tempeldeur\n' + m.hint, ''); if (c !== null) this.net.send({ t: 'code', code: c }); break; }
       case 'job': this.setJob(m.job); break;

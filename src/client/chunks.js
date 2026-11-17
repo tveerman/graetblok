@@ -3,7 +3,7 @@
 import * as THREE from '../../vendor/three.module.min.js';
 import { CS, CH, idx, chunkKey } from '../shared/constants.js';
 import {
-  B, B_SHAPE, B_PASS, B_OPAQUE, B_SOLID, B_LIGHT, B_GLOW, B_TOP, B_SIDE, B_BOTTOM, B_HEIGHT, B_BED, NUM_BLOCKS,
+  B, B_SHAPE, B_PASS, B_OPAQUE, B_SOLID, B_LIGHT, B_GLOW, B_TOP, B_SIDE, B_BOTTOM, B_HEIGHT, B_BED, NUM_BLOCKS, BlockArray,
   SHAPE_CUBE, SHAPE_CROSS, SHAPE_LIQUID, SHAPE_LOW, SHAPE_EGG, LIFE_LEAVES, LIFE_VINES, LIFE_FRUIT, LEAVES, TILE_DOR, tileId,
 } from '../shared/blocks.js';
 import { hash2 } from '../shared/noise.js';
@@ -98,7 +98,7 @@ for (let i = 0; i < 16; i++) { SKY_LUT[i] = 0.03 + 0.97 * Math.pow(i / 15, 1.7);
 
 const RAILS = B.rails, RAIL_STR = [SX, SZ, -SX, -SZ], RL = [0, 0, 0, 0];
 // werkgeheugen voor de mesher
-const pad = new Uint8Array(PW * PW * PH);
+const pad = new BlockArray(PW * PW * PH);      // blok-id's (16 bits)
 const BL = new Uint8Array(PW * PW * PH);
 const EFF = new Int16Array(26 * 26);
 const EFF2 = new Int16Array(26 * 26);
@@ -153,6 +153,7 @@ export class ChunkWorld {
     const old = this.chunks.get(key);
     if (old) this.dispose(old);
     // urgent: 0 = kan wachten, 1 = snel (licht veranderd), 2 = nu meteen (er is een blok weg of bij)
+    if (!(blocks instanceof BlockArray)) blocks = BlockArray.from(blocks);      // voor de zekerheid: altijd 16 bits
     const c = { cx, cz, key, b: blocks, hm: new Uint8Array(256), maxY: 0, emit: [], meshes: [null, null, null], meshed: false, urgent: 0 };
     this.scan(c);
     this.chunks.set(key, c);

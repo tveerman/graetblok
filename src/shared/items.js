@@ -1,10 +1,11 @@
-// Voorwerpen (alles met id >= 256) en recepten.
-import { B, BLOCKS, LOGS, LEAVES } from './blocks.js';
+// Voorwerpen (id 256..1023, zie de nummers bovenaan blocks.js) en recepten.
+import { B, BLOCKS, LOGS, LEAVES, ITEM_BASE, BLOCK2_BASE, isBlock } from './blocks.js';
 
 export const ITEMS = {};   // id -> definitie
 export const I = {};       // sleutel -> id
 
 function item(id, key, name, p = {}) {
+  if (id < ITEM_BASE || id >= BLOCK2_BASE) throw new Error('Voorwerp ' + key + ' heeft nummer ' + id + ': voorwerpen zijn 256..1023.');
   ITEMS[id] = Object.assign({ id, key, name, stack: 64 }, p);
   I[key] = id;
 }
@@ -171,13 +172,13 @@ item(388, 'fossiel', 'Fossiel', { icon: ['bone'] });
 item(389, 'kern_dino', 'Oerportaalkern', { icon: ['core', '#b6ff4a'], portal: 'dino', stack: 4 });
 item(390, 'oerhart', 'Oerhart', { icon: ['heart', '#b6ff4a'], stack: 1 });
 
-export const isBlock = (id) => id > 0 && id < 256;
+export { isBlock };
 export function itemName(id) {
-  if (id < 256) return BLOCKS[id] ? BLOCKS[id].name : '?';
+  if (BLOCKS[id]) return BLOCKS[id].name;
   return ITEMS[id] ? ITEMS[id].name : '?';
 }
 export function maxStack(id) {
-  if (id < 256) return 64;
+  if (isBlock(id)) return 64;
   return ITEMS[id] ? ITEMS[id].stack : 64;
 }
 
@@ -299,6 +300,12 @@ recipe(B.hooi, 1, [[I.tarwe, 4]]);
 recipe(I.pizza, 1, [[I.tomaat, 2], [I.tarwe, 2]], 'oven');
 recipe(I.friet, 1, [[I.aardappel, 2]], 'oven');
 recipe(I.popcorn, 2, [[I.mais, 1]], 'oven');
+recipe(B.zonnepaneel, 1, [[B.glas, 2], [I.ijzerstaaf, 2], [I.kristal, 1]], 'werkbank');
+recipe(B.windmolen, 1, [[I.ijzerstaaf, 4], [B.planken, 2]], 'werkbank');
+recipe(B.batterij, 1, [[I.ijzerstaaf, 3], [I.kristal, 2]], 'werkbank');
+recipe(B.fabriek, 1, [[I.ijzerstaaf, 6], [I.machineonderdeel, 2]], 'werkbank');
+recipe(B.teleportpoort, 1, [[I.machineonderdeel, 3], [I.kristal, 4], [I.goudstaaf, 2]], 'werkbank');
+recipe(B.klimaatmachine, 1, [[I.machineonderdeel, 4], [I.kristal, 4], [B.batterij, 1]], 'werkbank');
 recipe(B.schap_brood, 1, [[B.planken, 3], [I.brood, 1]], 'werkbank');
 recipe(B.schap_groente, 1, [[B.planken, 3], [I.appel, 2]], 'werkbank');
 recipe(B.schap_flessen, 1, [[B.planken, 3], [B.glas, 1]], 'werkbank');
@@ -330,6 +337,7 @@ recipe(B.dakpan, 4, [[B.baksteen, 4]], 'werkbank');
 recipe(B.vakwerk, 4, [[B.planken, 2], [B.zand, 2]], 'werkbank');
 recipe(B.kasteelmuur, 4, [[B.steenblok, 2], [B.keisteen, 2]], 'werkbank');
 recipe(B.grind, 4, [[B.keisteen, 2], [B.zand, 2]]);
+recipe(B.beton_rood, 4, [[B.beton, 4], [B.bloem_rood, 1]], 'werkbank');
 recipe(B.tafel, 1, [[B.planken, 3], [I.stok, 4]], 'werkbank');
 recipe(B.kruk, 2, [[B.planken, 1], [I.stok, 3]], 'werkbank');
 recipe(B.boekenkast, 1, [[B.planken, 4], [I.leer, 1]], 'werkbank');

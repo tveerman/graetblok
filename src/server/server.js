@@ -11,7 +11,7 @@
 
 import { CH, TICK_MS, INV_SIZE, HOTBAR, DAY_LENGTH, DAY_FRAC, RANKS, SECRET_RANK, chunkKey, clamp, dayPhase, isNight, xpNeed } from '../shared/constants.js';
 import { B, BLOCKS, B_SHAPE, EGG_TYPE, PORTAL_TO, PORTAL_BLOCK, SHAPE_LIQUID, BED_DIRS, bedFoot, bedHead, bedPart, isBed } from '../shared/blocks.js';
-import { I, ITEMS, RECIPES, matches, maxStack, itemName } from '../shared/items.js';
+import { I, ITEMS, RECIPES, matches, maxStack, itemName, isBlock } from '../shared/items.js';
 import { WORLDS, WORLD_ORDER, STORY_WORLDS, SPAWN } from '../shared/worlds.js';
 import { hash3, mulberry32 } from '../shared/noise.js';
 import { ServerWorld } from './world.js';
@@ -25,6 +25,7 @@ import { cityMethods } from './city.js';
 import { farmMethods } from './farm.js';
 import { jobMethods } from './jobs.js';
 import { secretMethods } from './secrets.js';
+import { techMethods } from './tech.js';
 import { CROP_OF_SEED } from '../shared/farm.js';
 import { WorldGen } from './worldgen.js';
 
@@ -250,7 +251,7 @@ export class GameServer {
 
   give(p, id, n) {
     const max = maxStack(id);
-    const dur = id >= 256 && ITEMS[id] ? ITEMS[id].dur : 0;      // nieuw gereedschap is helemaal heel
+    const dur = ITEMS[id] ? ITEMS[id].dur : 0;      // nieuw gereedschap is helemaal heel
     for (let i = 0; i < INV_SIZE && n > 0; i++) {
       const s = p.inv[i];
       if (s && s.id === id && s.n < max) { const a = Math.min(n, max - s.n); s.n += a; n -= a; }
@@ -350,9 +351,9 @@ export class GameServer {
     for (const [need, n] of r.in) this.take(p, need, n);
     const left = this.give(p, r.out, r.n);
     if (left > 0) this.toast(p, 'Je rugzak is vol!', 'warn');
-    const key = r.out < 256 ? BLOCKS[r.out].key : ITEMS[r.out].key;
+    const key = isBlock(r.out) ? BLOCKS[r.out].key : ITEMS[r.out].key;
     if (!p.flags['made_' + key]) { p.flags['made_' + key] = 1; this.addXp(p, 4); }
-    this.jobEvent(p, r.out >= 256 && ITEMS[r.out].food ? 'kook' : 'maak');
+    this.jobEvent(p, !isBlock(r.out) && ITEMS[r.out].food ? 'kook' : 'maak');
     this.send(p, { t: 'crafted', id: r.out });
     this.sendInv(p);
     this.checkQuests(p);
@@ -424,6 +425,7 @@ export class GameServer {
       if (other && other.head !== part.head && other.d === part.d) this.setBlock(w, ox, y, oz, 0);
     }
     if (EGG_TYPE[id]) delete this.meta.eggs[p.world + ':' + x + ',' + y + ',' + z];
+    this.techBroken(p, w, x, y, z, id);
     if (id === B.broedmachine) this.breakIncubator(p, p.world, x, y, z);
     if (this.cropBroken(p, w, x, y, z, id)) { /* een gewas: zie farm.js */ }
     else if (can) this.dropFor(p, def);
@@ -469,13 +471,13 @@ export class GameServer {
     if (!s || y < 1 || y >= CH - 1 || !BLOCKS[cur] || !BLOCKS[cur].replace || Math.hypot(x + 0.5 - p.x, y - p.y, z + 0.5 - p.z) > 9) return reject();
     // iets om te planten: op een akker wordt het een kiemplantje dat vanzelf groeit
     const crop = CROP_OF_SEED[s.id];
-    if (crop && (s.id >= 256 || s.id === B.tarwe || w.get(x, y - 1, z) === B.akker)) {
+    if (crop && (!isBlock(s.id) || s.id === B.tarwe || w.get(x, y - 1, z) === B.akker)) {
       if (!this.plantAt(w, x, y, z, crop)) { this.toast(p, 'Dit plant je op een akker. Akkergrond maak je van aarde en bladeren, of met een tractor.', 'warn'); return reject(); }
       s.n--; if (s.n <= 0) p.inv[p.sel] = null;
       this.sendInv(p);
       return;
     }
-    if (s.id >= 256) {
+    if (!isBlock(s.id)) {
       const it = ITEMS[s.id];
       if (it && it.portal) {
         if (it.portal === p.world) { this.toast(p, 'Je bent al in deze wereld.', 'warn'); return reject(); }
@@ -493,6 +495,7 @@ export class GameServer {
       return reject();
     }
     const def = BLOCKS[s.id];
+    if (!def) return reject();
     if (def.support && !w.solid(x, y - 1, z)) return reject();
     if (def.solid) {
       for (const q of this.players.values()) {
@@ -512,6 +515,7 @@ export class GameServer {
       this.toast(p, 'Het ei ligt er. Houd het warm met een kampvuur vlak ernaast!');
     }
     if (!p.flags['made_' + def.key] && (def.key === 'werkbank' || def.key === 'kampvuur' || def.key === 'bed')) p.flags['made_' + def.key] = 1;
+    this.techPlaced(p, w, x, y, z, s.id);
     s.n--; if (s.n <= 0) p.inv[p.sel] = null;
     this.jobEvent(p, 'bouw');
     this.sendInv(p);
@@ -576,6 +580,8 @@ export class GameServer {
       this.useHeart(p, w);
     } else if (id === B.broedmachine) {
       this.useIncubator(p, w, x, y, z);
+    } else if (id === B.zonnepaneel || id === B.windmolen || id === B.batterij || id === B.fabriek || id === B.teleportpoort || id === B.klimaatmachine) {
+      this.useTech(p, w, x, y, z, id);
     } else if (id === B.schakelaar_uit || id === B.schakelaar_aan) {
       this.useSwitch(p, w, x, y, z, id);
     } else if (id === B.knop_rood || id === B.knop_blauw || id === B.knop_geel) {
@@ -963,6 +969,7 @@ export class GameServer {
     this.updateEggs();
     this.updateIncubators();
     this.updateCrops();
+    this.updateTech();
     for (const q of this.players.values()) this.updateFires(q);
     for (const wid of active) this.cleanup(this.worlds[wid]);
     // chunks vergeten waar niemand meer is
@@ -1040,5 +1047,5 @@ export class GameServer {
   }
 }
 
-Object.assign(GameServer.prototype, entityMethods, npcMethods, zooMethods, vehicleMethods, kermisMethods, cityMethods, farmMethods, jobMethods, secretMethods);
+Object.assign(GameServer.prototype, entityMethods, npcMethods, zooMethods, vehicleMethods, kermisMethods, cityMethods, farmMethods, jobMethods, secretMethods, techMethods);
 export { itemName, isNight };

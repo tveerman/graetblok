@@ -3,7 +3,7 @@ import * as THREE from '../../vendor/three.module.min.js';
 import { EYE, REACH, CH, clamp, idx } from '../shared/constants.js';
 import { VEHICLES, vehStats, ROAD_BONUS } from '../shared/vehicles.js';
 import { CROP_OF_SEED } from '../shared/farm.js';
-import { B, BLOCKS, B_SHAPE, B_ROAD, SHAPE_LIQUID, PORTAL_TO, TILE_CRACK } from '../shared/blocks.js';
+import { B, BLOCKS, B_SHAPE, B_ROAD, SHAPE_LIQUID, PORTAL_TO, TILE_CRACK, isBlock } from '../shared/blocks.js';
 import { ITEMS, I } from '../shared/items.js';
 import { BREATH } from '../shared/mobs.js';
 import { RAIL_DX, RAIL_DZ, railLinks, railExit, railRamp, railPos, railAt, railDirOf } from '../shared/rails.js';
@@ -852,13 +852,13 @@ export class Player {
     const seed = !!CROP_OF_SEED[id] && !!b && b.id === B.akker;
     if (it && it.food && !seed) { g.net.send({ t: 'eat' }); return; }
     if (!b || !id) return;
-    if (id >= 256 && !(it && it.portal) && !seed) return;
+    if (!isBlock(id) && !(it && it.portal) && !seed) return;
     let x = b.x, y = b.y, z = b.z;
     if (!BLOCKS[b.id].replace) { x += b.nx; y += b.ny; z += b.nz; }
     const cur = g.world.getBlock(x, y, z);
     if (cur < 0 || !BLOCKS[cur].replace || y < 1 || y >= CH - 1) return;
     if (seed) { g.world.setBlock(x, y, z, B.kiem); g.sound.play('place', 1, 'leaf'); }
-    else if (id < 256) {
+    else if (isBlock(id)) {
       const def = BLOCKS[id];
       if (def.solid && this.pos.x + HW > x && this.pos.x - HW < x + 1 && this.pos.z + HW > z && this.pos.z - HW < z + 1 && this.pos.y + HH > y && this.pos.y < y + 1) return;
       if (def.support && !g.world.solid(x, y - 1, z)) { g.ui.toast('Dit moet op de grond staan.'); return; }

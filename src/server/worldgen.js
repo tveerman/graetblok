@@ -2,7 +2,7 @@
 // Alles hangt af van het zaadje (seed), dus dezelfde plek ziet er altijd hetzelfde uit.
 import { CS, CH, CHUNK_VOL, SEA, idx, clamp, lerp, smoothstep } from '../shared/constants.js';
 import { Simplex, hash2, hash3, mulberry32 } from '../shared/noise.js';
-import { B, LIFE_LEAVES, LIFE_VINES, LIFE_FRUIT, ZWAMMEN, ZWAMHOEDEN } from '../shared/blocks.js';
+import { B, BlockArray, LIFE_LEAVES, LIFE_VINES, LIFE_FRUIT, ZWAMMEN, ZWAMHOEDEN } from '../shared/blocks.js';
 import { WORLDS, CRASH, NEST_PEAK } from '../shared/worlds.js';
 import { siteMethods, SITE_ODDS } from './sites.js';
 import { cityGen } from './city.js';
@@ -41,8 +41,8 @@ export class WorldGen {
     this.n7 = new Simplex(s + 7); this.n8 = new Simplex(s + 8); this.n9 = new Simplex(s + 9);
     this.c = { h: 0, top: 0, under: 0, base: B.steen, liq: 0, ly: 0, tp: 0, tk: 0, vg: 0, nc: 0, ent: 0 };
     // werkgeheugen
-    this._H = new Int16Array(W * W); this._top = new Uint8Array(W * W); this._under = new Uint8Array(W * W);
-    this._base = new Uint8Array(W * W); this._liq = new Uint8Array(W * W); this._ly = new Uint8Array(W * W);
+    this._H = new Int16Array(W * W); this._top = new BlockArray(W * W); this._under = new BlockArray(W * W);
+    this._base = new BlockArray(W * W); this._liq = new BlockArray(W * W); this._ly = new Uint8Array(W * W);
     this._tp = new Float32Array(W * W); this._tk = new Uint8Array(W * W); this._vg = new Uint8Array(W * W);
     this._nc = new Uint8Array(W * W); this._ent = new Uint8Array(W * W);
     this._ca = new Float32Array(5 * 5 * (CH / 4 + 1)); this._cb = new Float32Array(5 * 5 * (CH / 4 + 1)); this._cc = new Float32Array(5 * 5 * (CH / 4 + 1));
@@ -307,7 +307,7 @@ export class WorldGen {
   // ---------- chunk maken ----------
 
   generate(cx, cz) {
-    const blocks = new Uint8Array(CHUNK_VOL);
+    const blocks = new BlockArray(CHUNK_VOL);
     const ox = cx * CS, oz = cz * CS;
     const H = this._H, TOP = this._top, UND = this._under, BASE = this._base, LIQ = this._liq, LY = this._ly;
     const TP = this._tp, TK = this._tk, VG = this._vg, NC = this._nc, ENT = this._ent;

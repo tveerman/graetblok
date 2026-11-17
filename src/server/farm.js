@@ -128,7 +128,7 @@ export const farmMethods = {
       const prijs = FARM_PRICES[id], n = this.count(p, id);
       if (!prijs || n < 1) return 0;
       this.take(p, id, n);
-      if (id >= 256 && ITEMS[id].leaves) this.giveLoot(p, ITEMS[id].leaves, n, true);      // de lege emmers krijg je terug
+      if (ITEMS[id] && ITEMS[id].leaves) this.giveLoot(p, ITEMS[id].leaves, n, true);      // de lege emmers krijg je terug
       const som = n * prijs + F.rest, munten = Math.floor(som + 1e-9);
       F.rest = som - munten;
       if (munten > 0) this.giveLoot(p, I.munt, munten, true);

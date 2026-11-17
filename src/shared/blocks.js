@@ -6,6 +6,19 @@
 
 export const SHAPE_AIR = 0, SHAPE_CUBE = 1, SHAPE_CROSS = 2, SHAPE_LIQUID = 3, SHAPE_LOW = 4, SHAPE_EGG = 5;
 
+// Nummers. Blokken en voorwerpen delen één reeks nummers, want in een rugzak kan allebei zitten:
+//      1 ..  255   blokken (de eerste reeks)
+//    256 .. 1023   voorwerpen (zie items.js)
+//   1024 .. 4095   blokken (de tweede reeks, voor alles wat er na de eerste 255 bij kwam)
+// Bestaande nummers veranderen nooit: ze staan in opgeslagen werelden en rugzakken.
+// Een chunk bewaart per vakje één nummer van 16 bits (Uint16Array).
+export const ITEM_BASE = 256;        // hier beginnen de voorwerpen
+export const BLOCK2_BASE = 1024;     // hier begint de tweede reeks blokken
+export const NUM_BLOCKS = 4096;      // zo lang zijn de opzoektabellen (hoogste blok-id + 1)
+export const BlockArray = Uint16Array;      // het soort lijst waar blok-id's in passen
+// Is dit nummer een blok (en geen lucht of voorwerp)? Gebruik dit overal in plaats van "id < 256".
+export const isBlock = (id) => id > 0 && (id < ITEM_BASE || (id >= BLOCK2_BASE && id < NUM_BLOCKS));
+
 export const BLOCKS = [];      // id -> definitie
 export const B = {};           // sleutel -> id
 export const TILE_NAMES = [];  // alle plaatjes die de atlas nodig heeft
@@ -18,6 +31,7 @@ function tile(name) {
 export const tileId = (name) => tile(name);
 
 function def(id, key, name, p = {}) {
+  if (id !== 0 && !isBlock(id)) throw new Error('Blok ' + key + ' heeft nummer ' + id + ': dat is geen blok-nummer (1..255 of 1024..4095).');
   const tiles = p.tiles || key;
   const t = Array.isArray(tiles) ? tiles : [tiles, tiles, tiles];
   const shape = p.shape === undefined ? SHAPE_CUBE : p.shape;
@@ -157,6 +171,15 @@ def(244, 'schap_juwelen', 'Wandkast met juwelen', { ...SCHAP, tiles: ['planken',
 def(245, 'koraal_roze', 'Roze koraal', { hard: 0.8, snd: 'stone' });
 def(246, 'koraal_oranje', 'Oranje koraal', { hard: 0.8, snd: 'stone' });
 def(247, 'koraal_blauw', 'Blauw koraal', { hard: 0.8, snd: 'stone', light: 4 });
+
+// techniek en fabrieken (zie tech.js). De eerste reeks nummers (1..255) is hierna bijna op:
+// alleen 254 en 255 zijn nog vrij. Nieuwe blokken krijgen een nummer vanaf 1024 (zie onderaan).
+def(248, 'zonnepaneel', 'Zonnepaneel', { tiles: ['zonnepaneel_top', 'zonnepaneel', 'ijzerblok'], shape: SHAPE_LOW, solid: true, opaque: false, height: 0.25, hard: 1.5, snd: 'glass', interact: true });
+def(249, 'windmolen', 'Windmolen', { tiles: ['ijzerblok', 'windmolen', 'ijzerblok'], hard: 2, snd: 'metal', interact: true });
+def(250, 'batterij', 'Batterij', { tiles: ['batterij_top', 'batterij', 'ijzerblok'], hard: 2, snd: 'metal', interact: true, light: 5 });
+def(251, 'fabriek', 'Fabrieksmachine', { tiles: ['ijzerblok', 'fabriek', 'ijzerblok'], hard: 3, tool: 'pick', snd: 'metal', interact: true });
+def(252, 'teleportpoort', 'Teleportatiepoort', { tiles: ['teleport_top', 'teleport', 'ijzerblok'], hard: 3, tool: 'pick', snd: 'metal', interact: true, light: 9 });
+def(253, 'klimaatmachine', 'Klimaatmachine', { tiles: ['klimaat_top', 'klimaat', 'ijzerblok'], hard: 3, tool: 'pick', snd: 'metal', interact: true });
 
 // de stad en het vliegveld
 def(172, 'beton', 'Beton', { hard: 3, tool: 'pick' });
@@ -320,8 +343,11 @@ export const MODEL_TILES = ['gras_spriet', 'plant_steel', 'plant_blad', 'bloembl
   'rail_staal', 'biels', 'tarwe_halm', 'tarwe_aar', 'web'];
 MODEL_TILES.forEach(tile);
 
-export const NUM_BLOCKS = 256;
-// Snelle opzoektabellen
+// ---- de tweede reeks blokken: nummers vanaf 1024 (BLOCK2_BASE) ----
+// Het eerste blok hier is een proef: gekleurd beton. De rest van de kleurblokken komt erachter.
+def(1024, 'beton_rood', 'Rood beton', { hard: 3, tool: 'pick' });
+
+// Snelle opzoektabellen (één vakje per mogelijk blok-id)
 export const B_ROAD = new Uint8Array(NUM_BLOCKS);      // 1 = wegdek: voertuigen rijden hier harder
 export const B_SHAPE = new Uint8Array(NUM_BLOCKS);
 export const B_PASS = new Uint8Array(NUM_BLOCKS);

@@ -54,6 +54,8 @@ export const JOBS = {
   spel_blik: { title: 'Kermisbaas', hi: '', game: 'blik', trades: [] },
   spel_ring: { title: 'Kermisbaas', hi: '', game: 'ring', trades: [] },
   spel_grijp: { title: 'Kermisbaas', hi: '', game: 'grijp', trades: [] },
+  uitvinder: { title: 'Uitvinder', hi: 'Welkom in mijn werkplaats! Met stroom kun je van alles laten werken.',
+    trades: [[M, 12, B.zonnepaneel, 1], [M, 10, B.windmolen, 1], [M, 15, B.batterij, 1], [M, 40, B.fabriek, 1], [M, 60, B.teleportpoort, 1], [M, 80, B.klimaatmachine, 1], [I.machineonderdeel, 1, M, 3]] },
   hotelier: { title: 'Hotelbaas', hi: 'Welkom in hotel De Zilveren Toren! Slaap gerust in een van de bedden achterin.',
     trades: [[M, 2, I.brood, 1], [M, 3, I.pannenkoek, 1], [M, 5, I.appeltaart, 1]] },
   baliemedewerker: { title: 'Baliemedewerker', hi: 'Welkom op het vliegveld! Het lijnvliegtuig staat aan het begin van de startbaan. Een vlucht kost 5 munten.',
@@ -442,6 +444,7 @@ export const npcMethods = {
       const J = JOBS[e.job];
       e.talk = 25;
       let say = J.hi || TIPS[(e.id + Math.floor(this.meta.time / 40)) % TIPS.length];
+      if (e.job === 'uitvinder') say = this.inventorSays(p);
       if (!p.flags.welkom) {
         p.flags.welkom = 1;
         this.giveLoot(p, M, 5); this.sendInv(p);

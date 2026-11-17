@@ -28,7 +28,7 @@ export const zooMethods = {
     const key = w.id + ':' + x + ',' + y + ',' + z, all = this.incubs();
     const inc = all[key] || (all[key] = { w: w.id, x, y, z, owner: p.name, eggs: [] });
     const s = p.inv[p.sel];
-    const kind = s && s.id >= 256 && ITEMS[s.id] ? ITEMS[s.id].egg : '';
+    const kind = s && ITEMS[s.id] ? ITEMS[s.id].egg : '';
     if (kind) {
       if (inc.eggs.length >= SLOTS) { this.toast(p, 'De broedmachine zit vol: er passen ' + SLOTS + ' eieren in.', 'warn'); return; }
       const E = EGG_KINDS[kind];

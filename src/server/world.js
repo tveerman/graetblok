@@ -8,7 +8,7 @@ export class ServerWorld {
     this.id = id;
     this.gen = new WorldGen(id, seed, genOpts);
     this.pop = new Map();             // bouwwerken waar nu bewoners rondlopen: sleutel -> { site, ids }
-    this.chunks = new Map();          // sleutel -> Uint8Array
+    this.chunks = new Map();          // sleutel -> Uint16Array met blok-id's
     this.edits = edits || new Map();  // sleutel -> Map(index -> blok)
     this.dirty = new Set();           // chunks met wijzigingen die nog opgeslagen moeten worden
     this.ents = new Map();            // id -> wezen
