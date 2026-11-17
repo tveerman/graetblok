@@ -68,7 +68,11 @@
   <div id="menuBox">
     <h1>GRAET BLOK</h1>
     <p class="tag">Een gigantische wereld vol monsters, draken, machines, geheimen en vrienden.</p>
-    <button id="btnPlay" class="btn big">▶ Spelen</button>
+    <div id="loadBox">
+      <div id="loadBar"><div id="loadFill"></div></div>
+      <p id="loadText">Het spel wordt geladen...</p>
+    </div>
+    <button id="btnPlay" class="btn big hidden">▶ Spelen</button>
     <div id="updateBox" class="hidden">
       <button id="btnReload" class="btn gold">🔄 Opnieuw laden</button>
       <p id="updateText">Er is een nieuwe versie van het spel!</p>
@@ -78,7 +82,7 @@
       <div id="lookTypes" class="btnrow"></div>
       <div id="lookColors" class="btnrow"></div>
     </div>
-    <button id="btnNew" class="btn small danger">Nieuwe wereld beginnen</button>
+    <button id="btnNew" class="btn small danger hidden">Nieuwe wereld beginnen</button>
     <p id="menuError"></p>
     <p class="credit">Bedacht door Jorian<span id="versionText"></span></p>
     <p id="serverStatus" class="credit"></p>
@@ -115,9 +119,67 @@
   window.addEventListener('load', function () { setTimeout(herstel, 20000); });
 })();
 </script>
+<script>
+// De balk op het beginscherm. Zolang het spel nog bestanden ophaalt, zichzelf opbouwt of kijkt
+// of er een nieuwe versie is, staat hier een balk in plaats van de knop "Spelen": zo zie je
+// dat er iets gebeurt en hoef je niet op een knop te drukken die nog niets doet.
+(function () {
+  var klaar = { spel: false, versie: false }, getoond = false;
+  function el(id) { return document.getElementById(id); }
+  // tekst = wat er gebeurt, deel = hoe ver (0..1; weglaten = de balk blijft staan waar hij stond)
+  window.graetLaad = function (tekst, deel) {
+    if (getoond) return;
+    el('loadText').textContent = tekst;
+    if (typeof deel === 'number') el('loadFill').style.width = Math.round(Math.max(0, Math.min(1, deel)) * 100) + '%';
+  };
+  // wat = 'spel' (het spel is opgebouwd) of 'versie' (er is gekeken of er een nieuwe versie is)
+  window.graetKlaar = function (wat) {
+    klaar[wat] = true;
+    if (getoond || !klaar.spel || !klaar.versie) return;
+    getoond = true;
+    el('loadBox').classList.add('hidden');
+    el('btnPlay').classList.remove('hidden'); el('btnNew').classList.remove('hidden');
+  };
+  // weer terug naar de balk (er wordt een nieuwe versie opgehaald en daarna herladen)
+  window.graetBezig = function (tekst, deel) {
+    getoond = false;
+    el('loadBox').classList.remove('hidden');
+    el('btnPlay').classList.add('hidden'); el('btnNew').classList.add('hidden');
+    window.graetLaad(tekst, deel);
+  };
+})();
+</script>
 <script type="module">
-// Het spel starten. Lukt dat niet (een bestand ontbreekt of past niet bij de rest), dan het vangnet.
-import('./src/client/main.js').catch(function (e) { console.error('Het spel kon niet starten:', e); if (window.graetHerstel) window.graetHerstel(e); });
+// Het spel starten: eerst alle bestanden ophalen (dan kan de balk laten zien hoe ver het is),
+// daarna het spel zelf opbouwen. Lukt dat niet (een bestand ontbreekt of past niet bij de
+// rest), dan het vangnet hierboven.
+(async function () {
+  try {
+    const list = await (await fetch('files.json')).json();
+    let done = 0, next = 0;
+    const one = async () => {
+      while (next < list.length) {
+        const f = list[next++];
+        try { await (await fetch(f)).arrayBuffer(); } catch (e) { /* het spel probeert het straks zelf nog eens */ }
+        window.graetLaad('Het spel wordt opgehaald... ' + (++done) + ' van ' + list.length, 0.05 + 0.75 * done / list.length);
+      }
+    };
+    await Promise.all([one(), one(), one(), one(), one(), one()]);
+  } catch (e) { /* geen lijst (bijv. geen verbinding): het spel laadt zijn bestanden dan zelf */ }
+  window.graetLaad('Het spel wordt opgebouwd...', 0.85);
+  // even wachten tot de balk getekend is: het opbouwen houdt daarna het scherm een paar tellen vast
+  await new Promise((r) => { let ok = false; const go = () => { if (!ok) { ok = true; r(); } }; requestAnimationFrame(() => requestAnimationFrame(go)); setTimeout(go, 250); });
+  try {
+    await import('./src/client/main.js');
+    window.graetLaad('Kijken of er een nieuwe versie is...', 0.95);
+    window.graetKlaar('spel');
+    // lukt het kijken naar een nieuwe versie niet, dan na een tijdje toch de knop laten zien
+    setTimeout(() => window.graetKlaar('versie'), 15000);
+  } catch (e) {
+    console.error('Het spel kon niet starten:', e);
+    if (window.graetHerstel) window.graetHerstel(e);
+  }
+})();
 </script>
 </body>
 </html>

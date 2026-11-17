@@ -84,16 +84,21 @@ async function fileList() {
 }
 
 // Haal bestanden vers van de server. Gooit een fout als de server onbereikbaar is.
-async function download(urls) {
+// wat = 'eerste' (alles voor het eerst opslaan) of 'kijken' (is er iets nieuws?): de pagina
+// krijgt te horen hoe ver we zijn, voor de balk op het beginscherm.
+async function download(urls, wat) {
   const files = [];
+  let done = 0, told = 0;
   const t = timed(40000);
   try {
     await Promise.all(urls.map(async (url) => {
       const res = await fetch(url, { cache: 'no-cache', signal: t.signal });
-      if (res.status === 404) return;                    // bestand bestaat niet (meer): overslaan
+      if (res.status === 404) { done++; return; }        // bestand bestaat niet (meer): overslaan
       if (!res.ok) throw new Error(url + ' gaf ' + res.status);
       const buf = await res.arrayBuffer();
       files.push({ url, buf, type: typeFor(url, res.headers.get('Content-Type')), sig: hash(new Uint8Array(buf)), lm: Date.parse(res.headers.get('Last-Modified') || '') || 0 });
+      done++;
+      if (wat && (done - told >= 4 || done === urls.length)) { told = done; notify({ t: 'sw-progress', wat, done, total: urls.length }); }
     }));
   } finally { t.done(); }
   if (!files.some((f) => f.url === BASE + 'index.html')) throw new Error('index.html ontbreekt');
@@ -122,7 +127,7 @@ async function notify(msg) {
 async function ensureFirst() {
   const meta = await readMeta();
   if (meta && meta.active && await caches.has(meta.active)) { metaMem = meta; return; }
-  const files = await download(await fileList());
+  const files = await download(await fileList(), 'eerste');
   const name = GEN_PREFIX + Date.now();
   const sigs = await store(name, files);
   await writeMeta({ active: name, sigs, stamp: stampOf(files), pending: null, pendingSigs: null, pendingStamp: null });
@@ -152,7 +157,7 @@ async function runCheck() {
   const cache = await caches.open(meta.active);
   const have = (await cache.keys()).map((r) => r.url);
   const urls = Array.from(new Set(listed.concat(have))).filter((u) => u !== self.location.href);
-  const files = await download(urls);
+  const files = await download(urls, 'kijken');
 
   // vergelijken met wat we al hebben (of met wat al klaarstaat)
   const known = meta.pending ? meta.pendingSigs : meta.sigs;

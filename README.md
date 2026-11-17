@@ -79,6 +79,14 @@ How "newer" is decided depends on how the game was opened:
   server turns out to be unreachable it says so and does not reload — without the service
   worker a reload would fail.
 
+While the game is still fetching its files, building itself or checking for a new version, the
+menu shows a progress bar instead of the play button ("Het spel wordt opgehaald... 12 van 42",
+"Het spel wordt opgebouwd...", "Kijken of er een nieuwe versie is..."). The play button appears
+when all of that is done, or after 15 seconds if the version check gets no answer. If a new
+version is found while the menu is open, the game loads it by itself and reloads (at most once
+a minute); the **🔄 Opnieuw laden** button is only shown when that is not possible, for example
+while a world is being played.
+
 Pressing play without reloading keeps the current version for that session.
 
 To get back to this menu while playing, open the pause menu (⚙️) and choose
@@ -115,10 +123,13 @@ the tablet is put away or the tab is hidden.
 
 The pause menu has separate switches for music ("Muziek") and sound effects
 ("Geluidseffecten"), and a slider "Regen en wind" for rain, wind, thunder, birds and animals.
-Two test switches help when the sound stutters on a device: "Grote geluidsbuffer" (asks the
-browser for a large audio buffer, `latencyHint: 'playback'`; on by default) and "Geluid in stille
-stand" (the silent `<audio>` loop for iOS; on by default). Both take effect after a reload. The
-audio line also shows the sample rate and the output delay in milliseconds. Its last line reports what the audio is doing on that device, for example
+On iPad and iPhone the music does not go through Web Audio at all: every piece is rendered
+ahead, written to a WAV blob (the melody twice plus its tail, with the volume baked in) and
+played by the same `<audio>` element that keeps the sound working in silent mode. Safari renders
+Web Audio in 3 ms blocks and drops out when an old iPad is busy; the media player buffers by
+itself. The switch "Muziek via de speler" (only shown there) turns this off again. The audio
+line shows the sample rate, the output delay and "via de speler" when this is active. Add
+`?speler` to the address to try it on a desktop browser. Its last line reports what the audio is doing on that device, for example
 "Geluid: aan · muziek: 57 noten, sterkte 9%, als lusje · effecten: aan" — useful when a device
 stays silent. "als lusje" means the music is rendered ahead of time and played as a loop (see
 "Sprites and sound"); "noot voor noot" means the browser could not do that and every note is

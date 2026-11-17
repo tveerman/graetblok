@@ -37,8 +37,30 @@ export function setupOffline(game) {
     if (!el || !ms) return;
     el.textContent = ' · versie van ' + new Date(ms).toLocaleString('nl-NL', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
   };
+  // De balk op het beginscherm (zie index.html). first = de eerste keer kijken na het laden
+  // van de pagina is nog bezig: zolang staat er een balk in plaats van de knop "Spelen".
+  let first = true, reloading = false;
+  const bar = (tekst, deel) => { if (window.graetLaad) window.graetLaad(tekst, deel); };
+  const firstDone = () => { if (!first) return; first = false; if (!reloading && window.graetKlaar) window.graetKlaar('versie'); };
+  const onMenuNow = () => game.state === 'menu';
+  // Mag het spel zichzelf herladen voor een nieuwe versie? Alleen op het beginscherm, en niet
+  // twee keer vlak achter elkaar (dan klopt er iets niet en laten we de knop zien).
+  const mayAuto = () => {
+    if (!onMenuNow() || reloading) return false;
+    let last = 0;
+    try { last = +sessionStorage.getItem('graetblok.auto') || 0; } catch (e) { /* geeft niet */ }
+    return Date.now() - last > 60000;
+  };
   const showUpdate = () => {
     if (!box) return;
+    if (mayAuto()) {
+      // nog niet aan het spelen: de nieuwe versie meteen laden, zonder dat je iets hoeft te doen
+      reloading = true;
+      try { sessionStorage.setItem('graetblok.auto', String(Date.now())); } catch (e) { /* geeft niet */ }
+      if (window.graetBezig) window.graetBezig('Er is een nieuwe versie! Die wordt nu geladen...', 0.05);
+      if (mode === 'sw') setTimeout(() => location.reload(), 400); else directReload();
+      return;
+    }
     txt.textContent = NEW_TEXT;
     box.classList.remove('hidden');
   };
@@ -64,9 +86,10 @@ export function setupOffline(game) {
     const t = timed(8000);
     try {
       const list = await fileList(t.signal);           // lukt dit, dan is de server bereikbaar
-      let changed = false;
+      let changed = false, seen = 0;
       await Promise.all(list.map(async (f) => {
         const live = await fetch(f, { method: 'HEAD', cache: 'no-store', signal: t.signal });
+        if (first) bar('Kijken of er een nieuwe versie is... ' + (++seen) + ' van ' + list.length, 0.9 + 0.1 * seen / list.length);
         if (!live.ok) return;
         const now = stamp(live);
         if (!(f in loaded)) {
@@ -92,12 +115,19 @@ export function setupOffline(game) {
     const t = timed(30000);
     try {
       const list = await fileList(t.signal);
-      await Promise.all(list.map((f) => fetch(f, { cache: 'reload', signal: t.signal }).then((r) => r.arrayBuffer())));
+      let got = 0;
+      await Promise.all(list.map((f) => fetch(f, { cache: 'reload', signal: t.signal }).then((r) => r.arrayBuffer()).then(() => {
+        got++;
+        txt.textContent = 'Bezig met laden... ' + got + ' van ' + list.length;
+        bar('De nieuwe versie wordt opgehaald... ' + got + ' van ' + list.length, got / list.length);
+      })));
       location.reload();
     } catch (e) {
       sayServer('down');
       txt.textContent = 'De server is nu niet bereikbaar. Probeer het straks nog eens.';
       btn.disabled = false;
+      // het vanzelf laden is mislukt: dan gewoon de knoppen weer laten zien
+      if (reloading) { reloading = false; first = true; firstDone(); box.classList.remove('hidden'); }
     } finally { t.done(); }
   }
 
@@ -110,16 +140,17 @@ export function setupOffline(game) {
     try {
       if (mode === 'sw') {
         const target = (reg && reg.active) || sw.controller;
-        if (!target) { busy = false; return; }
+        if (!target) { busy = false; firstDone(); return; }
         target.postMessage({ t: 'sw-check', force: !!force });
         // het antwoord komt als bericht (zie hieronder); komt er niets, dan is er iets mis
         clearTimeout(waitTimer);
-        waitTimer = setTimeout(() => { busy = false; sayServer('down'); }, 12000);
+        waitTimer = setTimeout(() => { busy = false; sayServer('down'); firstDone(); }, 12000);
         return;
       }
       await directCheck();
     } catch (e) { sayServer('down'); }
     busy = false;
+    firstDone();
   }
 
   if (btn) {
@@ -162,6 +193,10 @@ export function setupOffline(game) {
       sayServer(m.reachable ? 'up' : 'down');
       sayVersion(m.version);
       if (m.pending) showUpdate();
+      firstDone();
+    } else if (m.t === 'sw-progress') {
+      // de service worker haalt bestanden op: laat op het beginscherm zien hoe ver hij is
+      if (first) bar((m.wat === 'eerste' ? 'Het spel wordt opgeslagen op dit apparaat... ' : 'Kijken of er een nieuwe versie is... ') + m.done + ' van ' + m.total, 0.9 + 0.1 * m.done / m.total);
     } else if (m.t === 'sw-update') {
       // er is net een nieuwe versie klaargezet
       showUpdate();
