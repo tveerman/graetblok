@@ -229,3 +229,10 @@ body.touch #crosshair { opacity: .6; }
 .zrar { font-size: 11px; font-weight: 700; }
 .zcnt { font-size: 11px; opacity: .85; }
 .zegg { width: 26px; height: 26px; vertical-align: middle; }
+
+/* luchtbellen onder water */
+#air { font-size: 15px; line-height: 1; height: 18px; letter-spacing: -2px; text-shadow: 0 1px 2px rgba(0,0,0,.6); }
+#air { align-self: flex-start; }
+
+/* brandstof, schade en snelheid van je voertuig */
+#vehHud { font-size: 14px; font-weight: 700; padding: 4px 12px; border-radius: 10px; background: rgba(0,0,0,.45); text-shadow: 0 1px 2px #000; white-space: nowrap; }

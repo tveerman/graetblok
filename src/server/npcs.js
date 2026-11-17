@@ -6,7 +6,12 @@ import { B, BLOCKS, EGGS } from '../shared/blocks.js';
 import { I, ITEMS, itemName, maxStack, matches, GROUP_NAMES } from '../shared/items.js';
 import { WORLDS, WORLD_ORDER } from '../shared/worlds.js';
 import { MOBS, DRAGONS, BREATH } from '../shared/mobs.js';
-import { RAIL_YAW, railLinks } from '../shared/rails.js';
+import { RAIL_YAW, RAIL_DX, RAIL_DZ, railLinks, railExit, railRamp, railPos, railDirOf, railAt } from '../shared/rails.js';
+
+const LINE_SPEED = 8;        // zo hard rijdt de lijntrein (blokken per tel)
+const LINE_WAIT = 12;        // zo lang wacht hij op een station
+const LINE_RANGE = 120;      // rijdt alleen als er iemand zo dichtbij is (anders moet de wereld ver weg gemaakt worden)
+const _RL = [0, 0, 0, 0], _RP = [0, 0, 0, 0];
 
 const M = I.munt;
 const r2 = (v) => Math.round(v * 100) / 100;
@@ -19,7 +24,7 @@ export const JOBS = {
   kok: { title: 'Kok', hi: 'Welkom in het restaurant! Wat mag het zijn?',
     trades: [[M, 3, I.pannenkoek, 1], [M, 5, I.stoofpot, 1], [M, 12, I.heldenmaal, 1], [I.rauw_vlees, 2, M, 1], [I.bessen, 6, M, 1]] },
   smid: { title: 'Smid', hi: 'Goed staal, eerlijke prijzen. En ik koop al je staven.',
-    trades: [[M, 10, I.houweel_ijzer, 1], [M, 10, I.zwaard_ijzer, 1], [M, 8, I.bijl_ijzer, 1], [M, 24, I.harnas_ijzer, 1], [M, 2, I.pijl, 8],
+    trades: [[M, 60, I.v_auto, 1], [M, 45, I.v_motor, 1], [M, 35, I.v_quad, 1], [M, 4, I.moersleutel, 1], [M, 10, I.houweel_ijzer, 1], [M, 10, I.zwaard_ijzer, 1], [M, 8, I.bijl_ijzer, 1], [M, 24, I.harnas_ijzer, 1], [M, 2, I.pijl, 8],
       [I.ijzerstaaf, 1, M, 2], [I.koperstaaf, 1, M, 1], [I.goudstaaf, 1, M, 4], [I.steenkool, 4, M, 1]] },
   winkelier: { title: 'Winkelier', hi: 'Kijk gerust rond. Ik heb van alles!',
     trades: [[M, 2, B.fakkel, 6], [M, 4, B.lantaarn, 1], [M, 6, B.bed, 1], [M, 5, I.emmer, 1], [M, 8, I.boog, 1],
@@ -33,15 +38,15 @@ export const JOBS = {
     trades: [[I.robijn, 1, M, 8], [I.saffier, 1, M, 8], [I.smaragd, 1, M, 8], [I.amethist, 1, M, 4], [I.kristal, 1, M, 5], [B.gloeikristal, 2, M, 1],
       [M, 30, I.verrekijker, 1], [M, 45, I.springlaarzen, 1], [M, 12, B.lamp, 2]] },
   mijnwerker: { title: 'Mijnwerker', hi: 'Het mijnbedrijf koopt alles wat uit de grond komt.',
-    trades: [[M, 6, B.dynamiet, 2], [M, 14, I.houweel_ijzer, 1], [M, 3, B.fakkel, 8], [M, 60, I.ei_oer, 1],
+    trades: [[M, 90, I.v_vrachtwagen, 1], [M, 75, I.v_terreinwagen, 1], [M, 3, I.jerrycan, 1], [M, 6, B.dynamiet, 2], [M, 14, I.houweel_ijzer, 1], [M, 3, B.fakkel, 8], [M, 60, I.ei_oer, 1],
       [B.keisteen, 16, M, 1], [B.ijzer_erts, 2, M, 3], [B.koper_erts, 2, M, 2], [B.goud_erts, 1, M, 3], [B.marmer, 8, M, 2]] },
   marktkoopman: { title: 'Marktkoopman', hi: 'Appels, bessen, drankjes! Kom dat zien!',
-    trades: [[M, 5, I.ei_basis, 1], [M, 25, I.ei_oceaan, 1], [M, 1, I.bessen, 4], [M, 1, I.appel, 2], [M, 2, I.gebraden_vlees, 1], [M, 4, I.drankje, 1]] },
+    trades: [[M, 40, I.v_boot, 1], [M, 3, I.jerrycan, 1], [M, 5, I.ei_basis, 1], [M, 25, I.ei_oceaan, 1], [M, 1, I.bessen, 4], [M, 1, I.appel, 2], [M, 2, I.gebraden_vlees, 1], [M, 4, I.drankje, 1]] },
   drakenhandelaar: { title: 'Drakenhandelaar', hi: 'Psst... zoek je iets bijzonders? Ik heb eieren van heel ver weg.',
-    trades: [[M, 40, I.ei_magisch, 1], [M, 120, I.ei_sterren, 1], [M, 40, B.ei_vuur, 1], [M, 40, B.ei_ijs, 1], [M, 50, B.ei_bliksem, 1], [M, 50, B.ei_schaduw, 1], [M, 80, B.ei_kristal, 1],
+    trades: [[M, 160, I.v_helikopter, 1], [M, 40, I.ei_magisch, 1], [M, 120, I.ei_sterren, 1], [M, 40, B.ei_vuur, 1], [M, 40, B.ei_ijs, 1], [M, 50, B.ei_bliksem, 1], [M, 50, B.ei_schaduw, 1], [M, 80, B.ei_kristal, 1],
       [M, 6, I.drakenschub, 1], [I.drakenschub, 1, M, 4]] },
   stationschef: { title: 'Stationschef', hi: 'Instappen! Zet een locomotief op de rails en tik erop om te rijden.',
-    trades: [[M, 25, I.locomotief, 1], [M, 10, I.wagon, 1], [M, 4, B.rails, 16], [I.steenkool, 6, M, 1]] },
+    trades: [[M, 90, I.v_bus, 1], [M, 3, I.jerrycan, 1], [M, 25, I.locomotief, 1], [M, 10, I.wagon, 1], [M, 4, B.rails, 16], [I.steenkool, 6, M, 1]] },
   koning: { title: 'Koning', hi: 'Welkom in mijn kasteel, dappere held. Breng mij de kroon van de Skeletkoning en ik beloon je rijkelijk!',
     trades: [[I.spookkroon, 1, M, 100], [M, 100, B.ei_goud, 1], [M, 60, I.ridderharnas, 1], [M, 30, I.zwaard_zilver, 1], [I.drakenschub, 2, M, 10]] },
 };
@@ -96,6 +101,7 @@ export const npcMethods = {
     for (const s of near) {
       const d = Math.hypot(s.x - p.x, s.z - p.z);
       if (d < s.r0 + 60 && !w.pop.has(s.key)) this.populate(w, s);
+      if (d < s.r0 + 90 && s.kind === 'dorp') this.ensureLineTrain(w, s);
       if (d < s.r0 - 6 && s.name) inside = s;
     }
     if (inside) {
@@ -375,6 +381,7 @@ export const npcMethods = {
     const held = p.inv[p.sel], hid = held ? held.id : 0;
     const ai = e.def.ai;
     if (e.kind === 'trein') { this.useTrain(p, w, e, hid); return true; }
+    if (e.veh) { this.useVehicle(p, w, e, hid); return true; }
     if (e.job) {
       const J = JOBS[e.job];
       e.talk = 25;
@@ -535,6 +542,123 @@ export const npcMethods = {
     rec.eid = e.id;
   },
 
+  // ---------- de lijntrein ----------
+  // Elk dorp met een spoorlijn naar een ander dorp heeft een eigen trein met twee wagons. Hij
+  // wacht op het station, rijdt dan de lijn af tot het spoor ophoudt (het station van het
+  // volgende dorp), wacht daar en rijdt terug. Je mag instappen en hem zelf besturen; stap je
+  // uit, dan rijdt hij vanzelf weer verder.
+  ensureLineTrain(w, s) {
+    if (!this.meta.lines) this.meta.lines = {};
+    const gen = w.gen;
+    if (!gen.railPath) return;
+    // één trein per lijn die hier begint: dir 0 = de lijn naar het oosten, dir 1 = naar het zuiden
+    for (let dir = 0; dir < 2; dir++) {
+      const key = w.id + ':' + s.key + ':' + dir;
+      if (this.meta.lines[key]) continue;
+      if (!gen.railPath(s, dir)) { this.meta.lines[key] = -1; continue; }
+      const x = s.x + (dir ? 3 : 14), z = s.z + 30;      // op het zijspoor bij het perron, achter elkaar
+      const y = railAt((a, b, c) => w.get(a, b, c), x, s.y + 1, z);
+      if (y < 0) continue;                               // het station is hier (nog) niet gebouwd
+      if (!this.meta.trains) this.meta.trains = [];
+      // jx, jz = het knooppunt van dit dorp: daar kiest de trein zijn eigen lijn
+      const rec = { uid: this.meta.nextId++, w: w.id, x: x + 0.5, y: y + 0.1, z: z + 0.5, yaw: RAIL_YAW[0], wg: 2, line: key, dir, jx: s.x + 30, jz: s.z + 30, lastStop: s.key, wait: dir ? 14 : 6 };
+      this.meta.trains.push(rec);
+      this.meta.lines[key] = rec.uid;
+      this.spawnTrain(rec);
+    }
+  },
+
+  // de trein draait om: de locomotief gaat aan de andere kant van de wagons staan en rijdt terug
+  lineTurn(w, rec, e) {
+    const R = rec.R, get = (a, b, c) => w.get(a, b, c);
+    // terug langs het spoor tot voorbij de laatste wagon
+    let x = R.x, y = R.y, z = R.z, back = (R.din + 2) & 3;
+    const steps = Math.ceil(2.35 + rec.wg * 2.15) + 1;
+    for (let i = 0; i < steps; i++) {
+      const L = railLinks(get, x, y, z, _RL), out = railExit(L, back, 0);
+      if (out < 0) break;
+      const link = L[out];
+      x += RAIL_DX[out]; z += RAIL_DZ[out]; y += link === 2 ? 1 : link === 3 ? -1 : 0;
+      back = out;
+    }
+    const L = railLinks(get, x, y, z, _RL), out = railExit(L, back, 0);
+    rec.R = { x, y, z, din: back, dout: out < 0 ? back : out, t: 0.5, v: 0, end: out < 0 };
+    rec.wait = LINE_WAIT;
+    this.linePlace(w, rec, e);
+    this.broadcast(w.id, { t: 'entMeta', id: e.id, wg: rec.wg });      // de wagons opnieuw achter de locomotief zetten
+  },
+
+  linePlace(w, rec, e) {
+    const R = rec.R, get = (a, b, c) => w.get(a, b, c);
+    railPos(R.x, R.y, R.z, R.din, R.dout, R.t, railRamp(railLinks(get, R.x, R.y, R.z, _RL)), _RP);
+    rec.x = e.x = _RP[0]; rec.y = e.y = _RP[1] + 0.1; rec.z = e.z = _RP[2]; rec.yaw = e.yaw = _RP[3];
+    e.vx = e.vy = e.vz = 0;
+  },
+
+  updateLineTrains(dt) {
+    for (const rec of this.meta.trains || []) {
+      if (!rec.line) continue;
+      const w = this.worlds[rec.w], e = w && w.ents.get(rec.eid);
+      if (!e) continue;
+      if (e.rider) { rec.R = null; rec.wait = 4; continue; }          // iemand bestuurt hem zelf
+      let near = false;
+      for (const p of this.players.values()) if (p.world === rec.w && Math.hypot(p.x - e.x, p.z - e.z) < LINE_RANGE) { near = true; break; }
+      if (!near) continue;
+      const get = (a, b, c) => w.get(a, b, c);
+      if (!rec.R) {
+        // (opnieuw) op de rails zetten waar hij nu staat
+        const x = Math.floor(e.x), z = Math.floor(e.z), y = railAt(get, x, e.y + 0.3, z);
+        if (y < 0) continue;
+        const din = railDirOf(e.yaw), out = railExit(railLinks(get, x, y, z, _RL), din, 0);
+        rec.R = { x, y, z, din, dout: out < 0 ? din : out, t: 0.5, v: 0, end: out < 0 };
+      }
+      const R = rec.R;
+      if (rec.wait > 0) {
+        rec.wait -= dt;
+        if (rec.wait <= 0) this.fx(rec.w, 'toet', e.x, e.y + 1.5, e.z);       // hij vertrekt: toet!
+        continue;
+      }
+      R.v = Math.min(LINE_SPEED, R.v + 3 * dt);
+      let dist = R.v * dt, guard = 0, stop = false;
+      while (dist > 0 && guard++ < 8) {
+        const lim = R.end ? 0.5 : 1, room = lim - R.t;
+        if (dist < room) { R.t += dist; break; }
+        R.t = lim; dist -= room;
+        if (R.end) { stop = true; break; }
+        const link = railLinks(get, R.x, R.y, R.z, _RL)[R.dout];
+        if (!link) { stop = true; break; }
+        R.x += RAIL_DX[R.dout]; R.z += RAIL_DZ[R.dout]; R.y += link === 2 ? 1 : link === 3 ? -1 : 0;
+        R.din = R.dout; R.t = 0;
+        const L = railLinks(get, R.x, R.y, R.z, _RL);
+        let out = railExit(L, R.din, 0);
+        // Is dit het knooppunt of het perron van een dorp? (Het knooppunt ligt 30 blokken ten
+        // zuidoosten van het plein, het perron ligt op het zijspoor ten westen daarvan.)
+        let dorp = null;
+        for (const t of w.gen.sitesNear(R.x, R.z, 64)) if (t.kind === 'dorp' && t.z + 30 === R.z && (t.x + 30 === R.x || t.x + 14 === R.x)) { dorp = t; break; }
+        if (dorp && dorp.x + 30 === R.x) {
+          const home = rec.jx === R.x && rec.jz === R.z;
+          if (R.din === 0) {
+            // vanaf het perron: thuis de eigen lijn op, elders terug zoals hij gekomen is
+            const want = home ? rec.dir : rec.ret;
+            if (want !== undefined && L[want]) out = want;
+          } else {
+            // aankomen: het zijspoor op, naar het perron
+            if (!home && R.din !== 2) rec.ret = (R.din + 2) & 3;
+            if (L[2]) out = 2;
+          }
+        } else if (dorp && rec.lastStop !== dorp.key) {
+          // bij het perron van een ander dorp dan het vorige: stoppen en straks terugrijden
+          rec.lastStop = dorp.key;
+          if (out < 0) { R.end = true; R.dout = R.din; } else { R.end = false; R.dout = out; }
+          R.t = 0.5; stop = true; break;
+        }
+        if (out < 0) { R.end = true; R.dout = R.din; } else { R.end = false; R.dout = out; }
+      }
+      if (get(R.x, R.y, R.z) !== B.rails) { rec.R = null; rec.wait = 5; continue; }      // iemand heeft de rails weggehaald
+      if (stop) this.lineTurn(w, rec, e); else this.linePlace(w, rec, e);
+    }
+  },
+
   on_placeTrain(p, m) {
     const w = this.worlds[p.world];
     const x = m.x | 0, y = m.y | 0, z = m.z | 0;
@@ -572,6 +696,7 @@ export const npcMethods = {
   // met een houweel sla je de trein weer los van de rails
   pickTrain(p, w, e) {
     if (e.rider) return;
+    if (e.train && e.train.line) { this.toast(p, 'Dit is de lijntrein van het dorp. Je mag instappen en meerijden, maar hij blijft van het dorp.'); return; }
     const s = p.inv[p.sel], it = s && ITEMS[s.id];
     if (!it || it.tool !== 'pick') { this.toast(p, 'Sla met een houweel op de trein om hem weer op te pakken.'); return; }
     const rec = e.train;

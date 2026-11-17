@@ -4,6 +4,7 @@ import * as THREE from '../../vendor/three.module.min.js';
 import { skin, faceTex, wingTex } from './textures.js';
 import { DRAGONS, MOBS } from '../shared/mobs.js';
 import { ANIMALS, SHINY } from '../shared/animals.js';
+import { VEHICLES } from '../shared/vehicles.js';
 
 const BOX = new THREE.BoxGeometry(1, 1, 1);
 const PLANE = new THREE.PlaneGeometry(1, 1);
@@ -722,6 +723,85 @@ export function dier(S, shiny) {
   return root;
 }
 
+// ---------- voertuigen ----------
+// Elk voertuig is opgebouwd uit doosjes en wielen, met de neus naar +z. De wielen draaien mee
+// als je rijdt (net als bij de trein); de helikopter heeft draaiende wieken.
+function voertuig(kind) {
+  const V = VEHICLES[kind], heli = V.soort === 'lucht';
+  const root = base(heli ? 'heli' : 'trein'), a = root.userData.a, g = a.inner;
+  a.wheels = [];
+  const [w, h, l] = V.size;
+  const lak = mat(V.kleur, 'glad'), donker = mat(0x23262c, 'metaal'), band = mat(0x1a1a1e, 'glad'), glas = mat(0x9fd8f0, 'glad'), licht = glowMat(0xfff2b0), rood = glowMat(0xff3a2a), staal = mat(0xb0b8c4, 'metaal');
+  const wiel = (x, z, r, dik) => { const m = new THREE.Mesh(WIEL, band); m.rotation.z = Math.PI / 2; m.scale.set(r * 2, dik, r * 2); m.position.set(x, r, z); g.add(m); a.wheels.push(m); };
+  const lampen = (y, z, x) => { for (const s of [-1, 1]) { part(g, licht, 0.2, 0.12, 0.05, s * x, y, z); part(g, rood, 0.2, 0.1, 0.05, s * x, y, -z); } };
+  if (kind === 'auto' || kind === 'terreinwagen') {
+    const r = kind === 'auto' ? 0.32 : 0.44, by = r + 0.28, bh = kind === 'auto' ? 0.46 : 0.6;
+    for (const x of [-1, 1]) for (const z of [-1, 1]) wiel(x * (w / 2 - 0.08), z * l * 0.32, r, 0.24);
+    part(g, lak, w, bh, l, 0, by, 0);
+    part(g, donker, w * 0.98, 0.1, l * 1.02, 0, by - bh / 2, 0);                                  // bumpers
+    part(g, lak, w * 0.92, h - by - bh / 2 + 0.02, l * (kind === 'auto' ? 0.5 : 0.62), 0, (h + by + bh / 2) / 2, -l * 0.06);
+    part(g, glas, w * 0.94, (h - by - bh / 2) * 0.62, l * (kind === 'auto' ? 0.46 : 0.58), 0, (h + by + bh / 2) / 2 + 0.02, -l * 0.06);      // ramen rondom
+    part(g, glas, w * 0.86, (h - by - bh / 2) * 0.62, 0.04, 0, (h + by + bh / 2) / 2 + 0.02, l * (kind === 'auto' ? 0.2 : 0.26));
+    lampen(by + 0.05, l / 2 + 0.01, w * 0.32);
+    if (kind === 'terreinwagen') { const sp = new THREE.Mesh(WIEL, band); sp.rotation.x = Math.PI / 2; sp.scale.set(0.8, 0.22, 0.8); sp.position.set(0, by + 0.25, -l / 2 - 0.1); g.add(sp); part(g, donker, w * 0.9, 0.08, 0.9, 0, h + 0.04, -l * 0.1); }
+  } else if (kind === 'motor') {
+    wiel(0, l * 0.36, 0.34, 0.16); wiel(0, -l * 0.36, 0.34, 0.16);
+    part(g, lak, 0.3, 0.3, l * 0.6, 0, 0.62, 0);
+    part(g, donker, 0.26, 0.14, l * 0.36, 0, 0.84, -l * 0.12);                                    // zadel
+    const vork = part(g, staal, 0.08, 0.6, 0.08, 0, 0.72, l * 0.33); vork.rotation.x = -0.35;
+    part(g, donker, 0.66, 0.06, 0.06, 0, 1.0, l * 0.24);                                          // stuur
+    part(g, licht, 0.18, 0.16, 0.06, 0, 0.9, l * 0.42); part(g, rood, 0.14, 0.08, 0.05, 0, 0.74, -l * 0.44);
+    part(g, staal, 0.1, 0.1, 0.5, 0.2, 0.4, -l * 0.2);                                            // uitlaat
+  } else if (kind === 'quad') {
+    for (const x of [-1, 1]) for (const z of [-1, 1]) wiel(x * (w / 2 - 0.06), z * l * 0.32, 0.34, 0.3);
+    part(g, lak, w * 0.6, 0.34, l * 0.9, 0, 0.6, 0);
+    part(g, donker, w * 0.44, 0.12, l * 0.42, 0, 0.82, -l * 0.14);
+    part(g, donker, 0.76, 0.06, 0.06, 0, 0.98, l * 0.2);
+    for (const s of [-1, 1]) part(g, lak, 0.3, 0.06, 0.5, s * (w / 2 - 0.08), 0.74, l * 0.32);      // spatborden
+    part(g, licht, 0.3, 0.12, 0.05, 0, 0.72, l * 0.46); part(g, rood, 0.3, 0.08, 0.05, 0, 0.66, -l * 0.46);
+  } else if (kind === 'vrachtwagen' || kind === 'bus') {
+    const r = 0.46, by = r + 0.2;
+    for (const x of [-1, 1]) for (const z of (kind === 'bus' ? [0.34, -0.3] : [0.36, -0.14, -0.36])) wiel(x * (w / 2 - 0.1), z * l, r, 0.3);
+    part(g, donker, w * 0.9, 0.2, l * 0.98, 0, by, 0);                                             // onderstel
+    if (kind === 'bus') {
+      part(g, lak, w, h - by - 0.1, l, 0, (h + by + 0.1) / 2, 0);
+      part(g, glas, w + 0.02, (h - by) * 0.34, l * 0.9, 0, by + (h - by) * 0.62, -0.02);              // ramen aan de zijkanten
+      part(g, glas, w * 0.9, (h - by) * 0.44, 0.04, 0, by + (h - by) * 0.6, l / 2 + 0.01);
+      part(g, mat(0xf4f4f0, 'glad'), w + 0.02, 0.12, l * 1.0, 0, by + 0.28, 0);                       // witte streep
+    } else {
+      part(g, lak, w, h * 0.62, l * 0.26, 0, by + 0.1 + h * 0.31, l * 0.37);                          // de cabine
+      part(g, glas, w * 0.9, h * 0.24, 0.04, 0, by + h * 0.48, l / 2 + 0.01);
+      for (const s of [-1, 1]) part(g, glas, 0.04, h * 0.22, l * 0.14, s * (w / 2 + 0.005), by + h * 0.48, l * 0.39);
+      part(g, mat(0xd8dce4, 'metaal'), w, h - by - 0.1, l * 0.68, 0, (h + by + 0.1) / 2, -l * 0.14);    // de laadbak
+      part(g, staal, 0.1, 0.5, 0.1, w * 0.4, h * 0.95, l * 0.22);                                    // uitlaat
+    }
+    lampen(by + 0.25, l / 2 + 0.01, w * 0.36);
+  } else if (kind === 'boot') {
+    part(g, lak, w, 0.5, l * 0.78, 0, 0.3, -l * 0.06);
+    part(g, lak, w * 0.7, 0.5, l * 0.16, 0, 0.3, l * 0.38); part(g, lak, w * 0.36, 0.46, l * 0.1, 0, 0.32, l * 0.47);      // de punt
+    part(g, mat(0x2a6ad0, 'glad'), w + 0.02, 0.12, l * 0.8, 0, 0.42, -l * 0.06);                      // blauwe streep
+    part(g, mat(0x8a5a2c, 'vacht'), w * 0.84, 0.06, l * 0.7, 0, 0.56, -l * 0.08);                     // houten dek
+    part(g, glas, w * 0.7, 0.34, 0.05, 0, 0.78, l * 0.12);                                          // voorruit
+    part(g, donker, 0.34, 0.5, 0.3, 0, 0.5, -l * 0.5);                                              // buitenboordmotor
+    part(g, donker, w * 0.5, 0.1, 0.36, 0, 0.64, -l * 0.26);                                        // bankje
+  } else {
+    // helikopter
+    part(g, lak, w * 0.8, 1.1, l * 0.5, 0, 0.95, l * 0.1);
+    part(g, glas, w * 0.74, 0.7, 0.3, 0, 1.0, l * 0.34);
+    for (const s of [-1, 1]) part(g, glas, 0.04, 0.5, l * 0.24, s * w * 0.405, 1.1, l * 0.14);
+    const staart = part(g, lak, 0.26, 0.26, l * 0.5, 0, 1.2, -l * 0.36); void staart;
+    part(g, lak, 0.08, 0.6, 0.4, 0, 1.5, -l * 0.58);
+    for (const s of [-1, 1]) { part(g, staal, 0.08, 0.08, l * 0.5, s * w * 0.42, 0.1, l * 0.08); part(g, staal, 0.06, 0.34, 0.06, s * w * 0.42, 0.28, l * 0.22); part(g, staal, 0.06, 0.34, 0.06, s * w * 0.42, 0.28, -l * 0.04); }
+    part(g, donker, 0.14, 0.3, 0.14, 0, 1.62, l * 0.1);
+    const rotor = new THREE.Group(); rotor.position.set(0, 1.8, l * 0.1); g.add(rotor); a.rotor = rotor;
+    part(rotor, donker, l * 1.2, 0.04, 0.22, 0, 0, 0); part(rotor, donker, 0.22, 0.04, l * 1.2, 0, 0, 0);
+    const tr = new THREE.Group(); tr.position.set(0.1, 1.5, -l * 0.58); g.add(tr); a.tailRotor = tr;
+    part(tr, donker, 0.03, 0.7, 0.1, 0, 0, 0);
+    part(g, licht, 0.16, 0.1, 0.05, 0, 0.6, l * 0.36); part(g, rood, 0.1, 0.1, 0.05, 0, 1.2, -l * 0.62);
+  }
+  return root;
+}
+
 export function buildModel(kind, opts) {
   const def = MOBS[kind];
   const model = def ? def.model : kind;
@@ -749,6 +829,7 @@ export function buildModel(kind, opts) {
     case 'grijzewolf': m = quad(opts.world === 'schaduw' ? 0x2a2434 : 0x7a7e88, 'vacht', '#ffd040', true, 0); break;
     case 'reuzenspin': m = reuzenspin(); break;
     case 'trein': m = trein(); break;
+    case 'voertuig': m = voertuig(def.veh); break;
     case 'dier': m = dier(ANIMALS[def.animal].spec, opts.shiny || ''); break;
     default: m = pluizel(0xff00ff);
   }
@@ -807,6 +888,13 @@ export function animate(root, time, speed, flags, dt) {
       const f = Math.sin(time * 9 + root.id) * 0.7;
       for (const w of a.wings) w.rotation.z = w.userData.s * f;
       a.inner.rotation.x = atk ? 0.4 : 0;
+      break;
+    }
+    case 'heli': {
+      // de wieken draaien als er iemand in zit
+      const sp = flags & 2 ? 34 : 0;
+      a.spin = (a.spin || 0) + ((sp - (a.spin || 0)) * Math.min(1, dt * 1.5));
+      a.rotor.rotation.y += a.spin * dt; a.tailRotor.rotation.x += a.spin * dt * 1.6;
       break;
     }
     case 'trein':

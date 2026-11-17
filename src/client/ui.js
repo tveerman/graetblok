@@ -109,6 +109,20 @@ export class UI {
     if (this.modal === 'trade') this.renderTrade();
   }
 
+  // het schermpje van je voertuig: brandstof, schade en snelheid ('' = weg)
+  setVeh(text) {
+    const box = $('vehHud');
+    box.classList.toggle('hidden', !text);
+    box.textContent = text;
+  }
+
+  // de luchtbellen boven je hartjes: n = hoeveel er nog zijn (0..10), -1 = niet onder water
+  setAir(n) {
+    const box = $('air');
+    box.classList.toggle('hidden', n < 0);
+    if (n >= 0) box.textContent = '🫧'.repeat(n) + (n === 0 ? '💨' : '');
+  }
+
   setStats(m) {
     this.stats = m;
     const box = $('hearts');
@@ -597,6 +611,12 @@ export class UI {
     row.appendChild(toggle('Scherpte aanpassen', 'dynRes'));
     row.appendChild(toggle('Mooie graphics (proef)', 'hq'));
     b.appendChild(row);
+    // twee proefknoppen voor als het geluid hapert; ze werken pas na opnieuw laden
+    const rowS = el('div', 'btnrow');
+    rowS.appendChild(toggle('Grote geluidsbuffer', 'bigBuf'));
+    rowS.appendChild(toggle('Geluid in stille stand', 'silentFix'));
+    b.appendChild(rowS);
+    b.appendChild(el('p', 'hint', 'Hapert het geluid? Probeer deze twee knoppen één voor één. Ze werken pas als je het spel opnieuw laadt.'));
     const row2 = el('div', 'btnrow');
     const save = el('button', 'btn small', '💾 Nu opslaan');
     tap(save, () => { g.net.send({ t: 'save' }); this.toast('Opgeslagen!', 'good'); });

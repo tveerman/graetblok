@@ -19,6 +19,7 @@ import { QUESTS, computerLines } from './quests.js';
 import { entityMethods } from './entities.js';
 import { npcMethods } from './npcs.js';
 import { zooMethods } from './zoo.js';
+import { vehicleMethods } from './vehicles.js';
 import { WorldGen } from './worldgen.js';
 
 const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
@@ -52,6 +53,7 @@ export class GameServer {
     if (!meta.gen2) this.upgradeWorld(meta, per);
     for (const w of WORLD_ORDER) this.worlds[w] = new ServerWorld(w, meta.seed, per[w], { noSites: meta.noSites[w], oldChunks: meta.oldChunks[w] });
     for (const rec of meta.trains || []) this.spawnTrain(rec);
+    for (const rec of meta.vehicles || []) this.spawnVehicle(rec);
     this.ready = true;
     this.last = now();
     if (!this.timer) this.timer = setInterval(() => { try { this.tick(); } catch (e) { console.error('server tick', e); } }, TICK_MS);
@@ -726,6 +728,12 @@ export class GameServer {
         const r = e.train;
         e.x = r.x = p.x; e.y = r.y = p.y - 0.9; e.z = r.z = p.z;
         if (typeof m.ry === 'number') e.yaw = r.yaw = m.ry;
+      } else if (e && e.veh) {
+        // in een voertuig: het staat waar de speler zegt (een helikopter hangt onder je)
+        const r = e.veh, V = e.def;
+        e.x = r.x = p.x; e.y = r.y = p.y - (m.air ? (+m.seat || 0) : 0); e.z = r.z = p.z;
+        if (typeof m.ry === 'number') e.yaw = r.yaw = m.ry;
+        e.vx = e.vy = e.vz = 0; void V;
       } else if (e && e.def.animal) {
         // op een dier: op de grond staat het dier waar jij staat, in de lucht hangt het onder je
         e.x = p.x; e.y = p.y - (e.def.rideFly ? e.def.seat : 0); e.z = p.z; e.yaw = p.yaw; e.vx = e.vy = e.vz = 0;
@@ -794,6 +802,7 @@ export class GameServer {
         this.updateEntities(w, dt);
         this.updateProjectiles(w, dt);
       }
+      this.updateLineTrains(dt);
 
       this.updateFuses();
       this.acc.snap += dt;
@@ -904,5 +913,5 @@ export class GameServer {
   }
 }
 
-Object.assign(GameServer.prototype, entityMethods, npcMethods, zooMethods);
+Object.assign(GameServer.prototype, entityMethods, npcMethods, zooMethods, vehicleMethods);
 export { itemName, isNight };

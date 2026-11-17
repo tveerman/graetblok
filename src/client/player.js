@@ -1,6 +1,7 @@
 // De speler: lopen, springen, zwemmen, vliegen op een draak, hakken, bouwen en vechten.
 import * as THREE from '../../vendor/three.module.min.js';
 import { EYE, REACH, CH, clamp } from '../shared/constants.js';
+import { VEHICLES } from '../shared/vehicles.js';
 import { B, BLOCKS, B_SHAPE, SHAPE_LIQUID, PORTAL_TO, TILE_CRACK } from '../shared/blocks.js';
 import { ITEMS, I } from '../shared/items.js';
 import { BREATH } from '../shared/mobs.js';
@@ -12,6 +13,7 @@ const HW = 0.3, HH = 1.8;
 const _v = new THREE.Vector3();
 const _L = [0, 0, 0, 0], _P = [0, 0, 0, 0];
 
+const AIR_MAX = 15;        // zoveel tellen kun je onder water blijven
 export class Player {
   constructor(game) {
     this.g = game;
@@ -21,6 +23,8 @@ export class Player {
     this.onGround = false; this.inWater = false; this.headIn = 0;
     this.mount = 0; this.mountScale = 1;
     this.mountKind = '';          // 'trein' = op een trein, 'dier' = rijden over de grond, 'vlieg' = op een vliegend dier, '' = op een draak
+    this.veh = null; this.carYaw = 0; this.carV = 0; this.vehFuel = 0; this.vehDmg = 0; this.vehDist = 0; this.vehBump = 0; this.vehT = 0;      // het voertuig waar je in zit
+    this.air = AIR_MAX; this.drownT = 0; this.airShown = -1;      // lucht onder water
     this.seatH = 0; this.rideSp = 0;      // hoe hoog je op je rijdier zit en hoe hard het loopt
     this.rail = null;             // waar de trein op het spoor is: { x, y, z, din, dout, t, v, end }
     this.railV = 0; this.trainYaw = 0; this.trainPitch = 0; this.rev = false;
@@ -79,11 +83,21 @@ export class Player {
     this.dig = null; this.portalT = 0; this.portalLock = 3;
   }
 
-  setMount(id, scale, kind, seat, sp) {
+  setMount(id, scale, kind, seat, sp, m) {
     if (id) {
       this.mount = id; this.mountScale = scale || 1; this.mountKind = kind || '';
       this.seatH = seat || 0; this.rideSp = sp || 7;
       this.vel.set(0, 0, 0);
+      if (kind === 'auto' || kind === 'heli') {
+        // in een voertuig: je staat waar het voertuig staat en kijkt mee in zijn rijrichting
+        const e = this.g.ents.map.get(id);
+        this.veh = VEHICLES[m.veh]; this.carV = 0; this.vehDist = 0; this.vehBump = 0; this.vehT = 0;
+        this.vehFuel = m.fuel; this.vehDmg = m.dmg;
+        this.carYaw = e ? e.yaw : this.yaw; this.yaw = this.carYaw;
+        if (e) { this.pos.x = e.x; this.pos.z = e.z; this.pos.y = e.y + (kind === 'heli' ? this.seatH : 0) + 0.05; }
+        this.g.ents.ridden = id;
+        return;
+      }
       if (kind === 'trein') this.startRail(this.g.ents.map.get(id));
       else if (kind === 'dier') { const e = this.g.ents.map.get(id); if (e) { this.pos.x = e.x; this.pos.z = e.z; this.pos.y = Math.max(this.pos.y, e.y) + 0.1; } }      // je staat nu waar het dier staat
       else if (kind === 'vlieg') this.pos.y += this.seatH + 0.6;
@@ -94,6 +108,7 @@ export class Player {
         this.pos.x += Math.cos(this.trainYaw) * 1.3; this.pos.z -= Math.sin(this.trainYaw) * 1.3; this.pos.y += 0.25;
         this.rail = null; this.railV = 0;
       }
+      if (this.veh) { this.flushVeh(); this.pos.x += Math.cos(this.carYaw) * (this.veh.size[0] / 2 + 0.7); this.pos.z -= Math.sin(this.carYaw) * (this.veh.size[0] / 2 + 0.7); this.pos.y += 0.2; this.veh = null; this.g.sound.engine(0); this.g.ui.setVeh(''); }
       this.mount = 0; this.mountKind = ''; this.softLand = true; this.fallPeak = this.pos.y;
     }
     this.g.ents.ridden = this.mount;
@@ -159,6 +174,88 @@ export class Player {
     if (get(R.x, R.y, R.z) !== B.rails) { this.rail = null; g.ui.toast('De trein is van de rails!', 'warn'); }
   }
 
+  // Een auto, motor, vrachtwagen of boot besturen. Stick naar voren = gas, naar achteren =
+  // remmen en achteruit, opzij = sturen. De camera kijkt vanzelf mee in de rijrichting.
+  drive(dt) {
+    const g = this.g, inp = g.input, w = g.world, V = this.veh;
+    let hw = Math.min(0.75, Math.max(HW, V.size[0] * 0.42)), hh = Math.max(1.2, V.size[1]);
+    // staat hij klem (te dicht tegen een muur of onder een laag dak neergezet)? dan rekenen we
+    // even met een smal, laag voertuig, zodat je er altijd weer uit kunt rijden
+    if (w.boxHits(this.pos.x, this.pos.y, this.pos.z, hw, hh)) { hw = HW; hh = 1.0; }
+    if (w.boxHits(this.pos.x, this.pos.y, this.pos.z, HW, 1.0)) { this.pos.y = Math.floor(this.pos.y) + 1; this.vel.set(0, 0, 0); return; }
+    const feet = w.getBlock(Math.floor(this.pos.x), Math.floor(this.pos.y + 0.35), Math.floor(this.pos.z));
+    const under = w.getBlock(Math.floor(this.pos.x), Math.floor(this.pos.y - 0.25), Math.floor(this.pos.z));
+    const wet = feet > 0 && B_SHAPE[feet] === SHAPE_LIQUID, onWater = wet || (under > 0 && B_SHAPE[under] === SHAPE_LIQUID);
+    this.inWater = wet;
+    const boat = V.soort === 'boot';
+    // hoe hard mag hij nu? leeg of kapot = stil; een auto in het water en een boot op het land kruipen
+    let top = V.max * (1 - 0.5 * Math.min(1, this.vehDmg / 100));
+    if (this.vehFuel <= 0 || this.vehDmg >= 100) top = 0;
+    else if (boat ? !onWater : wet) top *= 0.18;
+    const want = inp.fwd > 0.15 ? top * (inp.sprint ? 1 : 0.8) : inp.fwd < -0.15 ? -top * 0.35 : 0;
+    const braking = want === 0 || (want > 0) !== (this.carV > 0);
+    const rate = (braking ? V.acc * 1.8 : V.acc) * dt;
+    this.carV += Math.max(-rate, Math.min(rate, want - this.carV));
+    // sturen gaat alleen als je rijdt; achteruit stuurt hij de andere kant op
+    const grip = Math.min(1, Math.abs(this.carV) / 3.5) * (this.carV < 0 ? -1 : 1) * (g.sky && g.sky.rain > 0.3 && !boat ? 0.8 : 1);
+    this.carYaw -= inp.strafe * V.turn * grip * dt;
+    let dy = this.carYaw - this.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy));
+    this.yaw += dy * Math.min(1, 7 * dt);                                  // de camera draait mee
+    this.vel.x = -Math.sin(this.carYaw) * this.carV; this.vel.z = -Math.cos(this.carYaw) * this.carV;
+    if (boat && wet) { this.vel.y = Math.min(this.vel.y + 22 * dt, 2.2); }      // een boot drijft
+    else { this.vel.y -= 27 * dt; if (this.vel.y < -48) this.vel.y = -48; }
+    const vmax = Math.max(Math.abs(this.vel.x), Math.abs(this.vel.y), Math.abs(this.vel.z));
+    const steps = Math.max(1, Math.ceil(vmax * dt / 0.4)), sdt = dt / steps;
+    let blocked = false;
+    const ox = this.pos.x, oz = this.pos.z;
+    for (let i = 0; i < steps; i++) {
+      if (this.moveX(this.vel.x * sdt, hw, hh, 0)) blocked = true;
+      if (this.moveZ(this.vel.z * sdt, hw, hh, 0)) blocked = true;
+      this.moveY(this.vel.y * sdt, hw, hh, 0);
+    }
+    this.fallPeak = this.pos.y; this.softLand = true;
+    if (blocked && Math.abs(this.carV) > 0.6) {
+      // tegen een blok: één blok omhoog kan hij nemen, hoger is een botsing
+      const s = this.carV > 0 ? 1 : -1, px = this.pos.x - Math.sin(this.carYaw) * 0.6 * s, pz = this.pos.z - Math.cos(this.carYaw) * 0.6 * s;
+      const free = !w.boxHits(px, this.pos.y + 1.05, pz, hw, hh) && !w.boxHits(this.pos.x, this.pos.y + 1.05, this.pos.z, hw, hh);
+      if (free && (this.onGround || wet)) { this.vel.y = 8.2; this.onGround = false; this.carV *= V.offroad ? 0.92 : 0.7; }
+      else if (!free) {
+        if (Math.abs(this.carV) > 7) { this.vehBump += Math.round((Math.abs(this.carV) - 5) * 1.5); g.sound.play('hit', 0.9); this.shake = Math.max(this.shake || 0, 0.25); }
+        this.carV *= -0.15;
+      }
+    }
+    const moved = Math.hypot(this.pos.x - ox, this.pos.z - oz);
+    this.vehDist += moved;
+    this.speedNow += (moved / dt - this.speedNow) * Math.min(1, dt * 10);
+  }
+
+  // brandstof, schade, het motorgeluid en het schermpje van het voertuig
+  vehicleTick(dt) {
+    const g = this.g, V = this.veh;
+    if (this.mountKind === 'heli') {
+      // een helikopter verbruikt ook als hij stil hangt; zonder brandstof zakt hij
+      this.vehDist += (4 + this.speedNow) * dt;
+      if (this.vehFuel <= 0 || this.vehDmg >= 100) this.vel.y = Math.min(this.vel.y, -6);
+      this.carYaw = this.yaw;
+      this.speedNow = Math.hypot(this.vel.x, this.vel.y, this.vel.z);
+    }
+    this.vehT += dt;
+    if (this.vehT >= 1) this.flushVeh();
+    g.sound.engine(this.vehFuel > 0 && this.vehDmg < 100 ? 1 : 0, this.speedNow / V.max, V.soort);
+    const t = '⛽ ' + Math.round(this.vehFuel / V.tank * 100) + '%  ·  🔧 ' + Math.round(100 - this.vehDmg) + '%  ·  ' + Math.round(this.speedNow * 3.6) + ' km/u' +
+      (this.vehFuel <= 0 ? '  ·  De tank is leeg! Tik met een jerrycan op het voertuig.' : this.vehDmg >= 100 ? '  ·  Kapot! Repareer met een moersleutel.' : '');
+    if (t !== this.vehText) { this.vehText = t; g.ui.setVeh(t); }
+    if (this.vehDmg > 55 && Math.random() < dt * 6) g.particles.add(this.pos.x - Math.sin(this.carYaw) * 1.1, this.pos.y + 1.0, this.pos.z - Math.cos(this.carYaw) * 1.1, (Math.random() - 0.5) * 0.4, 1.2 + Math.random(), (Math.random() - 0.5) * 0.4, 0.25, 0.25, 0.27, 0.6, 1.3, -0.5);
+  }
+
+  // de server vertellen hoe ver je gereden hebt en of je gebotst bent
+  flushVeh() {
+    this.vehT = 0;
+    if (this.vehDist < 0.05 && !this.vehBump) return;
+    this.g.net.send({ t: 'vehUse', d: +this.vehDist.toFixed(2), bump: this.vehBump });
+    this.vehDist = 0; this.vehBump = 0;
+  }
+
   heldItem() { const s = this.g.inv[this.g.sel]; return s ? s[0] : 0; }
 
   // ---------- elke frame ----------
@@ -178,7 +275,8 @@ export class Player {
 
     const ready = !this.frozen && !this.dead && w.isLoaded(this.pos.x, this.pos.z);
     if (ready) {
-      if (!this.mount || this.mountKind === 'dier') this.walk(dt); else if (this.mountKind === 'trein') this.ride(dt); else this.fly(dt);
+      if (!this.mount || this.mountKind === 'dier') this.walk(dt); else if (this.mountKind === 'trein') this.ride(dt); else if (this.mountKind === 'auto') this.drive(dt); else this.fly(dt);
+      if (this.veh) this.vehicleTick(dt);
       this.environment(dt);
     } else { this.vel.set(0, 0, 0); this.speedNow = 0; }
 
@@ -191,6 +289,7 @@ export class Player {
       this.sendT = 0;
       const m = { t: 'move', x: this.pos.x, y: this.pos.y, z: this.pos.z, yaw: this.yaw, pitch: this.pitch };
       if (this.mountKind === 'trein') m.ry = this.trainYaw;
+      if (this.veh) { m.ry = this.carYaw; if (this.mountKind === 'heli') { m.air = 1; m.seat = this.seatH; } }
       g.net.send(m);
     }
   }
@@ -296,7 +395,10 @@ export class Player {
         this.moveY(this.vel.y * sdt, hw, hh, below);
       }
     }
-    if (this.pos.y > CH + 18) { this.pos.y = CH + 18; this.vel.y = 0; }
+    // Je kunt tot een flink stuk boven de wolken vliegen (de wolken hangen op 152, in de
+    // wolkenwereld op 168): er dwars doorheen en erbovenuit.
+    const top = (g.worldId === 'wolken' ? 168 : 152) + 46;
+    if (this.pos.y > top) { this.pos.y = top; this.vel.y = Math.min(0, this.vel.y); }
     this.onGround = false; this.inWater = false;
     this.fallPeak = this.pos.y;
     this.speedNow = Math.hypot(this.vel.x, this.vel.z);
@@ -347,6 +449,16 @@ export class Player {
       this.lavaT -= dt;
       if (this.lavaT <= 0) { this.lavaT = 0.6; if (!g.trees.vuur) g.net.send({ t: 'hurtSelf', k: 'lava', n: 3 }); }
     } else this.lavaT = 0;
+    // Onder water raakt je lucht op: na vijftien tellen zijn de bellen op en gaat er elke tel
+    // een hartje af, tot je weer boven komt. Boven water komt de lucht snel terug.
+    const head = w.getBlock(px, Math.floor(this.pos.y + EYE), pz);
+    const riding = this.mount && this.mountKind !== 'dier';
+    if (head === B.water && !riding) {
+      if (this.air > 0) this.air = Math.max(0, this.air - dt);
+      else { this.drownT -= dt; if (this.drownT <= 0) { this.drownT = 1; g.net.send({ t: 'hurtSelf', k: 'water', n: 2 }); } }
+    } else { this.air = Math.min(AIR_MAX, this.air + dt * 5); this.drownT = 0; }
+    const bubbles = this.air >= AIR_MAX ? -1 : Math.ceil(this.air / AIR_MAX * 10);
+    if (bubbles !== this.airShown) { this.airShown = bubbles; g.ui.setAir(bubbles); }
     // uit de wereld gevallen
     if (this.pos.y < -12) {
       this.pos.copy(this.safe); this.vel.set(0, 0, 0); this.fallPeak = this.pos.y; this.softLand = true;
@@ -370,7 +482,7 @@ export class Player {
   updateCamera(dt) {
     const g = this.g, cam = g.R.camera, w = g.world;
     const third = this.cam === 1 || this.mount || this.dead;
-    const eyeY = this.pos.y + (this.mount ? 1.25 : EYE) + (this.mountKind === 'dier' ? this.seatH : 0);
+    const eyeY = this.pos.y + (this.mount ? 1.25 : EYE) + (this.mountKind === 'dier' || this.mountKind === 'auto' ? this.seatH : 0);
     const hx = Math.floor(this.pos.x), hz = Math.floor(this.pos.z);
     if (!third) {
       const bob = this.onGround ? Math.sin(this.bobPh) * 0.035 * Math.min(1, this.speedNow / 4) : 0;
@@ -405,11 +517,11 @@ export class Player {
 
     // eigen poppetje
     const m = this.model;
-    m.visible = third;
+    m.visible = third && !(this.veh && !this.veh.open);      // in een dichte auto zie je jezelf niet
     if (third) {
       m.position.copy(this.pos);
-      if (this.mountKind === 'dier') m.position.y += this.seatH - 0.62;      // je zit op zijn rug
-      else if (this.mountKind === 'vlieg') m.position.y -= 0.62;
+      if (this.mountKind === 'dier' || this.mountKind === 'auto') m.position.y += this.seatH - 0.62;      // je zit op zijn rug, of op de stoel
+      else if (this.mountKind === 'vlieg' || this.mountKind === 'heli') m.position.y -= 0.62;
       m.rotation.y = this.yaw + Math.PI;
       const a = m.userData.a;
       a.pose = this.mount ? 'ride' : '';
@@ -534,6 +646,12 @@ export class Player {
         g.net.send({ t: 'use', x: b.x, y: b.y, z: b.z });
         return;
       }
+    }
+    if (it && it.veh) {
+      // een voertuig zet je op de grond (een boot op het water) waar je naar wijst
+      if (b) { g.net.send({ t: 'placeVeh', x: b.x, y: b.y, z: b.z }); this.swing = 0.25; }
+      else g.ui.toast('Wijs een plek op de grond aan om je ' + it.name.toLowerCase() + ' neer te zetten.');
+      return;
     }
     if (it && it.train) {
       // een locomotief zet je op rails

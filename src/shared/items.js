@@ -121,6 +121,18 @@ item(344, 'ei_magisch', 'Magisch ei', { icon: ['egg', '#b070f0', ['#ffe680', 'st
 item(345, 'ei_oer', 'Oer-ei', { icon: ['egg', '#c8a070', ['#6a4a2a', 'barst']], egg: 'oer', stack: 16 });
 item(346, 'ei_sterren', 'Sterrenei', { icon: ['egg', '#1c2450', ['#fff6b0', 'ster']], egg: 'sterren', stack: 16 });
 
+// voertuigen (zie vehicles.js): veh = welk voertuig; je zet ze neer zoals een locomotief
+item(347, 'v_auto', 'Auto', { icon: ['car', '#d8362c', 'auto'], veh: 'auto', stack: 1 });
+item(348, 'v_terreinwagen', 'Terreinwagen', { icon: ['car', '#4a7a3a', 'jeep'], veh: 'terreinwagen', stack: 1 });
+item(349, 'v_motor', 'Motor', { icon: ['car', '#2a2e36', 'motor'], veh: 'motor', stack: 1 });
+item(350, 'v_quad', 'Quad', { icon: ['car', '#f0a020', 'quad'], veh: 'quad', stack: 1 });
+item(351, 'v_vrachtwagen', 'Vrachtwagen', { icon: ['car', '#2a6ad0', 'truck'], veh: 'vrachtwagen', stack: 1 });
+item(352, 'v_bus', 'Bus', { icon: ['car', '#f0c020', 'bus'], veh: 'bus', stack: 1 });
+item(353, 'v_boot', 'Boot', { icon: ['car', '#f4f4f0', 'boot'], veh: 'boot', stack: 1 });
+item(354, 'v_helikopter', 'Helikopter', { icon: ['car', '#1c2028', 'heli'], veh: 'helikopter', stack: 1 });
+item(355, 'jerrycan', 'Jerrycan met brandstof', { icon: ['can'], stack: 16 });
+item(356, 'moersleutel', 'Moersleutel', { icon: ['wrench'], stack: 1 });
+
 export const isBlock = (id) => id > 0 && id < 256;
 export function itemName(id) {
   if (id < 256) return BLOCKS[id] ? BLOCKS[id].name : '?';
@@ -174,6 +186,12 @@ recipe(I.lasergeweer, 1, [[I.machineonderdeel, 3], [I.ijzerstaaf, 2], [I.kristal
 recipe(I.drankje, 1, [[I.bessen, 3], [B.gloeikristal, 1]], 'werkbank');
 recipe(B.steenblok, 4, [[B.steen, 4]], 'werkbank');
 recipe(B.lamp, 1, [[B.gloeikristal, 1], [B.glas, 1]], 'werkbank');
+recipe(I.jerrycan, 2, [[I.steenkool, 3], [I.ijzerstaaf, 1]], 'oven');
+recipe(I.moersleutel, 1, [[I.ijzerstaaf, 2]], 'werkbank');
+recipe(I.v_quad, 1, [[I.ijzerstaaf, 6], [I.machineonderdeel, 1], [I.leer, 2]], 'werkbank');
+recipe(I.v_motor, 1, [[I.ijzerstaaf, 6], [I.machineonderdeel, 2], [I.leer, 1]], 'werkbank');
+recipe(I.v_auto, 1, [[I.ijzerstaaf, 10], [I.machineonderdeel, 2], [B.glas, 3]], 'werkbank');
+recipe(I.v_boot, 1, [[B.planken, 12], [I.ijzerstaaf, 2], [I.machineonderdeel, 1]], 'werkbank');
 recipe(B.broedmachine, 1, [[I.ijzerstaaf, 3], [B.glas, 2], [B.fakkel, 1]], 'werkbank');
 recipe(B.ijzerblok, 1, [[I.ijzerstaaf, 4]], 'werkbank');
 recipe(B.goudblok, 1, [[I.goudstaaf, 4]], 'werkbank');

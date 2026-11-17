@@ -1721,6 +1721,34 @@ const ICONS = {
     g.restore();
   },
   stick: (g) => { g.strokeStyle = '#4a3018'; g.lineWidth = 9; g.lineCap = 'round'; g.beginPath(); g.moveTo(16, 50); g.lineTo(48, 14); g.stroke(); g.strokeStyle = '#9a6e3a'; g.lineWidth = 5; g.stroke(); },
+  // een voertuig van opzij: c = de lak, soort = 'auto', 'jeep', 'motor', 'quad', 'truck', 'bus', 'boot' of 'heli'
+  car: (g, c, soort) => {
+    g.strokeStyle = 'rgba(0,0,0,0.7)'; g.lineWidth = 2; g.lineJoin = 'round';
+    const box = (x, y, w, h, col) => { g.fillStyle = col; g.fillRect(x, y, w, h); g.strokeRect(x, y, w, h); };
+    const wheel = (x, y, r) => { g.fillStyle = '#1c1c20'; g.beginPath(); g.arc(x, y, r, 0, 6.3); g.fill(); g.stroke(); g.fillStyle = '#b8c0cc'; g.beginPath(); g.arc(x, y, r * 0.4, 0, 6.3); g.fill(); };
+    if (soort === 'motor') { box(18, 30, 26, 9, c); box(24, 24, 14, 6, '#2a2e36'); g.beginPath(); g.moveTo(44, 30); g.lineTo(50, 18); g.lineTo(42, 18); g.stroke(); wheel(14, 44, 9); wheel(50, 44, 9); }
+    else if (soort === 'boot') { g.fillStyle = c; g.beginPath(); g.moveTo(4, 30); g.lineTo(60, 30); g.lineTo(50, 46); g.lineTo(12, 46); g.closePath(); g.fill(); g.stroke(); box(20, 20, 18, 10, '#9fd8f0'); g.strokeStyle = '#58b8e8'; g.lineWidth = 3; g.beginPath(); g.moveTo(2, 54); for (let x = 2; x < 62; x += 12) g.quadraticCurveTo(x + 6, 48, x + 12, 54); g.stroke(); }
+    else if (soort === 'heli') { g.fillStyle = c; g.beginPath(); g.ellipse(36, 34, 18, 12, 0, 0, 6.3); g.fill(); g.stroke(); box(4, 30, 20, 5, c); box(2, 22, 5, 14, c); g.fillStyle = '#9fd8f0'; g.beginPath(); g.ellipse(44, 32, 8, 7, 0, 0, 6.3); g.fill(); g.stroke(); g.lineWidth = 3; g.beginPath(); g.moveTo(8, 16); g.lineTo(62, 16); g.moveTo(36, 16); g.lineTo(36, 22); g.moveTo(22, 52); g.lineTo(52, 52); g.moveTo(28, 46); g.lineTo(28, 52); g.moveTo(44, 46); g.lineTo(44, 52); g.stroke(); }
+    else if (soort === 'truck') { box(4, 14, 36, 30, '#d8dce4'); box(40, 22, 18, 22, c); box(46, 26, 10, 8, '#9fd8f0'); wheel(14, 48, 7); wheel(28, 48, 7); wheel(50, 48, 7); }
+    else if (soort === 'bus') { box(4, 16, 56, 28, c); for (let x = 8; x < 54; x += 12) box(x, 21, 9, 9, '#9fd8f0'); wheel(16, 48, 7); wheel(48, 48, 7); }
+    else if (soort === 'quad') { box(16, 26, 32, 10, c); box(24, 20, 14, 6, '#2a2e36'); g.beginPath(); g.moveTo(44, 26); g.lineTo(46, 16); g.stroke(); wheel(14, 42, 10); wheel(50, 42, 10); }
+    else { const hi = soort === 'jeep'; box(4, hi ? 28 : 32, 56, hi ? 14 : 12, c); box(16, hi ? 14 : 20, 28, hi ? 14 : 12, c); box(20, hi ? 17 : 23, 9, 8, '#9fd8f0'); box(32, hi ? 17 : 23, 9, 8, '#9fd8f0'); wheel(16, 46, hi ? 9 : 7); wheel(48, 46, hi ? 9 : 7); g.fillStyle = '#fff2b0'; g.fillRect(57, hi ? 31 : 35, 3, 4); }
+  },
+  can: (g) => {
+    g.strokeStyle = 'rgba(0,0,0,0.7)'; g.lineWidth = 2;
+    g.fillStyle = '#d8362c'; g.fillRect(14, 16, 36, 40); g.strokeRect(14, 16, 36, 40);
+    g.fillStyle = '#a82820'; g.fillRect(18, 8, 14, 9); g.strokeRect(18, 8, 14, 9); g.fillRect(38, 10, 8, 7); g.strokeRect(38, 10, 8, 7);
+    g.strokeStyle = '#a82820'; g.lineWidth = 3; g.beginPath(); g.moveTo(18, 22); g.lineTo(46, 50); g.moveTo(46, 22); g.lineTo(18, 50); g.stroke();
+    g.fillStyle = '#ffe14a'; g.font = 'bold 14px sans-serif'; g.textAlign = 'center'; g.fillText('⛽', 32, 42);
+  },
+  wrench: (g) => {
+    g.save(); g.translate(32, 32); g.rotate(-0.78);
+    g.strokeStyle = 'rgba(0,0,0,0.7)'; g.lineWidth = 2; g.fillStyle = '#c8ced8';
+    g.fillRect(-4, -14, 8, 36); g.strokeRect(-4, -14, 8, 36);
+    g.beginPath(); g.arc(0, -18, 10, 0.5, 2.64, true); g.lineTo(-4, -12); g.lineTo(4, -12); g.closePath(); g.fill(); g.stroke();
+    g.beginPath(); g.arc(0, 24, 6, 0, 6.3); g.fill(); g.stroke();
+    g.restore();
+  },
   // een ei voor de broedmachine: c = kleur, o = [tweede kleur, patroon]
   egg: (g, c, o) => drawEgg(g, c, o ? o[0] : '#ffffff', o ? o[1] : 'vlek'),
   lump: (g, c) => { g.fillStyle = c; g.strokeStyle = '#000'; g.lineWidth = 2; g.beginPath(); g.moveTo(14, 40); g.lineTo(22, 20); g.lineTo(40, 14); g.lineTo(52, 30); g.lineTo(46, 50); g.lineTo(24, 52); g.closePath(); g.fill(); g.stroke(); g.fillStyle = 'rgba(255,255,255,0.25)'; g.beginPath(); g.moveTo(24, 24); g.lineTo(38, 18); g.lineTo(34, 30); g.closePath(); g.fill(); },

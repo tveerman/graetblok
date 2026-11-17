@@ -114,7 +114,11 @@ still: no time passes and nothing attacks. The game also opens the pause menu by
 the tablet is put away or the tab is hidden.
 
 The pause menu has separate switches for music ("Muziek") and sound effects
-("Geluidseffecten"), and a slider "Regen en wind" for rain, wind, thunder, birds and animals. Its last line reports what the audio is doing on that device, for example
+("Geluidseffecten"), and a slider "Regen en wind" for rain, wind, thunder, birds and animals.
+Two test switches help when the sound stutters on a device: "Grote geluidsbuffer" (asks the
+browser for a large audio buffer, `latencyHint: 'playback'`; on by default) and "Geluid in stille
+stand" (the silent `<audio>` loop for iOS; on by default). Both take effect after a reload. The
+audio line also shows the sample rate and the output delay in milliseconds. Its last line reports what the audio is doing on that device, for example
 "Geluid: aan · muziek: 57 noten, sterkte 9%, als lusje · effecten: aan" — useful when a device
 stays silent. "als lusje" means the music is rendered ahead of time and played as a loop (see
 "Sprites and sound"); "noot voor noot" means the browser could not do that and every note is
@@ -208,6 +212,22 @@ From Jorian's design document (`spel.txt`), following development phases 1–4, 
   fly ("🪽 Vliegen": pegasus, griffins, pteranodon, phoenixes). **Guards** (dog, wolf, lion,
   T-rex...) bite monsters that come near you; you get the XP and loot. Not in yet: clothes,
   breeding, the animal school and wild animals.
+- **Vehicles** – the start of the second part of Jorian's plan. Car, off-road car, motorbike,
+  quad, lorry, bus, boat and helicopter (`src/shared/vehicles.js`). Buy one in a village (smith,
+  mining company, station master, market trader, dragon trader) or craft the small ones, hold it
+  and tap the ground to put it down, then tap it or use the "🚗 Instappen" button. Stick
+  forward = throttle, back = brake and reverse, sideways = steer; the camera follows. A vehicle
+  takes one-block steps by itself, uses fuel (refill by tapping it with a jerrycan), gets damaged
+  when you hit a wall at speed (repair with a spanner and an iron bar) and stays where you leave
+  it. Hit it with a pickaxe to take it with you again. Not in yet: roads, racing, the garage,
+  upgrades and petrol stations.
+- **Line trains** – every village with a railway to another village has its own train with two
+  wagons. It waits at the platform, toots, drives to the next village's platform, waits and
+  comes back. You may get in and drive it yourself; when you get out it carries on.
+- **Air under water** – ten bubbles above the hearts; after fifteen seconds under water you
+  lose a heart every second until you come up.
+- **Above the clouds** – dragons, flying animals and the helicopter can fly through the cloud
+  layer (at height 152) up to height 198.
 - **Story quests** – 18 steps from "chop a tree" to "defeat the Drakenkoning", shown top-left,
   with a compass marker for the early ones.
 
@@ -346,6 +366,7 @@ game.net.send({ t: 'debug', c: 'site', kind: 'dorp' })     // jump to the neares
 game.net.send({ t: 'debug', c: 'weather', k: 'onweer' })   // 'zon', 'regen', 'onweer', 'sneeuw', 'storm'
 game.net.send({ t: 'debug', c: 'herd', kind: 'schaap' })   // a herd next to you ('koe', 'wolf', 'beer')
 game.net.send({ t: 'debug', c: 'hatch' })                  // every egg in an incubator hatches now
+game.net.send({ t: 'debug', c: 'give', id: 347, n: 1 })     // a car (347-354 are the vehicles, 355 a jerrycan, 356 a spanner)
 game.net.send({ t: 'debug', c: 'pet', a: 'paard' })        // an animal of your own without an egg (optional sh: 'golden')
 game.net.send({ t: 'debug', c: 'spawn', kind: 'd_eenhoorn', dx: 3 })   // any animal from src/shared/animals.js
 ```

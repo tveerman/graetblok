@@ -189,6 +189,12 @@ export class Entities {
           const px = e.x + Math.sin(e.yaw) * 0.84, pz = e.z + Math.cos(e.yaw) * 0.84;
           for (let i = 0; i < 3; i++) this.particles.add(px, e.y + 2.05, pz, (Math.random() - 0.5) * 0.5, 1.6 + Math.random(), (Math.random() - 0.5) * 0.5, 0.92, 0.92, 0.94, 0.5 + Math.random() * 0.3, 1.4, -0.6);
         }
+      } else if (e.id === this.ridden && e.def.veh) {
+        // het voertuig waar je in zit staat waar jij staat (een helikopter hangt onder je)
+        const air = player.mountKind === 'heli';
+        e.x = player.pos.x; e.z = player.pos.z; e.y = player.pos.y - (air ? player.seatH : 0); e.yaw = player.carYaw + Math.PI;
+        e.speed = air ? 6 : player.carV; e.flags = air ? 2 : 0;
+        e.group.rotation.x = air ? -player.pitch * 0.25 : 0;
       } else if (e.id === this.ridden && e.def.animal) {
         // het dier waar je op zit: op de grond staat het waar jij staat, in de lucht hangt het onder je
         const air = player.mountKind === 'vlieg';

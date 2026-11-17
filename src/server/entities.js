@@ -57,6 +57,7 @@ export const entityMethods = {
       if (e.pet && e.pet.a) { if (e.pet.sh) m.sh = e.pet.sh; if (e.pet.name) m.n = e.pet.name; }
       if (e.job) { m.j = e.job; m.v = e.look || 0; }
       if (e.train) m.wg = e.train.wg;
+      if (e.veh) m.dm = Math.round(e.veh.dmg);
     }
     return m;
   },
@@ -570,6 +571,7 @@ export const entityMethods = {
     p.atkCd = this.meta.time;
     if (Math.hypot(e.x - p.x, e.y + e.h / 2 - p.y - 1, e.z - p.z) > 5.5 + e.w) return;
     if (e.kind === 'trein') { this.pickTrain(p, w, e); return; }
+    if (e.veh) { this.pickVehicle(p, w, e); return; }
     if (FRIEND[e.def.ai]) { if (this.meta.time - (p.sorryT || 0) > 4) { p.sorryT = this.meta.time; this.toast(p, 'Niet slaan! Dat is een vriend.', 'warn'); } return; }
     const s = p.inv[p.sel], it = s && ITEMS[s.id];
     const dmg = ((it && it.dmg) || 1) + Math.floor(p.level / 5);

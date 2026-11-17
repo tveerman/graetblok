@@ -19,7 +19,7 @@ import { setupOffline } from './offline.js';
 import { Weather } from './weather.js';
 
 const $ = (id) => document.getElementById(id);
-const DEFAULTS = { view: 5, volume: 0.8, amb: 1, sens: 1, music: true, sfx: true, autoJump: true, dynRes: true, hq: false };
+const DEFAULTS = { view: 5, volume: 0.8, amb: 1, bigBuf: true, silentFix: true, sens: 1, music: true, sfx: true, autoJump: true, dynRes: true, hq: false };
 
 class Game {
   constructor() {
@@ -136,7 +136,7 @@ class Game {
   audioText() {
     const d = this.sound.diag();
     if (!d) return 'Geluid: nog niet gestart (tik ergens op het scherm)';
-    const run = (d.state === 'running' ? 'aan' : 'staat stil (' + d.state + ')') + ' op ' + Math.round(d.rate / 100) / 10 + ' kHz';
+    const run = (d.state === 'running' ? 'aan' : 'staat stil (' + d.state + ')') + ' op ' + Math.round(d.rate / 100) / 10 + ' kHz, vertraging ' + d.lat + ' ms';
     const mus = !this.settings.music ? 'uit' : d.notes + ' noten, sterkte ' + Math.round(d.level * 100) + '%, ' + (d.loop ? 'als lusje' : 'noot voor noot');
     return 'Geluid: ' + run + ' · muziek: ' + mus + ' · effecten: ' + (this.settings.sfx ? 'aan' : 'uit') + (d.ios ? ' · stille stand omzeild: ' + (d.channel ? 'ja' : 'nee') : '');
   }
@@ -191,6 +191,7 @@ class Game {
     this.R.setView(S.view);
     this.sound.setVolume(S.volume);
     this.sound.musicOn = S.music;
+    this.sound.bigBuf = S.bigBuf !== false; this.sound.useTag = S.silentFix !== false;      // gelden vanaf de volgende keer dat het spel start
     this.sound.setAmb(S.amb === undefined ? 1 : S.amb);
     this.sound.setSfx(S.sfx);
     this.input.sens = S.sens;
@@ -299,7 +300,11 @@ class Game {
       }
       case 'fx': this.fx(m); break;
       case 'mount':
-        p.setMount(m.id, m.s, m.k, m.seat, m.sp); ui.setMounted(!!m.id);
+        p.setMount(m.id, m.s, m.k, m.seat, m.sp, m); ui.setMounted(!!m.id);
+        if (m.id && (m.k === 'auto' || m.k === 'heli')) {
+          ui.toast(m.k === 'heli' ? (this.touch ? 'Je vliegt! Stick naar voren, ⬆ omhoog, ⬇ omlaag.' : 'Je vliegt! W = vooruit · spatie omhoog · shift omlaag · R uitstappen')
+            : (this.touch ? 'Stick naar voren: gas. Naar achteren: remmen. Opzij: sturen.' : 'W = gas · S = remmen en achteruit · A/D = sturen · shift = plankgas · R uitstappen'));
+        } else
         if (m.id && (m.k === 'dier' || m.k === 'vlieg')) {
           this.sound.play('chirp', 0.7);
           ui.toast(m.k === 'vlieg' ? (this.touch ? 'Je vliegt! Stick naar voren, ⬆ omhoog, ⬇ omlaag.' : 'Je vliegt! W = vooruit · spatie omhoog · shift omlaag · R afstappen')
@@ -315,6 +320,7 @@ class Game {
       case 'debugSite': this.debugSite = m.s; break;
       case 'dragons': this.dragons = m.l; ui.refreshDragon(); break;
       case 'zoo': this.zoo = m; ui.refreshZoo(); break;
+      case 'veh': p.vehFuel = m.fuel; p.vehDmg = m.dmg; break;      // brandstof en schade van je voertuig
       case 'dragonMenu': ui.openDragon(m.uid); break;
       case 'bossDown': this.sound.play('restore', 0.7); break;
     }
@@ -338,6 +344,7 @@ class Game {
     switch (m.k) {
       case 'hit': P.burst(x, y, z, 7, [1, 0.25, 0.2], { speed: 3, size: 0.16, life: 0.4 }); s.play('hit', v); break;
       case 'poof': P.burst(x, y, z, Math.round(16 * (m.a || 1)), [0.75, 0.75, 0.8], { speed: 2.5, size: 0.4 * Math.max(1, (m.a || 1) * 0.7), life: 0.8, grav: -1, spread: m.a || 1 }); s.play('poof', v); break;
+      case 'toet': P.burst(x, y + 0.6, z, 10, [0.92, 0.92, 0.94], { speed: 1.4, size: 0.5, life: 1.4, grav: -1.5, up: 1 }); s.play('toet', v * 0.7); break;      // de lijntrein vertrekt
       case 'hearts': P.burst(x, y, z, 8, [1, 0.4, 0.6], { speed: 1.2, size: 0.26, life: 1, grav: -2, up: 1 }); s.play('hearts', v); break;
       case 'levelup': P.burst(x, y, z, 34, [1, 0.85, 0.3], { speed: 3, size: 0.22, life: 1.2, grav: -3, up: 2 }); s.play('levelup', v); break;
       case 'portal': P.burst(x, y, z, 50, [0.7, 0.4, 1], { speed: 3, size: 0.26, life: 1.2, grav: 0, spread: 2 }); s.play('portal', v); break;
@@ -457,6 +464,17 @@ class Game {
     return null;
   }
 
+  // een voertuig waar je vlak naast staat
+  nearVehicle() {
+    let best = null, bd = 4.2;
+    for (const e of this.ents.map.values()) {
+      if (!e.def.veh) continue;
+      const d = Math.hypot(e.x - this.player.pos.x, e.y - this.player.pos.y, e.z - this.player.pos.z) - e.w / 2;
+      if (d < bd) { bd = d; best = e; }
+    }
+    return best;
+  }
+
   // je eigen rijdier vlak bij je (paard, olifant, grote wolf, T-rex...)
   nearRide() {
     let best = null, bd = 5;
@@ -469,6 +487,8 @@ class Game {
   }
 
   rideNearest() {
+    const v = this.player.mount ? null : this.nearVehicle();
+    if (v) { this.net.send({ t: 'useEnt', id: v.id }); return; }
     const r = this.player.mount || this.nearDragon(5) ? null : this.nearRide();
     if (r && !this.nearTrain()) { this.net.send({ t: 'rideEnt', id: r.id }); return; }
     const t = this.player.mount ? null : this.nearTrain();
@@ -579,11 +599,12 @@ class Game {
       const own = p.mount ? null : this.nearDragon();
       const train = p.mount || own ? null : this.nearTrain();
       const steed = p.mount || own || train ? null : this.nearRide();
-      this.ui.setRide(train ? '🚂 Instappen' : steed ? (steed.def.rideFly ? '🪽 Vliegen' : '🐎 Rijden') : !own ? '' : (dragonStage(own.growth) >= 2 ? '🐉 Vliegen' : '🐉 ' + (own.name || 'Draak')));
+      const car = p.mount ? null : this.nearVehicle();
+      this.ui.setRide(car ? (car.def.veh === 'helikopter' ? '🚁 Instappen' : car.def.veh === 'boot' ? '🚤 Instappen' : '🚗 Instappen') : train ? '🚂 Instappen' : steed ? (steed.def.rideFly ? '🪽 Vliegen' : '🐎 Rijden') : !own ? '' : (dragonStage(own.growth) >= 2 ? '🐉 Vliegen' : '🐉 ' + (own.name || 'Draak')));
       this.animalSounds(hd);
       const surf = this.world.get(Math.floor(p.pos.x) >> 4, Math.floor(p.pos.z) >> 4);
       const under = surf ? p.pos.y < surf.hm[(Math.floor(p.pos.x) & 15) * 16 + (Math.floor(p.pos.z) & 15)] - 6 : false;
-      this.sound.ambience(hd, { world: this.worldId, under, day: this.R.dayF, flying: !!p.mount && p.mountKind !== 'trein' && p.mountKind !== 'dier' && p.speedNow > 4, rain: Math.max(this.sky.rain, this.sky.snow * 0.25), roof: this.sky.roof });
+      this.sound.ambience(hd, { world: this.worldId, under, day: this.R.dayF, flying: !!p.mount && p.mountKind !== 'trein' && p.mountKind !== 'dier' && p.mountKind !== 'auto' && p.speedNow > 4, rain: Math.max(this.sky.rain, this.sky.snow * 0.25), roof: this.sky.roof });
     }
     const t3 = performance.now();
     this.R.render();

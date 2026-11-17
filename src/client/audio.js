@@ -53,6 +53,8 @@ export class Sound {
     this.ambT = 0;
     this.kicked = false;
     this.sfxOn = true;
+    this.bigBuf = true;      // grote geluidsbuffer (zie unlock); wordt gezet vanuit de instellingen
+    this.useTag = true;      // de stille speler voor de stille stand van iPad en iPhone gebruiken
     this.ambVol = 1;         // hoe hard regen, wind en andere geluiden van de omgeving klinken (0..1)
     this.dest = null;        // waar een los geluidje naartoe gaat (leeg = de gewone geluidseffecten)
     this.notes = 0;          // hoeveel muzieknoten er zijn ingepland (voor de controle in het pauzemenu)
@@ -72,7 +74,7 @@ export class Sound {
       const as = navigator.audioSession;
       if (as) { if (as.type !== 'playback') as.type = 'playback'; this.channelMode = 'sessie'; }
     } catch (e) { /* bestaat hier niet */ }
-    if (!IS_IOS) return;
+    if (!IS_IOS || !this.useTag) return;
     try {
       if (!this.tag) {
         const a = this.tag = document.createElement('audio');
@@ -91,7 +93,7 @@ export class Sound {
 
   // het spel verdwijnt naar de achtergrond: de stille speler hoeft dan niet door te lopen
   sleep() {
-    this.stopMusic();
+    this.stopMusic(); this.engine(0);
     try { if (this.tag && !this.tag.paused) this.tag.pause(); } catch (e) { /* geeft niet */ }
   }
 
@@ -102,7 +104,14 @@ export class Sound {
     if (!AC) return;
     if (this.ctx) this.channel();
     if (!this.ctx) {
-      const c = this.ctx = new AC();
+      // Een grote geluidsbuffer: de tablet rekent het geluid dan in grotere stukken vooruit uit.
+      // Geluidjes klinken een fractie later, maar als de tablet het druk heeft (en dat heeft een
+      // oude iPad met dit spel) valt het geluid veel minder snel weg. Kan de browser het niet,
+      // dan gewoon de standaard.
+      let c = null;
+      if (this.bigBuf) { try { c = new AC({ latencyHint: 'playback' }); } catch (e) { c = null; } }
+      if (!c) c = new AC();
+      this.ctx = c;
       this.master = c.createGain();
       this.master.gain.value = this.vol;
       this.master.connect(c.destination);
@@ -139,7 +148,7 @@ export class Sound {
       this.echo = null;
     }
     const c = this.ctx;
-    if (!this.tag) this.channel();          // de eerste keer: pas nu, zodat de stille speler de snelheid van het spel kent
+    if (!this.tag && !this.chan1) { this.chan1 = true; this.channel(); }          // de eerste keer: pas nu, zodat de stille speler de snelheid van het spel kent
     if (c.state !== 'running') {
       try { const pr = c.resume(); if (pr && pr.catch) pr.catch(() => {}); } catch (e) { /* nog niet toegestaan */ }
     }
@@ -154,6 +163,29 @@ export class Sound {
   }
 
   setVolume(v) { this.vol = v; if (this.master) this.master.gain.value = v; }
+
+  // Het motorgeluid van je voertuig: één brommende toon die hoger wordt als je harder gaat.
+  // on = 0 zet hem uit. f = hoe hard je gaat (0..1), soort = 'weg', 'boot' of 'lucht'.
+  engine(on, f = 0, soort = 'weg') {
+    const c = this.ctx;
+    if (!c) return;
+    const now = c.currentTime;
+    if (!on) {
+      if (this.eng) { const e = this.eng; this.eng = null; e.g.gain.setTargetAtTime(0, now, 0.08); try { e.o.stop(now + 0.5); } catch (er) { /* geeft niet */ } }
+      return;
+    }
+    if (!this.eng) {
+      const o = c.createOscillator(), lp = c.createBiquadFilter(), g = c.createGain();
+      o.type = 'sawtooth'; o.frequency.value = 45; lp.type = 'lowpass'; lp.frequency.value = 420; g.gain.value = 0;
+      o.connect(lp); lp.connect(g); g.connect(this.sfxGain); o.start();
+      this.eng = { o, g, t: 0 };
+    }
+    if (now - this.eng.t < 0.12) return;                 // een paar keer per tel bijstellen is genoeg
+    this.eng.t = now;
+    const base = soort === 'lucht' ? 34 : soort === 'boot' ? 40 : 46;
+    this.eng.o.frequency.setTargetAtTime(base + Math.min(1.2, f) * 78, now, 0.12);
+    this.eng.g.gain.setTargetAtTime(this.sfxOn ? 0.05 + Math.min(1, f) * 0.04 : 0, now, 0.12);
+  }
 
   // hoe hard de omgeving klinkt: regen, wind, onweer, vogels en dieren
   setAmb(v) {
@@ -171,7 +203,7 @@ export class Sound {
   diag() {
     if (!this.ctx) return null;
     this.measure();
-    return { state: this.ctx.state, rate: this.ctx.sampleRate, notes: this.notes, level: this.level || 0, ios: IS_IOS, channel: this.channelMode, loop: this.canRender };
+    return { state: this.ctx.state, lat: Math.round(((this.ctx.baseLatency || 0) + (this.ctx.outputLatency || 0)) * 1000), rate: this.ctx.sampleRate, notes: this.notes, level: this.level || 0, ios: IS_IOS, channel: this.channelMode, loop: this.canRender };
   }
 
   // hoe sterk is het muzieksignaal op dit moment? (de hoogste waarde van de laatste paar seconden)
