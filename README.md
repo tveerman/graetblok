@@ -436,6 +436,11 @@ From Jorian's design document (`spel.txt`), following development phases 1–4, 
   above the map finds places by name ("Lindeburg"), by kind ("tempel", "kasteel") or region
   ("woestijn", "rivier") within 5000 blocks, nearest first; each hit can be viewed on the
   map or marked for the compass.
+- **Butterflies and butterfly wings** – butterflies in six colour pairs flutter low over the
+  land by day in the green world, the cloud world and the Oerwereld. One hit and a butterfly
+  drops butterfly wings: a consumable that, used from your hand, carries you (with dragons
+  and animals that follow you) back to your bed, from any world, or to the spaceship when
+  you have no bed. Each use costs one pair.
 - **Player character with a skeleton** (`src/client/rig.js`) – the human, elf and robot you
   can play are built on one rig with joints (hips, knees, ankles, spine, neck, shoulders,
   elbows). The animation computes joint angles: knees bend while the leg swings forward, the

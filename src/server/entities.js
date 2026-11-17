@@ -10,13 +10,13 @@ import { FOODS } from './quests.js';
 // [soort, maximum in de buurt, wanneer]
 const SPAWNS = {
   groen: [['pluizel', 3, 'day'], ['hert', 3, 'day'], ['pluizel', 2, 'any'], ['kruiper', 3, 'night'], ['robotspin', 2, 'night'], ['golem', 1, 'cave'], ['kruiper', 2, 'cave'],
-    ['haai', 2, 'water'], ['kwal', 3, 'water'], ['haai', 1, 'water'],
+    ['haai', 2, 'water'], ['kwal', 3, 'water'], ['haai', 1, 'water'], ['vlinder', 4, 'day'], ['vlinder', 3, 'day'],
     ['schaap', 1, 'day'], ['koe', 1, 'day'], ['wolf', 1, 'any'], ['beer', 1, 'day'], ['spin', 2, 'night'], ['skelet', 2, 'night'], ['spin', 2, 'cave'], ['skelet', 2, 'cave'], ['wildedraak', 1, 'sky']],
   ijs: [['ijswolf', 3, 'any'], ['pluizel', 2, 'day'], ['ijswolf', 4, 'night'], ['hert', 2, 'day'], ['beer', 1, 'day'], ['schaap', 1, 'day'], ['skelet', 2, 'night'], ['wildedraak', 1, 'sky']],
   vuur: [['vuurgeest', 4, 'any'], ['golem', 2, 'any'], ['skelet', 2, 'any'], ['wildedraak', 1, 'sky']],
   schaduw: [['schim', 3, 'any'], ['kruiper', 3, 'any'], ['pluizel', 2, 'any'], ['spin', 3, 'any'], ['skelet', 2, 'any'], ['wolf', 1, 'any'], ['wildedraak', 1, 'sky']],
-  dino: [['haai', 1, 'water'], ['kwal', 2, 'water'], ['oerraptor', 3, 'any'], ['oertriceratops', 2, 'day'], ['oerstego', 2, 'day'], ['oerbrachio', 1, 'day'], ['oertrex', 1, 'any'], ['pluizel', 2, 'day'], ['oerraptor', 2, 'night'], ['spin', 2, 'cave'], ['wildedraak', 1, 'sky']],
-  wolken: [['stormvleugel', 3, 'any'], ['pluizel', 3, 'any'], ['hert', 2, 'any'], ['schaap', 1, 'any'], ['wildedraak', 1, 'sky']],
+  dino: [['vlinder', 3, 'day'], ['haai', 1, 'water'], ['kwal', 2, 'water'], ['oerraptor', 3, 'any'], ['oertriceratops', 2, 'day'], ['oerstego', 2, 'day'], ['oerbrachio', 1, 'day'], ['oertrex', 1, 'any'], ['pluizel', 2, 'day'], ['oerraptor', 2, 'night'], ['spin', 2, 'cave'], ['wildedraak', 1, 'sky']],
+  wolken: [['vlinder', 3, 'day'], ['stormvleugel', 3, 'any'], ['pluizel', 3, 'any'], ['hert', 2, 'any'], ['schaap', 1, 'any'], ['wildedraak', 1, 'sky']],
 };
 // deze wezens doe je geen pijn: dorpelingen, ridders, boomwachters en treinen
 const FRIEND = { npc: 1, guard: 1, none: 1 };
@@ -196,7 +196,8 @@ export const entityMethods = {
     else if (e.fly) {
       let g = w.topY(Math.floor(e.x), Math.floor(e.z));
       if (g < 0) g = 56;
-      e.vy = clamp(g + 5 - e.y, -2, 2);
+      // (een vlinder blijft laag en dobbert op en neer)
+      e.vy = clamp(g + (e.def.laag ? 1.8 + Math.sin(e.t * 1.3 + e.id) * 0.9 : 5) - e.y, -2, 2);
     }
   },
 

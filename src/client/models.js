@@ -298,6 +298,23 @@ export function setDragonGrowth(root, growth) {
 // het poppetje van de speler heeft een echt skelet met gewrichten: zie rig.js
 export function playerModel(look) { return buildRig(look); }
 
+// Een vlinder: een dun lijfje met twee grote gekleurde vleugels aan elke kant.
+const VLINDER_KLEUR = [[0xf08a20, 0x2a2014], [0x3a8ae8, 0xf4f4f0], [0xf4ce32, 0x2a2014], [0xf06ab0, 0xfff0a0], [0xf4f4f0, 0x8a4ad0], [0xe03a2a, 0x2a2014]];
+function vlinder() {
+  const root = base('vlinder'), g = root.userData.a.inner, a = root.userData.a;
+  const [c1, c2] = VLINDER_KLEUR[Math.floor(Math.random() * VLINDER_KLEUR.length)];
+  const lijf = mat(0x2a2014, 'glad'), vl = mat(c1, 'glad'), stip = mat(c2, 'glad');
+  part(g, lijf, 0.06, 0.06, 0.34, 0, 0, 0);
+  part(g, lijf, 0.02, 0.02, 0.14, 0.03, 0.04, 0.22); part(g, lijf, 0.02, 0.02, 0.14, -0.03, 0.04, 0.22);      // voelsprieten
+  for (const s of [-1, 1]) {
+    const piv = new THREE.Group(); piv.position.set(s * 0.03, 0.02, 0); g.add(piv); piv.userData.s = s; a.wings.push(piv);
+    part(piv, vl, 0.3, 0.02, 0.26, s * 0.17, 0, 0.08);                 // voorvleugel
+    part(piv, vl, 0.22, 0.02, 0.2, s * 0.13, 0, -0.14);                // achtervleugel
+    part(piv, stip, 0.1, 0.025, 0.1, s * 0.2, 0, 0.08); part(piv, stip, 0.07, 0.025, 0.07, s * 0.14, 0, -0.14);
+  }
+  return root;
+}
+
 // ---------- zeedieren ----------
 
 // Een haai met de neus naar +z: een grijs lijf met een witte buik, een rugvin, borstvinnen en
@@ -875,6 +892,7 @@ export function buildModel(kind, opts) {
     case 'spin': m = spin(); break;
     case 'geest': m = geest(def.tint || 0xffffff, !!def.boss); break;
     case 'haai': m = haai(); break;
+    case 'vlinder': m = vlinder(); break;
     case 'kwal': m = kwal(); break;
     case 'vleugel': m = vleugel(def.boss ? 0x3a4a8a : 0x6a86b0); break;
     case 'draak': m = draak(def.dragon || opts.dtype || 'vuur', opts.growth); break;
@@ -951,6 +969,13 @@ export function animate(root, time, speed, flags, dt) {
       for (const l of a.legs) { l.rotation.x = moving ? Math.sin(ph * 1.6 + l.userData.ph) * 0.5 : 0; l.rotation.z = l.userData.rz + (moving ? Math.cos(ph * 1.6 + l.userData.ph) * 0.12 : 0); }
       a.inner.position.z = atk ? 0.2 : 0;
       break;
+    case 'vlinder': {
+      // snel klapperende vleugels, en het lijfje dobbert op en neer
+      const f = 0.25 + Math.abs(Math.sin(time * 13 + root.id)) * 1.05;
+      for (const w of a.wings) w.rotation.z = w.userData.s * f;
+      a.inner.position.y = 0.2 + Math.sin(time * 5 + root.id) * 0.06;
+      break;
+    }
     case 'vis':
       // een haai zwiept met zijn staart, sneller als hij aanvalt
       a.tail[0].rotation.y = Math.sin(time * (atk ? 16 : 6 + speed) + root.id) * 0.5;

@@ -878,6 +878,7 @@ export class Player {
     }
     // iets wat je kunt planten: wijs je een akker aan, dan plant je het (anders eet je het op)
     const seed = !!CROP_OF_SEED[id] && !!b && b.id === B.akker;
+    if (it && it.thuis) { g.net.send({ t: 'thuis' }); g.sound.play('levelup'); this.swing = 0.25; return; }      // vlindervleugels: terug naar huis
     if (it && it.food && !seed) { g.net.send({ t: 'eat' }); return; }
     if (!b || !id) return;
     if (!isBlock(id) && !(it && it.portal) && !seed) return;

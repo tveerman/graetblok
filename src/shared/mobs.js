@@ -23,6 +23,8 @@ export const MOBS = {
     drops: [[I.schaduwhart, 1, 1, 1], [I.schaduwkristal, 6, 8, 1], [I.drakenschub, 3, 3, 1]] },
   stormwachter: { name: 'Stormwachter, bewaker van de Hemelboom', model: 'vleugel', scale: 3.2, hp: 320, dmg: 6, speed: 7, w: 3.0, h: 1.8, ai: 'boss', boss: 'wolken', proj: 'bliksem', fly: true, xp: 380,
     drops: [[I.hemelhart, 1, 1, 1], [I.hemelkristal, 6, 8, 1], [I.drakenschub, 4, 4, 1]] },
+  // vlinders: ze fladderen overdag laag over het land en laten vlindervleugels vallen
+  vlinder: { name: 'Vlinder', model: 'vlinder', hp: 1, speed: 1.8, w: 0.5, h: 0.4, ai: 'passive', fly: true, laag: true, xp: 1, drops: [[I.vlindervleugels, 1, 1, 1]] },
   // gevaar in het water: ze zwemmen alleen, en vallen je alleen aan als je zelf in het water bent
   haai: { name: 'Haai', model: 'haai', hp: 30, dmg: 5, speed: 4.4, w: 1.0, h: 0.7, ai: 'melee', fly: true, swim: true, xp: 22, drops: [[I.rauw_vlees, 1, 3, 1], [I.bot, 1, 2, 0.6]] },
   kwal: { name: 'Kwal', model: 'kwal', hp: 8, dmg: 2, speed: 1.1, w: 0.7, h: 0.8, ai: 'melee', fly: true, swim: true, xp: 6, drops: [[B.gloeikristal, 1, 1, 0.3]] },

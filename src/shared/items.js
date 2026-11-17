@@ -171,6 +171,8 @@ item(387, 'verband', 'Verband', { icon: ['gewas', 'knol', '#f4f4f0'], stack: 16 
 item(388, 'fossiel', 'Fossiel', { icon: ['bone'] });
 item(389, 'kern_dino', 'Oerportaalkern', { icon: ['core', '#b6ff4a'], portal: 'dino', stack: 4 });
 item(390, 'oerhart', 'Oerhart', { icon: ['heart', '#b6ff4a'], stack: 1 });
+// vlindervleugels: gebruik ze en je vliegt in één keer terug naar je bed (of naar het ruimteschip)
+item(391, 'vlindervleugels', 'Vlindervleugels', { icon: ['vlinder'], thuis: 1, stack: 16 });
 
 export { isBlock };
 export function itemName(id) {

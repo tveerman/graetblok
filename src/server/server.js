@@ -832,6 +832,29 @@ export class GameServer {
     this.enterWorld(p, false);
   }
 
+  // Vlindervleugels gebruiken: je vliegt terug naar je bed, of naar het ruimteschip als je
+  // geen bed hebt (of als het is weggehaald). Kost één paar vleugels.
+  on_thuis(p) {
+    if (p.dead) return;
+    const held = p.inv[p.sel];
+    if (!held || held.id !== I.vlindervleugels) return;
+    let s = p.spawn;
+    if (s && !isBed(this.worlds[s.w].get(Math.floor(s.x), Math.floor(s.y) - 1, Math.floor(s.z)))) { s = null; p.spawn = null; }
+    const bed = !!s;
+    if (!s) s = { w: 'groen', x: SPAWN.x, y: -1, z: SPAWN.z };
+    held.n--; if (held.n <= 0) p.inv[p.sel] = null;
+    if (p.mount) this.on_dismount(p);
+    this.fx(p.world, 'hearts', p.x, p.y + 1, p.z);
+    this.syncOwned(p);
+    this.removeOwned(p, this.worlds[p.world]);
+    p.world = s.w; p.x = s.x; p.y = s.y; p.z = s.z;
+    for (const d of p.dragons) if (d.mode === 'follow') { d.world = s.w; d.x = s.x; d.y = Math.max(s.y, 1) + 1; d.z = s.z + 1.5; d.far = 1; }
+    for (const d of p.pets) if (d.mode === 'follow') { d.world = s.w; d.x = s.x; d.y = Math.max(s.y, 1); d.z = s.z + 1; }
+    this.enterWorld(p, false);
+    this.sendInv(p);
+    this.toast(p, bed ? '🦋 De vlindervleugels dragen je terug naar je bed.' : '🦋 De vlindervleugels dragen je terug naar het ruimteschip. (Slaap in een bed om daar terug te komen.)', 'good');
+  }
+
   on_respawn(p) {
     if (!p.dead) return;
     p.dead = false;

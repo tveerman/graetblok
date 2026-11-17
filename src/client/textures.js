@@ -2039,6 +2039,15 @@ const ICONS = {
       g.fillStyle = 'rgba(255,255,255,0.5)'; g.beginPath(); g.arc(x - 4, y - 4, 3, 0, 6.3); g.fill();
     }
   },
+  vlinder: (g) => {
+    g.strokeStyle = 'rgba(0,0,0,0.6)'; g.lineWidth = 2;
+    for (const s of [-1, 1]) {
+      g.fillStyle = '#f08a20'; g.beginPath(); g.ellipse(32 + s * 14, 24, 13, 15, s * 0.5, 0, 6.3); g.fill(); g.stroke();
+      g.fillStyle = '#f4ce32'; g.beginPath(); g.ellipse(32 + s * 11, 44, 9, 10, -s * 0.4, 0, 6.3); g.fill(); g.stroke();
+      g.fillStyle = '#2a2014'; g.beginPath(); g.arc(32 + s * 16, 22, 4, 0, 6.3); g.fill();
+    }
+    g.fillStyle = '#2a2014'; g.fillRect(30, 14, 4, 38);
+  },
   // wat je oogst op de boerderij: vorm = 'wortel', 'knol', 'kolf', 'rond', 'bes', 'ster', 'bloem', 'halm' of 'pizza'
   gewas: (g, vorm, c) => {
     g.strokeStyle = 'rgba(0,0,0,0.6)'; g.lineWidth = 2; g.lineJoin = 'round';
