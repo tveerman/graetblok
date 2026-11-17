@@ -227,6 +227,7 @@ export function animateRig(a, time, speed, dt) {
     if (sw > 0) { const t = time * 3.4 + i * PI; sx = lerp(sx, -1.7 + Math.sin(t) * 0.9, sw); out = lerp(out, 0.3 + Math.max(0, Math.cos(t)) * 0.7, sw); el = lerp(el, -0.3, sw); }
     if (riding) { sx = -0.95; el = -0.4; out = 0.12; }
     if (a.atk) { sx = -2.2 + Math.sin(time * 20 + i * 2) * 0.5; el = -0.3; }                                // een monster dat uithaalt
+    if (i === 1 && a.hold && !riding && sw < 0.5) { sx = sx * 0.3 - 0.5; el = Math.min(el, -0.95); out = Math.min(out, 0.08); }      // je houdt iets vast
     if (i === 1 && a.swing > 0) { sx = -2.3 + Math.sin(a.swing * 14) * 1.1; el = -0.35; out = 0.05; }      // hakken, slaan, bouwen
     R.sh.rotation.set(sx, 0, R.s * out);
     R.el.rotation.x = el;

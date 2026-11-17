@@ -327,13 +327,14 @@ From Jorian's design document (`spel.txt`), following development phases 1–4, 
   each with its own gait (villager, knight, rattling skeleton, heavy lumbering giant); what
   they hold moves with the forearm. Four-legged animals and walking birds get a knee in every
   leg that is long enough (`kneeify`). Cost: four extra boxes per creature.
-- **Three camera modes** (the 📷 button, V or F5): through your own eyes, now with your two forearms in view
-  (the one holding your item swings when you dig, hit or build; colours follow the character
-  you chose), from behind, and from the front so you can see your character. In the front
+- **Three camera modes** (the 📷 button, V or F5): through your own eyes, with the forearm
+  that holds your item in view (it swings when you dig, hit or build; with empty hands your
+  arms hang down out of view, as they do seen from outside, and only show when you punch), from behind, and from the front so you can see your character. In the front
   view a tap on the screen still aims where you tap; without a tap you aim straight ahead
   from your eyes. The best armour in your backpack is now visible on the character: chest
   plate, shoulder pieces and a helmet in the armour's colour (the elf keeps its cap, the
-  robot its antenna).
+  robot its antenna). Seen from outside, the character holds what you carry in its raised
+  right hand. Getting off a dragon or other mount high in the air now gives fall damage.
 - **Story quests** – 18 steps from "chop a tree" to "defeat the Drakenkoning", shown top-left,
   with a compass marker for the early ones.
 

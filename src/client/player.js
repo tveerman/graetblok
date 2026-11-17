@@ -82,6 +82,15 @@ export class Player {
     if (this.fpArms) for (const a of this.fpArms) cam.remove(a);
     this.fpArms = buildArms(look);
     for (const a of this.fpArms) { a.visible = false; cam.add(a); }
+    // wat je vasthoudt zie je ook van buitenaf: een plaatje in de rechterhand van het poppetje
+    const A = this.model.userData.a;
+    this.handItem = new THREE.Mesh(new THREE.PlaneGeometry(0.34, 0.34), new THREE.MeshBasicMaterial({ map: this.heldTex, transparent: true, alphaTest: 0.3, side: THREE.DoubleSide }));
+    this.handItem.rotation.y = Math.PI / 2;
+    this.handItem.position.set(0, -A.S.fore - 0.1, 0.14);
+    const dwars = new THREE.Mesh(this.handItem.geometry, this.handItem.material); dwars.rotation.y = Math.PI / 2;      // kruislings, zodat je het van alle kanten ziet
+    this.handItem.add(dwars);
+    this.handItem.visible = false;
+    A.arms[1].el.add(this.handItem);
   }
 
   teleport(x, y, z, yaw) {
@@ -132,7 +141,8 @@ export class Player {
       this.raceHold = 0;
       if (this.mountKind === 'rit' && this.rideE) { const x = this.rideA.exit; this.pos.set(this.rideE.x + x[0], this.rideE.y + x[1], this.rideE.z + x[2]); this.vel.set(0, 0, 0); this.rideA = null; this.rideE = null; }
       if (this.veh) { this.flushVeh(); this.pos.x += Math.cos(this.carYaw) * (this.veh.size[0] / 2 + 0.7); this.pos.z -= Math.sin(this.carYaw) * (this.veh.size[0] / 2 + 0.7); this.pos.y += 0.2; this.veh = null; this.g.sound.engine(0); this.g.ui.setVeh(''); }
-      this.mount = 0; this.mountKind = ''; this.softLand = true; this.fallPeak = this.pos.y;
+      // (geen zachte landing: stap je hoog in de lucht af, dan val je echt)
+      this.mount = 0; this.mountKind = ''; this.softLand = false; this.fallPeak = this.pos.y;
     }
     this.g.ents.ridden = this.mount;
   }
@@ -663,6 +673,8 @@ export class Player {
       let best = null;
       for (const s of g.inv) { const it = s && ITEMS[s[0]]; if (it && it.armor && (!best || it.armor > best.armor)) best = it; }
       setArmor(m, best ? parseInt(best.icon[1].slice(1), 16) : null, !!best && best.key === 'harnas_leer');
+      a.hold = this.heldItem() > 0;                         // iets in je hand: dan houd je je arm omhoog
+      this.handItem.visible = a.hold;
       a.pose = this.mount ? 'ride' : '';
       a.airborne = !this.onGround && !this.mount && !this.inWater; a.vy = this.vel.y; a.swim = this.inWater && !this.mount;
       if (this.swing > 0 && !(a.swing > 0)) a.swing = this.swing;
@@ -682,9 +694,11 @@ export class Player {
       this.held.rotation.z = -s * 0.9 + 0.1;
     }
     // je armen: de ene houdt vast wat je in je hand hebt, de andere hangt onder in beeld
-    const arms = this.fpArms, show = !third && !this.zoom;
+    // Net als van buitenaf: met lege handen hangen je armen omlaag (uit beeld); heb je iets vast
+    // of sla je, dan komt die arm omhoog.
+    const arms = this.fpArms, show = !third && !this.zoom && (id > 0 || this.swing > 0);
     if (arms) {
-      arms[0].visible = arms[1].visible = show;
+      arms[0].visible = show; arms[1].visible = false;
       if (show) {
         const s = this.swing > 0 ? Math.sin((this.swing / 0.3) * Math.PI) : 0;
         const side = g.touch ? -1 : 1, ax = 0.37 * Math.min(1.6, cam.aspect), bob = Math.sin(this.bobPh) * 0.012;
