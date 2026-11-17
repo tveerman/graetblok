@@ -346,6 +346,31 @@ MODEL_TILES.forEach(tile);
 // ---- de tweede reeks blokken: nummers vanaf 1024 (BLOCK2_BASE) ----
 // Het eerste blok hier is een proef: gekleurd beton. De rest van de kleurblokken komt erachter.
 def(1024, 'beton_rood', 'Rood beton', { hard: 3, tool: 'pick' });
+// inrichting voor winkels, het vliegveld en de kermis
+const LAAG = { shape: SHAPE_LOW, solid: true, opaque: false, hard: 1, snd: 'wood' };
+def(1025, 'kassa', 'Kassa', { ...LAAG, height: 0.5, tiles: ['kassa_top', 'kassa', 'ijzerblok'], snd: 'metal' });
+def(1026, 'plantenbak', 'Plantenbak', { tiles: ['plantenbak_top', 'plantenbak', 'planken'], hard: 1, snd: 'wood' });
+def(1027, 'kleed_rood', 'Rood vloerkleed', { ...LAAG, height: 0.0625, tiles: 'kleed_rood', snd: 'snow', hard: 0.3 });
+def(1028, 'kleed_blauw', 'Blauw vloerkleed', { ...LAAG, height: 0.0625, tiles: 'kleed_blauw', snd: 'snow', hard: 0.3 });
+def(1029, 'vitrine', 'Vitrine', { tiles: ['vitrine_top', 'vitrine', 'planken'], hard: 1, snd: 'glass', light: 5 });
+def(1030, 'bank', 'Bankje', { ...LAAG, height: 0.5, tiles: ['bank_top', 'bank', 'planken'] });
+def(1031, 'vertrekbord', 'Vertrekbord', { tiles: ['ijzerblok', 'vertrekbord', 'ijzerblok'], hard: 1.5, snd: 'metal', light: 6, glow: 12 });
+def(1032, 'koffer', 'Koffer', { ...LAAG, height: 0.625, tiles: ['koffer_top', 'koffer', 'koffer_top'] });
+def(1033, 'bagageband', 'Bagageband', { ...LAAG, height: 0.5, tiles: ['bagageband_top', 'bagageband', 'ijzerblok'], snd: 'metal' });
+def(1034, 'incheckbalie', 'Incheckbalie', { tiles: ['balie_top', 'incheckbalie', 'beton'], hard: 2, snd: 'metal', light: 3 });
+def(1035, 'tegel_wit', 'Witte tegels', { hard: 2, tool: 'pick' });
+def(1036, 'tegel_ruit', 'Geblokte tegels', { hard: 2, tool: 'pick' });
+def(1037, 'reclamebord', 'Reclamebord', { tiles: ['ijzerblok', 'reclamebord', 'ijzerblok'], hard: 1.5, snd: 'metal', light: 6, glow: 12 });
+def(1038, 'kledingrek', 'Kledingrek', { tiles: ['planken', 'kledingrek', 'planken'], hard: 1, snd: 'wood' });
+def(1039, 'vlaggetjes', 'Vlaggetjes', { ...CROSS, support: false, hard: 0.2 });
+def(1040, 'ballonnen', 'Ballonnen', { ...CROSS, hard: 0.2 });
+def(1041, 'tegel_geel', 'Gele kermistegels', { hard: 2, tool: 'pick' });
+def(1042, 'tegel_roze', 'Roze kermistegels', { hard: 2, tool: 'pick' });
+def(1043, 'tentdoek', 'Gestreept tentdoek', { hard: 0.5, snd: 'snow' });
+// nieuwe gebieden: de steel van een reuzenpaddenstoel, cactus en zandsteen
+def(1044, 'zwamsteel', 'Paddenstoelsteel', { hard: 0.8, snd: 'leaf' });
+def(1045, 'cactus', 'Cactus', { tiles: ['cactus_top', 'cactus', 'cactus_top'], hard: 0.6, snd: 'leaf' });
+def(1046, 'zandsteen', 'Zandsteen', { hard: 2.5, tool: 'pick' });
 
 // Snelle opzoektabellen (één vakje per mogelijk blok-id)
 export const B_ROAD = new Uint8Array(NUM_BLOCKS);      // 1 = wegdek: voertuigen rijden hier harder

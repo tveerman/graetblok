@@ -11,8 +11,9 @@ export const RIDES = {
   draaimolen: { name: 'Draaimolen', knop: '🎠 Opstappen', dur: 24, w: 8, h: 3 },
   zweefmolen: { name: 'Zweefmolen', knop: '🪑 Instappen', dur: 26, w: 5, h: 4 },
   schommelschip: { name: 'Schommelschip', knop: '⛵ Instappen', dur: 26, w: 7, h: 4 },
+  theekopjes: { name: 'Theekopjes', knop: '☕ Instappen', dur: 24, w: 8, h: 3 },
 };
-export const RIDE_ORDER = ['achtbaan', 'reuzenrad', 'vrijeval', 'draaimolen', 'zweefmolen', 'schommelschip'];
+export const RIDE_ORDER = ['achtbaan', 'reuzenrad', 'vrijeval', 'draaimolen', 'zweefmolen', 'schommelschip', 'theekopjes'];
 
 for (const k of RIDE_ORDER) {
   const R = RIDES[k];

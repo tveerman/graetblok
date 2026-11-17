@@ -477,3 +477,5 @@ BLOCK_MODELS[B.spinnenweb] = [spinnenweb()];
 // groot veld blijft licht voor de tablet)
 for (const k in B) if (k === 'kiem' || k.startsWith('g_')) BLOCK_MODELS[B[k]] = [gewas(k)];
 BLOCK_MODELS[B.varen] = [gewas('varen')];
+BLOCK_MODELS[B.vlaggetjes] = [gewas('vlaggetjes')];
+BLOCK_MODELS[B.ballonnen] = [gewas('ballonnen')];

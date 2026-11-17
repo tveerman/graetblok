@@ -151,14 +151,46 @@ function zweefmolen() {
     const arm = new THREE.Group(); piv.add(arm);
     const m = new Merge();
     m.box(0.05, 4.6, 0.05, 0, -2.3, 0.3); m.box(0.05, 4.6, 0.05, 0, -2.3, -0.3);
-    m.box(0.7, 0.12, 0.7, 0, -4.7, 0); m.box(0.12, 0.7, 0.7, -0.33, -4.3, 0);
+    // het stoeltje kijkt in de draairichting (-z): de rugleuning zit erachter, met twee armleuningen
+    m.box(0.7, 0.12, 0.7, 0, -4.7, 0); m.box(0.7, 0.7, 0.1, 0, -4.3, 0.33); m.box(0.08, 0.3, 0.6, 0.34, -4.5, 0); m.box(0.08, 0.3, 0.6, -0.34, -4.5, 0);
     arm.add(m.mesh(skinMat(KLEUREN[i], 'glad')));
     armen.push(arm); a.seats.push(seat(arm, 0, -4.9, 0));
   }
   // de stoeltjes zwaaien naar buiten; af en toe gaat hij even langzamer en hangen ze weer recht
-  a.update = (t) => { const k = 0.55 + 0.45 * Math.sin(t * 0.25); spin.rotation.y = t * (0.6 + 0.5 * k); for (const arm of armen) arm.rotation.z = 0.25 + 0.6 * k; };
+  // (De hoek is de som van alle snelheid tot nu toe. Eerst stond hier tijd x snelheid: dan gaat
+  // hij steeds harder en zelfs achteruit naarmate het spel langer loopt.)
+  a.update = (t) => {
+    const k = 0.55 + 0.45 * Math.sin(t * 0.25);
+    spin.rotation.y = 0.4 * t + 0.3 * (0.55 * t - 1.8 * Math.cos(t * 0.25));       // snelheid: 0,4 tot 0,7 rondjes-hoek per tel
+    for (const arm of armen) arm.rotation.z = 0.15 + 0.4 * k;
+  };
+  a.seatYaw = Math.PI;                 // je kijkt in de draairichting
   a.pickSeat = (t, px, pz) => { let best = 0, bd = 1e9; a.seats.forEach((s, i) => { s.getWorldPosition(_v); const d = Math.hypot(_v.x - px, _v.z - pz); if (d < bd) { bd = d; best = i; } }); return best; };
   a.exit = [0, 0.2, 8];
+  return root;
+}
+
+// ---------- theekopjes ----------
+// Een draaiende schijf met vier grote kopjes die zelf ook nog ronddraaien.
+function theekopjes() {
+  const root = base('theekopjes'), a = root.userData.a;
+  const spin = new THREE.Group(); root.add(spin);
+  const vloer = new THREE.Mesh(new THREE.CylinderGeometry(4.6, 4.6, 0.3, 20), skinMat(0xf06ab0, 'glad')); vloer.position.y = 0.15; spin.add(vloer);
+  const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 1.1, 1.8, 12), skinMat(0xf4f4f0, 'glad')); pot.position.y = 1.2; spin.add(pot);
+  const tuit = new Merge(); tuit.box(0.3, 0.3, 0.9, 0, 1.5, 1.2); tuit.box(0.5, 0.2, 0.5, 0, 2.2, 0); spin.add(tuit.mesh(skinMat(0xf4f4f0, 'glad')));
+  const kopjes = [];
+  for (let i = 0; i < 4; i++) {
+    const an = i / 4 * TAU, k = new THREE.Group();
+    k.position.set(Math.cos(an) * 2.9, 0.3, Math.sin(an) * 2.9); spin.add(k);
+    const kleur = [0xd8362c, 0xf0d020, 0x2a6ad0, 0x3ab04a][i];
+    const kop = new THREE.Mesh(new THREE.CylinderGeometry(1.15, 0.85, 0.9, 12, 1, true), new THREE.MeshLambertMaterial({ color: kleur, side: THREE.DoubleSide })); kop.position.y = 0.55; k.add(kop);
+    const bodem = new THREE.Mesh(new THREE.CylinderGeometry(0.85, 0.85, 0.1, 12), skinMat(0xf4f4f0, 'glad')); bodem.position.y = 0.12; k.add(bodem);
+    const oor = new Merge(); oor.box(0.12, 0.5, 0.5, 1.3, 0.6, 0); k.add(oor.mesh(skinMat(kleur, 'glad')));
+    kopjes.push(k); a.seats.push(seat(k, 0, 0.75, 0));
+  }
+  a.update = (t) => { spin.rotation.y = t * 0.5; kopjes.forEach((k, i) => { k.rotation.y = -t * (1.1 + 0.3 * Math.sin(t * 0.4 + i)) + i; }); };
+  a.pickSeat = (t, px, pz) => { let best = 0, bd = 1e9; a.seats.forEach((s, i) => { s.getWorldPosition(_v); const d = Math.hypot(_v.x - px, _v.z - pz); if (d < bd) { bd = d; best = i; } }); return best; };
+  a.exit = [0, 0.2, 6];
   return root;
 }
 
@@ -345,5 +377,5 @@ function achtbaan() {
   return root;
 }
 
-const BUILD = { reuzenrad, draaimolen, zweefmolen, schommelschip, vrijeval, achtbaan };
+const BUILD = { reuzenrad, draaimolen, zweefmolen, schommelschip, vrijeval, achtbaan, theekopjes };
 export function buildRide(kind) { return kind === 'lijnvlucht' ? lijnvlucht() : (BUILD[kind] || reuzenrad)(); }

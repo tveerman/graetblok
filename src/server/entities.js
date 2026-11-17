@@ -10,11 +10,12 @@ import { FOODS } from './quests.js';
 // [soort, maximum in de buurt, wanneer]
 const SPAWNS = {
   groen: [['pluizel', 3, 'day'], ['hert', 3, 'day'], ['pluizel', 2, 'any'], ['kruiper', 3, 'night'], ['robotspin', 2, 'night'], ['golem', 1, 'cave'], ['kruiper', 2, 'cave'],
+    ['haai', 2, 'water'], ['kwal', 3, 'water'], ['haai', 1, 'water'],
     ['schaap', 1, 'day'], ['koe', 1, 'day'], ['wolf', 1, 'any'], ['beer', 1, 'day'], ['spin', 2, 'night'], ['skelet', 2, 'night'], ['spin', 2, 'cave'], ['skelet', 2, 'cave'], ['wildedraak', 1, 'sky']],
   ijs: [['ijswolf', 3, 'any'], ['pluizel', 2, 'day'], ['ijswolf', 4, 'night'], ['hert', 2, 'day'], ['beer', 1, 'day'], ['schaap', 1, 'day'], ['skelet', 2, 'night'], ['wildedraak', 1, 'sky']],
   vuur: [['vuurgeest', 4, 'any'], ['golem', 2, 'any'], ['skelet', 2, 'any'], ['wildedraak', 1, 'sky']],
   schaduw: [['schim', 3, 'any'], ['kruiper', 3, 'any'], ['pluizel', 2, 'any'], ['spin', 3, 'any'], ['skelet', 2, 'any'], ['wolf', 1, 'any'], ['wildedraak', 1, 'sky']],
-  dino: [['oerraptor', 3, 'any'], ['oertriceratops', 2, 'day'], ['oerstego', 2, 'day'], ['oerbrachio', 1, 'day'], ['oertrex', 1, 'any'], ['pluizel', 2, 'day'], ['oerraptor', 2, 'night'], ['spin', 2, 'cave'], ['wildedraak', 1, 'sky']],
+  dino: [['haai', 1, 'water'], ['kwal', 2, 'water'], ['oerraptor', 3, 'any'], ['oertriceratops', 2, 'day'], ['oerstego', 2, 'day'], ['oerbrachio', 1, 'day'], ['oertrex', 1, 'any'], ['pluizel', 2, 'day'], ['oerraptor', 2, 'night'], ['spin', 2, 'cave'], ['wildedraak', 1, 'sky']],
   wolken: [['stormvleugel', 3, 'any'], ['pluizel', 3, 'any'], ['hert', 2, 'any'], ['schaap', 1, 'any'], ['wildedraak', 1, 'sky']],
 };
 // deze wezens doe je geen pijn: dorpelingen, ridders, boomwachters en treinen
@@ -119,6 +120,16 @@ export const entityMethods = {
   moveFly(w, e, dt) {
     const hw = e.w / 2 - 0.02;
     const vx = e.vx + e.kx, vz = e.vz + e.kz;
+    if (e.def.swim) {
+      // een zeedier blijft in het water: het zwemt alleen naar een plek waar water is
+      const nat = (x, y, z) => w.get(Math.floor(x), Math.floor(y + 0.2), Math.floor(z)) === B.water;
+      const nx = e.x + vx * dt, nz = e.z + vz * dt, ny = e.y + e.vy * dt;
+      if (nat(nx, e.y, e.z) && !this.hits(w, nx, e.y, e.z, hw, e.h)) e.x = nx; else e.dirx = -e.dirx;
+      if (nat(e.x, e.y, nz) && !this.hits(w, e.x, e.y, nz, hw, e.h)) e.z = nz; else e.dirz = -e.dirz;
+      if (nat(e.x, ny, e.z) && nat(e.x, ny + 0.9, e.z) && !this.hits(w, e.x, ny, e.z, hw, e.h)) e.y = ny;
+      e.kx *= 0.86; e.kz *= 0.86;
+      return;
+    }
     if (e.noclip) { e.x += vx * dt; e.y += e.vy * dt; e.z += vz * dt; }
     else {
       const nx = e.x + vx * dt;
@@ -181,7 +192,8 @@ export const entityMethods = {
     const sp = e.def.speed * 0.45;
     e.vx = e.dirx * sp; e.vz = e.dirz * sp;
     if (e.dirx || e.dirz) e.yaw = Math.atan2(e.dirx, e.dirz);
-    if (e.fly) {
+    if (e.def.swim) e.vy = Math.sin(e.t * 0.7 + e.id) * 0.4;
+    else if (e.fly) {
       let g = w.topY(Math.floor(e.x), Math.floor(e.z));
       if (g < 0) g = 56;
       e.vy = clamp(g + 5 - e.y, -2, 2);
@@ -221,8 +233,10 @@ export const entityMethods = {
   },
 
   aiMelee(w, e, dt) {
-    const n = this.nearest(w, e, 20);
+    const n = this.nearest(w, e, e.def.swim ? 14 : 20);
     if (!n) { this.wander(w, e, dt); return; }
+    // een zeedier laat je met rust zolang je op het droge staat of in een boot zit
+    if (e.def.swim && (n.p.mount || w.get(Math.floor(n.p.x), Math.floor(n.p.y + 0.4), Math.floor(n.p.z)) !== B.water)) { this.wander(w, e, dt); return; }
     const p = n.p, sp = e.def.speed;
     const dx = p.x - e.x, dz = p.z - e.z, h = Math.hypot(dx, dz) || 1;
     e.yaw = Math.atan2(dx, dz);
@@ -801,7 +815,7 @@ export const entityMethods = {
     const [kind, cap, when] = table[Math.floor(this.rnd() * table.length)];
     if (when === 'day' && night) return;
     if (when === 'night' && !night) return;
-    const under = when === 'cave', sky = when === 'sky';
+    const under = when === 'cave', sky = when === 'sky', sea = when === 'water';
     if (under && p.y > 34) return;
     if (sky && this.rnd() > 0.12) return;                   // wilde draken zijn zeldzaam
     const def = MOBS[kind];
@@ -838,6 +852,13 @@ export const entityMethods = {
         e.home = { x: e.x, y: e.y, z: e.z, r: 30 };
         return;
       }
+      if (sea) {
+        // een zeedier: alleen waar het water minstens drie blokken diep is
+        if (top < 2 || !w.liquid(x, top + 1, z) || !w.liquid(x, top + 3, z) || w.get(x, top + 2, z) !== B.water) return;
+        this.spawnEnt(w, kind, x + 0.5, top + 1.6, z + 0.5);
+        return;
+      }
+      if (def.swim) return;
       if (top < 2) { if (!def.fly) return; y = 58 + this.rnd() * 20; }
       else {
         if (w.liquid(x, top + 1, z)) return;

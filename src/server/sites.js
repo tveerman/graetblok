@@ -60,7 +60,7 @@ const PARK_STALLS = [
 // r = hoe groot de stenen plaat eronder is
 const PARK_RIDES = [
   { k: 'achtbaan', x: -6, z: -38, r: 0 }, { k: 'reuzenrad', x: 32, z: 6, r: 7 }, { k: 'vrijeval', x: -34, z: 6, r: 4 },
-  { k: 'draaimolen', x: -15, z: 7, r: 6 }, { k: 'zweefmolen', x: 13, z: 7, r: 7 }, { k: 'schommelschip', x: -20, z: 32, r: 7 },
+  { k: 'draaimolen', x: -15, z: 7, r: 6 }, { k: 'zweefmolen', x: 13, z: 7, r: 7 }, { k: 'schommelschip', x: -20, z: 32, r: 7 }, { k: 'theekopjes', x: 38, z: 39, r: 5 },
 ];
 const PARK_BOTS = { x: 22, z: 33 };
 const CIRCUIT_NAMES = ['de Drakenring', 'het Bliksemcircuit', 'de Stormbaan', 'het Vonkenpark', 'de Kometenring', 'het Donderdal', 'de Raketbaan', 'het Turbocircuit'];
@@ -989,6 +989,46 @@ export const siteMethods = {
         S.fill(x + r.x + dx, y + 1, z + r.z + dz, x + r.x + dx, y + 8, z + r.z + dz, 0);
       }
     }
+    // ---- vrolijker en voller ----
+    // gekleurde tegels op de paden (om en om geel en roze)
+    for (let dx = -44; dx <= 44; dx++) for (let dz = -20; dz <= 50; dz++) {
+      if (S.get(x + dx, y, z + dz) === P.road) S.set(x + dx, y, z + dz, ((dx >> 1) + (dz >> 1)) & 1 ? B.tegel_geel : B.tegel_roze);
+    }
+    // vlaggetjes boven op het hek en ballonnen aan de lantaarnpalen
+    for (let d = -45; d <= 45; d++) for (const [fx, fz] of [[d, -46], [d, 46], [-46, d], [46, d]]) {
+      if (fz === 46 && Math.abs(fx) <= 4) continue;
+      if ((fx + fz) % 6 !== 0 && S.get(x + fx, y + 2, z + fz) === 0) S.set(x + fx, y + 2, z + fz, B.vlaggetjes);
+    }
+    for (const lx of [-36, -18, 18, 36]) for (const lz of [-5, 21]) S.set(x + lx, y + 5, z + lz, B.ballonnen);
+    // de poort: een grote gestreepte boog met ballonnen en lichtjes
+    for (const gx of [-5, 5]) { S.fill(x + gx, y + 1, z + 46, x + gx, y + 8, z + 46, B.tentdoek); S.set(x + gx, y + 9, z + 46, B.ballonnen); S.set(x + gx, y + 1, z + 48, B.plantenbak); }
+    S.fill(x - 5, y + 9, z + 46, x + 5, y + 10, z + 46, B.tentdoek);
+    for (let gx = -4; gx <= 4; gx++) S.set(x + gx, y + 11, z + 46, gx & 1 ? B.neon_geel : B.neon_roze);
+    S.fill(x - 1, y + 9, z + 45, x + 1, y + 10, z + 45, B.reclamebord);
+    // bloembakken en bankjes langs het middenpad
+    for (let dz = -14; dz <= 42; dz += 8) for (const sx of [-3, 3]) {
+      if (S.get(x + sx, y + 1, z + dz) === 0) S.set(x + sx, y + 1, z + dz, (dz >> 3) & 1 ? B.plantenbak : B.bank);
+    }
+    // de circustent in de zuidwesthoek: een gestreepte punttent waar je in kunt
+    {
+      const tx = x - 38, tz = z + 36;
+      for (let k = 0; k <= 8; k++) {
+        const r = 6.4 - k * 0.75;
+        for (let dx = -7; dx <= 7; dx++) for (let dz = -7; dz <= 7; dz++) {
+          const d = Math.hypot(dx, dz);
+          if (d <= r && d > r - 1.2) S.set(tx + dx, y + 1 + k, tz + dz, B.tentdoek);
+          else if (d <= r - 1.2 && k < 8) S.set(tx + dx, y + 1 + k, tz + dz, 0);
+        }
+      }
+      S.fill(tx - 1, y + 1, tz - 6, tx + 1, y + 3, tz - 6, 0);                          // de ingang (aan de kant van het pad)
+      S.fill(tx, y + 1, tz, tx, y + 10, tz, P.log); S.set(tx, y + 11, tz, B.wol_rood); S.set(tx, y + 12, tz, B.ballonnen);
+      for (let dx = -4; dx <= 4; dx++) for (let dz = -4; dz <= 4; dz++) if (Math.hypot(dx, dz) < 4.6) S.set(tx + dx, y, tz + dz, (dx + dz) & 1 ? B.tegel_geel : B.wol_rood);      // de piste
+      for (const [bx, bz] of [[-3, 2], [3, 2], [-2, 3], [2, 3], [0, 4]]) S.set(tx + bx, y + 1, tz + bz, B.bank);
+      S.set(tx - 3, y + 4, tz - 2, B.lantaarn); S.set(tx + 3, y + 4, tz - 2, B.lantaarn);
+    }
+    // picknicktafels in de noordwesthoek
+    for (const [px, pz] of [[-41, -30], [-41, -24], [-36, -27]]) { S.set(x + px, y + 1, z + pz, B.tafel); S.set(x + px - 1, y + 1, z + pz, B.bank); S.set(x + px + 1, y + 1, z + pz, B.bank); S.set(x + px, y + 2, z + pz, B.ballonnen); }
+
     // de botsautobaan: een gladde vloer met een muurtje van twee hoog en een smalle ingang
     const bx = x + PARK_BOTS.x, bz = z + PARK_BOTS.z;
     S.fill(bx - 9, y, bz - 6, bx + 9, y, bz + 6, B.asfalt);

@@ -393,6 +393,27 @@ From Jorian's design document (`spel.txt`), following development phases 1–4, 
   machines were left out because the first 255 block numbers were nearly used up (254 and
   255 are free); since then there is a second range of block numbers, see "Block and item
   numbers" below.
+- **New regions, sea dangers and a livelier fair, shops and airliner** –
+  *Regions* (`biome()` in `src/server/worldgen.js`): far from the spaceship the green world
+  now changes into a deep ocean with underwater volcanoes, a desert with cacti and sandstone,
+  high mountains up to the build limit, a glowing mushroom forest with giant mushrooms and
+  crystal fields with amethyst spires; a message names the region you walk into. They start
+  450 blocks from the spaceship in a new world; in an older world only beyond everything the
+  player built and never closer than 1700 blocks, so known land does not change.
+  *Sea dangers*: sharks and jellyfish (`swim` mobs in `src/shared/mobs.js`) spawn in water at
+  least three blocks deep, never leave it and only attack a swimmer, not someone on land or
+  in a boat; fixed bands of sea current (`seaFlow` in `player.js`) carry a swimmer along.
+  *Fair*: coloured path tiles, bunting on the fence, balloons, a big striped gate with neon,
+  flower boxes and benches, a circus tent you can enter, picnic tables and a new teacup
+  ride; the swing ride no longer speeds up the longer the game runs.
+  *Shops and airport*: nineteen furnishing blocks in the new block range (cash register,
+  planter, carpets, display case, bench, departure board, suitcase, baggage belt, check-in
+  desk, tiles, advertising board, clothes rack, bunting, balloons, tent cloth) furnish the
+  city shops and the terminal. *Rides in first person*: with the camera on "own eyes" you now
+  sit inside a ride; the airliner has a real cabin with twelve seats, windows and lights.
+  *Fix*: looking up a site while a terrain column was being computed could corrupt that one
+  column (a stray one-block pillar or hole); sites are now looked up first.
+  Debug: `{c:'streek', k:'oceaan'|'woestijn'|'gebergte'|'zwammen'|'kristal'}`.
 - **Player character with a skeleton** (`src/client/rig.js`) – the human, elf and robot you
   can play are built on one rig with joints (hips, knees, ankles, spine, neck, shoulders,
   elbows). The animation computes joint angles: knees bend while the leg swings forward, the

@@ -298,6 +298,45 @@ export function setDragonGrowth(root, growth) {
 // het poppetje van de speler heeft een echt skelet met gewrichten: zie rig.js
 export function playerModel(look) { return buildRig(look); }
 
+// ---------- zeedieren ----------
+
+// Een haai met de neus naar +z: een grijs lijf met een witte buik, een rugvin, borstvinnen en
+// een staart die heen en weer zwiept.
+function haai() {
+  const root = base('vis'), g = root.userData.a.inner, a = root.userData.a;
+  const grijs = mat(0x6a7684, 'glad'), wit = mat(0xe8ecf0, 'glad'), zwart = mat(0x14161a, 'glad');
+  g.position.y = 0.35;
+  part(g, grijs, 0.7, 0.6, 1.5, 0, 0, 0);
+  part(g, wit, 0.66, 0.2, 1.4, 0, -0.24, 0);
+  part(g, grijs, 0.56, 0.46, 0.6, 0, 0.02, 0.95);                       // de kop
+  part(g, grijs, 0.36, 0.3, 0.36, 0, 0.0, 1.36);                        // de snuit
+  const kaak = new THREE.Group(); kaak.position.set(0, -0.16, 0.95); g.add(kaak); a.jaw = kaak;
+  part(kaak, wit, 0.46, 0.1, 0.6, 0, -0.04, 0.2);
+  for (let i = -2; i <= 2; i++) part(kaak, mat(0xffffff, 'glad'), 0.05, 0.08, 0.05, i * 0.09, 0.04, 0.44);      // tanden
+  for (const s of [-1, 1]) { part(g, zwart, 0.06, 0.08, 0.08, s * 0.29, 0.1, 1.05); const v = part(g, grijs, 0.6, 0.06, 0.4, s * 0.55, -0.16, 0.3); v.rotation.z = -s * 0.4; }
+  const rug = part(g, grijs, 0.08, 0.5, 0.5, 0, 0.5, -0.05); rug.rotation.x = -0.4;
+  const staart = new THREE.Group(); staart.position.set(0, 0, -0.75); g.add(staart); a.tail.push(staart);
+  part(staart, grijs, 0.4, 0.4, 0.7, 0, 0, -0.35);
+  const s1 = part(staart, grijs, 0.07, 0.7, 0.3, 0, 0.3, -0.8); s1.rotation.x = 0.5;
+  const s2 = part(staart, grijs, 0.07, 0.45, 0.26, 0, -0.2, -0.76); s2.rotation.x = -0.5;
+  return root;
+}
+
+// Een kwal: een doorschijnend roze hoedje met slierten eronder.
+function kwal() {
+  const root = base('kwal'), g = root.userData.a.inner, a = root.userData.a;
+  const roze = mat(0xf0a0d0, 'glad', { transparent: true, opacity: 0.75 }), licht = glowMat(0xffd0f0);
+  g.position.y = 0.5;
+  part(g, roze, 0.7, 0.3, 0.7, 0, 0.1, 0); part(g, roze, 0.5, 0.2, 0.5, 0, 0.32, 0);
+  part(g, licht, 0.3, 0.1, 0.3, 0, 0.12, 0);
+  for (let i = 0; i < 6; i++) {
+    const an = i / 6 * Math.PI * 2, t = new THREE.Group();
+    t.position.set(Math.cos(an) * 0.22, -0.05, Math.sin(an) * 0.22); g.add(t); a.tail.push(t);
+    part(t, roze, 0.06, 0.5, 0.06, 0, -0.25, 0);
+  }
+  return root;
+}
+
 // ---------- mensen: dorpelingen, de koning en ridders ----------
 
 // Kleren per beroep: [hemd, broek, hoed, schort]. hoed: zie hieronder.
@@ -835,6 +874,8 @@ export function buildModel(kind, opts) {
     case 'golem': m = golem(def.tint || 0x8a8a86, def.tint === 0xff5a1a ? '#ffe040' : (def.tint ? '#ffffff' : '#ffb020')); break;
     case 'spin': m = spin(); break;
     case 'geest': m = geest(def.tint || 0xffffff, !!def.boss); break;
+    case 'haai': m = haai(); break;
+    case 'kwal': m = kwal(); break;
     case 'vleugel': m = vleugel(def.boss ? 0x3a4a8a : 0x6a86b0); break;
     case 'draak': m = draak(def.dragon || opts.dtype || 'vuur', opts.growth); break;
     case 'mens': m = mens(opts.job, opts.variant || 0); break;
@@ -909,6 +950,17 @@ export function animate(root, time, speed, flags, dt) {
     case 'spin':
       for (const l of a.legs) { l.rotation.x = moving ? Math.sin(ph * 1.6 + l.userData.ph) * 0.5 : 0; l.rotation.z = l.userData.rz + (moving ? Math.cos(ph * 1.6 + l.userData.ph) * 0.12 : 0); }
       a.inner.position.z = atk ? 0.2 : 0;
+      break;
+    case 'vis':
+      // een haai zwiept met zijn staart, sneller als hij aanvalt
+      a.tail[0].rotation.y = Math.sin(time * (atk ? 16 : 6 + speed) + root.id) * 0.5;
+      a.inner.rotation.y = Math.sin(time * (6 + speed) + root.id) * 0.06;
+      if (a.jaw) a.jaw.rotation.x = atk ? 0.5 : 0.08;
+      break;
+    case 'kwal':
+      // een kwal pompt zichzelf vooruit: de hoed gaat open en dicht en de slierten golven mee
+      a.inner.scale.set(1 + Math.sin(time * 2.4 + root.id) * 0.1, 1 - Math.sin(time * 2.4 + root.id) * 0.12, 1 + Math.sin(time * 2.4 + root.id) * 0.1);
+      a.tail.forEach((t, i) => { t.rotation.x = Math.sin(time * 2.4 + i) * 0.25; t.rotation.z = Math.cos(time * 2 + i * 2) * 0.2; });
       break;
     case 'geest':
       a.inner.position.y = Math.sin(time * 2.2 + root.id) * 0.12;

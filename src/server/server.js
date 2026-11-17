@@ -45,7 +45,7 @@ export class GameServer {
 
   newMeta() {
     return { v: 1, seed: (Math.random() * 2147483647) | 0, time: DAY_LENGTH * 0.05, trees: {}, bossDead: {}, portals: [], eggs: {}, nextId: 1,
-      gen2: 1, gen3: 1, gen4: 1, gen5: 1, gen6: 1, noSmall: {}, noCity: {}, noParks: {}, noSites: {}, oldChunks: {}, trains: [], weather: {}, cleared: {} };
+      gen2: 1, gen3: 1, gen4: 1, gen5: 1, gen6: 1, gen7: 1, noSmall: {}, noCity: {}, noParks: {}, noSites: {}, oldChunks: {}, trains: [], weather: {}, cleared: {} };
   }
 
   async init() {
@@ -62,7 +62,8 @@ export class GameServer {
     if (!meta.gen4) this.upgradeParks(meta, per);
     if (!meta.gen5) this.upgradeCity(meta, per);
     if (!meta.gen6) this.upgradeSmall(meta, per);
-    for (const w of WORLD_ORDER) this.worlds[w] = new ServerWorld(w, meta.seed, per[w], { noSites: meta.noSites[w], oldChunks: meta.oldChunks[w], noParks: (meta.noParks || {})[w], noCity: (meta.noCity || {})[w], noSmall: (meta.noSmall || {})[w] });
+    if (!meta.gen7) this.upgradeBiomes(meta, per);
+    for (const w of WORLD_ORDER) this.worlds[w] = new ServerWorld(w, meta.seed, per[w], { noSites: meta.noSites[w], oldChunks: meta.oldChunks[w], noParks: (meta.noParks || {})[w], noCity: (meta.noCity || {})[w], noSmall: (meta.noSmall || {})[w], biomeStart: (meta.biomeStart || {})[w] });
     for (const rec of meta.trains || []) this.spawnTrain(rec);
     for (const rec of meta.vehicles || []) this.spawnVehicle(rec);
     this.ready = true;
@@ -122,6 +123,19 @@ export class GameServer {
       }
       meta.noParks[wid] = Array.from(blocked);
     }
+  }
+
+  // Een wereld van vóór de nieuwe gebieden (oceaan, woestijn, hooggebergte...): daar beginnen
+  // ze pas een flink eind voorbij alles wat de speler al heeft gebouwd of gegraven, en nooit
+  // dichterbij dan 1700 blokken (voorbij de stad en het vliegveld bij het ruimteschip). Zo verandert er niets aan het land dat hij kent.
+  upgradeBiomes(meta, per) {
+    meta.gen7 = 1;
+    let ver = 0;
+    for (const key of per.groen ? per.groen.keys() : []) {
+      const cx = Math.floor(key / 65536) - 32768, cz = (key % 65536) - 32768;
+      ver = Math.max(ver, Math.hypot(cx * 16 + 8, cz * 16 + 8));
+    }
+    meta.biomeStart = { groen: Math.round(Math.max(1700, ver + 320)) };
   }
 
   // Een wereld van vóór de wachttorens, doolhoven en tempels: in een klein vak (112 blokken)
@@ -1011,7 +1025,13 @@ export class GameServer {
     else if (m.c === 'world') this.moveToWorld(p, m.w, m.x === undefined ? p.x : m.x, -1, m.z === undefined ? p.z : m.z);
     else if (m.c === 'xp') this.addXp(p, m.n || 100);
     else if (m.c === 'god') p.god = !!m.v;
-    else if (m.c === 'dag') this.dayShift = m.v | 0;                    // verschuif de echte dag (om het weekend en de werkweek te testen)
+    else if (m.c === 'dag') this.dayShift = m.v | 0;
+    else if (m.c === 'streek') {
+      // spring naar het dichtstbijzijnde stuk van een gebied: 'oceaan', 'woestijn', 'gebergte', 'zwammen' of 'kristal'
+      let best = null;
+      for (let r = 100; r < 6000 && !best; r += 60) for (let a = 0; a < 6.28; a += 60 / r) { const x = Math.round(p.x + Math.cos(a) * r), z = Math.round(p.z + Math.sin(a) * r); const b = w.gen.biome(x, z); if (b && b.k === m.k && b.w > 0.95) { best = [x, z]; break; } }
+      if (best) { p.x = best[0] + 0.5; p.z = best[1] + 0.5; p.y = Math.max(w.topY(best[0], best[1]), 40) + 3 + (m.dy || 0); this.send(p, { t: 'tp', x: p.x, y: p.y, z: p.z }); }
+    }                    // verschuif de echte dag (om het weekend en de werkweek te testen)
     else if (m.c === 'egg') { for (const k in this.meta.eggs) this.meta.eggs[k].prog = 0.95; }
     else if (m.c === 'pet') this.debugPet(p, m.a, m.sh || '');      // meteen een eigen dier, bijv. { c: 'pet', a: 'paard' }
     else if (m.c === 'hatch') { const all = this.incubs(); for (const k in all) for (const e of all[k].eggs) e.left = 1; }      // alle eieren in de broedmachines komen meteen uit

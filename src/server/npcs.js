@@ -144,6 +144,13 @@ export const npcMethods = {
         this.toast(p, (inside.kind === 'vliegveld' ? 'Welkom op ' : inside.kind === 'dorp' || inside.kind === 'stad' ? 'Welkom in ' : inside.kind === 'kamp' ? 'Pas op: je bent bij ' : 'Je bent bij ') + inside.name + (inside.evil && inside.kind === 'kasteel' ? '. Het spookt hier...' : inside.kind === 'vliegveld' ? '! Het lijnvliegtuig wacht aan het begin van de startbaan: stap in om mee te vliegen.' : '!'), inside.evil ? 'boss' : 'good');
       }
     } else p.inSite = null;
+    // een nieuw gebied binnengelopen?
+    const streek = gen.biomeName ? gen.biomeName(p.x, p.z) : '';
+    if (streek !== (p.streek || '')) {
+      p.streek = streek;
+      const tekst = { oceaan: '🌊 De Diepe Oceaan. Pas op voor haaien, kwallen en stromingen, en kijk uit naar onderwatervulkanen.', woestijn: '🏜️ De Woestijn. Heet zand zover je kunt kijken.', gebergte: '🏔️ Het Hooggebergte. De toppen verdwijnen in de wolken.', zwammen: '🍄 Het Paddenstoelenwoud. Alles geeft hier licht.', kristal: '💎 De Kristalvelden. Paarse spitsen steken uit de grond.' }[streek];
+      if (tekst) this.toast(p, tekst, 'good');
+    }
     // het kompas wijst naar dorpen en kastelen in de buurt
     const cell = Math.floor(p.x / 224) + ',' + Math.floor(p.z / 224);
     if (cell !== p.siteCell) { p.siteCell = cell; this.sendSites(p); }

@@ -6,13 +6,14 @@ import { B, BlockArray, LIFE_LEAVES, LIFE_VINES, LIFE_FRUIT, ZWAMMEN, ZWAMHOEDEN
 import { WORLDS, CRASH, NEST_PEAK } from '../shared/worlds.js';
 import { siteMethods, SITE_ODDS } from './sites.js';
 import { cityGen } from './city.js';
-import { secretGen } from './secrets.js';
+import { secretGen, SMALL_CELL } from './secrets.js';
+import { SITE_CELL } from './sites.js';
 
 const M = 4;                 // rand om de chunk heen (voor bomen die over de grens hangen)
 const W = CS + 2 * M;
 const WORLD_SALT = { groen: 0, ijs: 1000, vuur: 2000, schaduw: 3000, wolken: 4000, dino: 5000 };
 
-const T_EIK = 1, T_BERK = 2, T_DEN = 3, T_SCHADUW = 4, T_VERKOOLD = 5, T_HEMEL = 6, T_IJSPIEK = 7, T_PILAAR = 8, T_REUS = 9;
+const T_EIK = 1, T_BERK = 2, T_DEN = 3, T_SCHADUW = 4, T_VERKOOLD = 5, T_HEMEL = 6, T_IJSPIEK = 7, T_PILAAR = 8, T_REUS = 9, T_ZWAM = 10, T_KRISTAL = 11, T_CACTUS = 12;
 const V_GROEN = 1, V_IJS = 2, V_VUUR = 3, V_SCHADUW = 4, V_HEMEL = 5, V_OER = 6;
 
 export const NEST_REGION = 144;
@@ -30,6 +31,8 @@ export class WorldGen {
     this.noCity = new Set(opts.noCity || []);            // vakken waar geen stad of vliegveld mag komen (daar had de speler al gebouwd)
     this.noCircuits = !!(opts && opts.noCircuits);      // een wereld van vóór de racebanen: daar komen er geen bij
     this.oldChunks = new Set(opts.oldChunks || []);
+    // vanaf zo ver van het ruimteschip beginnen de nieuwe gebieden (in een bestaande wereld: voorbij alles wat al gebouwd is)
+    this.biomeStart = opts.biomeStart || 450;
     this.raw = false;
     this.hasSites = !!SITE_ODDS[world];
     this.def = WORLDS[world];
@@ -53,6 +56,13 @@ export class WorldGen {
   // ---------- kolommen per wereld ----------
 
   col(x, z) {
+    // Eerst opzoeken welk bouwwerk hier in de buurt staat. Dat zoeken rekent zelf ook kolommen
+    // uit, in hetzelfde werkgeheugen: gebeurt het pas nadat deze kolom is ingevuld, dan raakt
+    // die door elkaar (dat gaf af en toe een losse pilaar of put van één blok).
+    if (this.hasSites && !this.raw) {
+      this.siteAt(Math.floor(x / SITE_CELL), Math.floor(z / SITE_CELL));
+      if (this.world === 'groen') this.smallAt(Math.floor(x / SMALL_CELL), Math.floor(z / SMALL_CELL));
+    }
     const c = this.c;
     c.liq = 0; c.ly = 0; c.tp = 0; c.tk = 0; c.vg = 0; c.nc = 0; c.ent = 0; c.base = B.steen;
     switch (this.world) {
@@ -70,6 +80,43 @@ export class WorldGen {
 
   // hoogte van de grond (zonder grotten en bomen)
   surface(x, z) { return this.col(x, z).h; }
+
+  // ---------- nieuwe gebieden in de groene wereld ----------
+  // Ver van het ruimteschip verandert het land: een diepe oceaan met onderwatervulkanen, een
+  // woestijn, een hooggebergte dat tot in de wolken reikt, een paddenstoelenwoud dat licht
+  // geeft en kristalvelden. Geeft { k, w } terug: welk gebied en hoe sterk (aan de rand loopt
+  // het vloeiend over in het gewone land), of null.
+  biome(x, z) {
+    if (this.world !== 'groen') return null;
+    const far = smoothstep(this.biomeStart, this.biomeStart + 160, Math.hypot(x, z));
+    if (far <= 0) return null;
+    const v = this.n9.n2(x / 1100 + 33.3, z / 1100 - 71.7), u = this.n7.n2(x / 800 - 12.1, z / 800 + 90.4);
+    let k = '', w = 0;
+    if (v < -0.36) { k = 'oceaan'; w = smoothstep(-0.36, -0.48, v); }
+    else if (v > 0.5) { k = 'gebergte'; w = smoothstep(0.5, 0.62, v); }
+    else if (v > -0.2 && v < 0.08 && u > 0.12) { k = 'woestijn'; w = Math.min(smoothstep(-0.2, -0.13, v), smoothstep(0.08, 0.01, v), smoothstep(0.12, 0.24, u)); }
+    else if (v > 0.18 && v < 0.46 && u < -0.1) {
+      k = u < -0.42 ? 'kristal' : 'zwammen';
+      w = Math.min(smoothstep(0.18, 0.25, v), smoothstep(0.46, 0.39, v), smoothstep(-0.1, -0.2, u), smoothstep(0, 0.06, Math.abs(u + 0.42)));
+    }
+    w *= far;
+    return w > 0.01 ? { k, w } : null;
+  }
+  biomeName(x, z) {
+    const b = this.biome(x, z);
+    return b && b.w > 0.6 ? b.k : '';
+  }
+  // een onderwatervulkaan in dit stuk oceaan (of null)
+  seaVolcano(rx, rz) {
+    const key = 'z' + rx * 4096 + rz;
+    let v = this.regionCache.get(key);
+    if (v === undefined) {
+      const s = this.seed + 640;
+      v = hash2(rx, rz, s) < 0.45 ? { x: rx * 176 + 40 + hash2(rx, rz, s + 1) * 96, z: rz * 176 + 40 + hash2(rx, rz, s + 2) * 96, r: 22 + hash2(rx, rz, s + 3) * 10 } : null;
+      this.regionCache.set(key, v);
+    }
+    return v;
+  }
 
   colGroen(x, z, c) {
     const T = this.tree;
@@ -107,9 +154,29 @@ export class WorldGen {
       if (dt < 42) { c.nc = 1; if (dt < 37) special = 1; }      // geen gewone bomen onder de kruin van de levensboom
     }
 
+    // de nieuwe gebieden ver van het ruimteschip
+    const bm = special ? null : this.biome(x, z);
+    let krater = 0;
+    if (bm) {
+      if (bm.k === 'oceaan') {
+        let ho = SEA - 15 + hills * 3;
+        const v = this.seaVolcano(Math.floor(x / 176), Math.floor(z / 176));
+        if (v) { const dv = Math.hypot(x - v.x, z - v.z); if (dv < v.r) { const kegel = SEA - 4 - dv * (11 / v.r) - (dv < 3 ? (3 - dv) * 1.2 : 0); if (kegel > ho) { ho = kegel; krater = dv < 3.5 ? 2 : 1; } } }
+        h = lerp(h, ho, bm.w);
+      } else if (bm.k === 'gebergte') h = lerp(h, SEA + 30 + r * r * 60 + hills * 6, bm.w);
+      else if (bm.k === 'woestijn') h = lerp(h, SEA + 5 + hills * 4 + Math.abs(this.n2.n2(x / 34, z / 34)) * 4, bm.w);
+      else if (bm.k === 'kristal') h = lerp(h, SEA + 8 + hills * 5, bm.w);
+    }
     c.h = h;
     const fh = Math.floor(h);
     if (fh < SEA) { c.liq = B.water; c.ly = SEA; }
+    if (bm && bm.w > 0.5 && bm.k !== 'gebergte') {
+      // de bodem en begroeiing van het gebied zelf
+      if (bm.k === 'oceaan') { c.top = krater === 2 ? B.magmasteen : krater ? B.basalt : B.zand; c.under = krater ? B.basalt : B.zand; if (krater) c.base = B.basalt; c.nc = 1; return; }
+      if (bm.k === 'woestijn' && fh >= SEA) { c.top = B.zand; c.under = B.zandsteen; c.vg = V_VUUR; c.tp = hash2(x, z, this.seed + 41) < 0.006 ? 1 : 0; c.tk = T_CACTUS; return; }
+      if (bm.k === 'zwammen' && fh > SEA + 1) { c.top = B.gloeimos; c.under = B.aarde; c.vg = V_SCHADUW; c.tp = 0.02; c.tk = T_ZWAM; return; }
+      if (bm.k === 'kristal' && fh > SEA + 1) { c.top = hash2(x >> 1, z >> 1, this.seed + 43) < 0.3 ? B.amethistblok : B.steen; c.under = B.steen; c.tp = 0.012; c.tk = T_KRISTAL; return; }
+    }
     if (fh <= SEA + 1) { c.top = B.zand; c.under = B.zand; }
     else if (fh > SEA + 54 + hills * 3) { c.top = B.sneeuw; c.under = B.steen; }
     else if (fh > SEA + 36 + hills * 4) { c.top = B.steen; c.under = B.steen; }
@@ -589,6 +656,32 @@ export class WorldGen {
   }
 
   plantTree(kind, x, y, z, put, soft, rnd) {
+    if (kind === T_ZWAM) {
+      // een reuzenpaddenstoel: een bleke steel met een brede hoed die licht geeft
+      const th = 4 + Math.floor(rnd() * 5), R = 2 + Math.floor(rnd() * 2), hoed = ZWAMHOEDEN[Math.floor(rnd() * ZWAMHOEDEN.length)];
+      for (let i = 0; i < th; i++) put(x, y + i, z, B.zwamsteel);
+      for (let dx = -R; dx <= R; dx++) for (let dz = -R; dz <= R; dz++) {
+        const d = Math.hypot(dx, dz);
+        if (d <= R + 0.3) soft(x + dx, y + th, z + dz, hoed);
+        if (d <= R - 0.7) soft(x + dx, y + th + 1, z + dz, hoed);
+        else if (d > R - 0.6 && d <= R + 0.3) soft(x + dx, y + th - 1, z + dz, hoed);
+      }
+      return;
+    }
+    if (kind === T_KRISTAL) {
+      // een kristalspits: een hoge punt met lagere punten eromheen
+      const th = 3 + Math.floor(rnd() * 7);
+      for (let i = 0; i < th; i++) put(x, y + i, z, B.amethistblok);
+      for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const hh = Math.floor(th * (0.2 + rnd() * 0.45)); for (let i = 0; i < hh; i++) put(x + dx, y + i, z + dz, B.amethistblok); }
+      put(x, y + th, z, B.gloeikristal);
+      return;
+    }
+    if (kind === T_CACTUS) {
+      const th = 2 + Math.floor(rnd() * 3);
+      for (let i = 0; i < th; i++) put(x, y + i, z, B.cactus);
+      if (th > 2 && rnd() < 0.6) { const s = rnd() < 0.5 ? 1 : -1; put(x + s, y + 1, z, B.cactus); put(x + s, y + 2, z, B.cactus); }
+      return;
+    }
     if (kind === T_REUS) {
       // een reuzenboom: een dikke voet, een hoge stam en twee platte kruinen boven elkaar
       const th = 13 + Math.floor(rnd() * 7);

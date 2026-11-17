@@ -129,7 +129,7 @@ export const cityGen = {
       if (!S.hit(x0 - 1, z0 - 1, x0 + 19, z0 + 19)) return;
       const h = Math.min(top, (2 + (i % 3)) * 4 + 5);
       tower(S, x0, z0, x0 + 18, z0 + 18, y, h, i & 1 ? B.baksteen : B.beton, s.seed + 50 + i, 6);
-      S.fill(x0 + 1, y, z0 + 1, x0 + 17, y, z0 + 17, B.planken);
+      S.fill(x0 + 1, y, z0 + 1, x0 + 17, y, z0 + 17, job === 'marktkoopman' ? B.planken : job === 'juwelier' ? B.marmer : job === 'bakker' || job === 'kok' ? B.tegel_ruit : B.tegel_wit);
       S.fill(x0 + 1, y + 1, z0 + 1, x0 + 17, y + 4, z0 + 17, 0);
       // T: i loopt langs de gevel met de deur, j naar binnen
       const T = side === 'n' ? { X: (a, b) => x0 + a, Z: (a, b) => z0 + b } : side === 'w' ? { X: (a, b) => x0 + b, Z: (a) => z0 + a } : { X: (a, b) => x0 + 18 - b, Z: (a) => z0 + a };
@@ -145,12 +145,18 @@ export const cityGen = {
       for (let a = 2; a <= 16; a++) for (let k = 1; k <= 2; k++) set(a, 17, k, achter);
       for (let a = 3; a <= 15; a++) if (a !== 9) set(a, 12, 1, B.tafel);                                         // de toonbank
       for (const a of [4, 14]) for (const b of [5, 11]) set(a, b, 5, B.lamp);
+      // aankleding: een loper van de deur naar de toonbank, een kassa, planten bij de deur en reclame aan de gevel
+      for (let b = 1; b <= 10; b++) set(9, b, 1, i & 1 ? B.kleed_blauw : B.kleed_rood);
+      set(11, 12, 2, B.kassa);
+      for (const a of [7, 11]) { set(a, 1, 1, B.plantenbak); set(a, -1, 1, B.plantenbak); }
+      for (const a of [3, 15]) set(a, 0, 4, B.reclamebord);
+      for (const a of [4, 14]) set(a, -2, 1, B.bank);
       if (job === 'bakker') { set(2, 16, 1, B.oven); set(3, 16, 1, B.oven); set(15, 16, 1, B.hooi); }
       else if (job === 'kok') { for (const a of [3, 7, 11, 15]) for (const b of [4, 8]) { set(a, b, 1, B.tafel); set(a + 1, b, 1, B.kruk); set(a - 1, b, 1, B.kruk); } set(4, 16, 1, B.kookpot); set(14, 16, 1, B.oven); }
-      else if (job === 'winkelier') { for (const a of [5, 13]) { set(a, 6, 1, B.tafel); set(a, 8, 1, B.tafel); } }
-      else if (job === 'juwelier') { for (const a of [3, 6, 12, 15]) set(a, 16, 1, a % 2 ? B.goudblok : B.zilverblok); }
+      else if (job === 'winkelier') { for (const a of [4, 5, 6, 12, 13, 14]) for (const b of [4, 8]) set(a, b, 1, B.kledingrek); for (const a of [5, 13]) set(a, 6, 1, B.vitrine); }
+      else if (job === 'juwelier') { for (const a of [4, 6, 12, 14]) for (const b of [4, 7]) set(a, b, 1, B.vitrine); }
       else if (job === 'monteur') { set(3, 4, 1, B.garage); set(5, 4, 1, B.werkbank); set(15, 16, 1, B.ijzerblok); }
-      else { for (const a of [2, 3, 15, 16]) set(a, 16, 1, B.hooi); }
+      else { for (const a of [3, 4, 14, 15]) for (const b of [4, 7]) set(a, b, 1, b === 4 ? B.hooi : B.vitrine); }
     });
     // de zilveren toren met het hotel, aan de noordkant van het plein
     if (S.hit(X - 13, Z - 67, X + 13, Z - 34)) {
@@ -244,7 +250,7 @@ export const cityGen = {
     }
     // de terminal: een lange hal met tien gates aan de kant van het platform
     if (S.hit(X - 62, Z + 4, X + 62, Z + 30)) {
-      S.fill(X - 62, y, Z + 10, X + 62, y, Z + 30, B.marmer);
+      S.fill(X - 62, y, Z + 10, X + 62, y, Z + 30, B.tegel_wit);
       S.fill(X - 62, y + 1, Z + 10, X + 62, y + 8, Z + 30, B.beton);
       S.fill(X - 61, y + 1, Z + 11, X + 61, y + 7, Z + 29, 0);
       S.fill(X - 62, y + 9, Z + 10, X + 62, y + 9, Z + 30, B.beton_donker);
@@ -261,12 +267,23 @@ export const cityGen = {
         for (const a of [-2, 2]) S.fill(gx + a, y + 1, Z + 5, gx + a, y + 3, Z + 5, B.ijzerblok);
         S.fill(gx - 2, y + 4, Z + 5, gx + 2, y + 4, Z + 5, B.ijzerblok);
         S.set(gx, y + 4, Z + 5, B['bord_' + n]);                                        // het nummer van de gate
-        for (const a of [-3, 3]) S.fill(gx + a, y + 1, Z + 13, gx + a, y + 1, Z + 15, B.kruk);      // wachtstoelen
+        for (const a of [-3, 3]) { S.fill(gx + a, y + 1, Z + 13, gx + a, y + 1, Z + 15, B.bank); S.set(gx + a, y + 1, Z + 12, B.plantenbak); }      // wachtbankjes met een plant
+        S.fill(gx, y + 1, Z + 11, gx, y + 1, Z + 15, B.kleed_blauw);                          // een loper naar de gate
+        if (n % 3 === 2) S.fill(gx + 6, y + 4, Z + 11, gx + 6, y + 5, Z + 11, B.vertrekbord);       // schermen met vertrektijden
       }
       S.fill(X - 2, y + 1, Z + 30, X + 2, y + 4, Z + 30, 0);                              // de ingang
       for (let a = -3; a <= 3; a++) S.set(X + a, y + 5, Z + 31, B.luifel);
-      S.fill(X - 13, y + 1, Z + 24, X - 6, y + 1, Z + 24, B.tafel);                      // de balie
-      S.fill(X + 7, y + 1, Z + 24, X + 14, y + 1, Z + 24, B.tafel);
+      S.fill(X - 13, y + 1, Z + 24, X - 6, y + 1, Z + 24, B.incheckbalie);               // de incheckbalies
+      S.fill(X + 7, y + 1, Z + 24, X + 14, y + 1, Z + 24, B.incheckbalie);
+      S.fill(X - 13, y + 1, Z + 22, X - 6, y + 1, Z + 22, B.kleed_rood); S.fill(X + 7, y + 1, Z + 22, X + 14, y + 1, Z + 22, B.kleed_rood);
+      for (const a of [-10, 10]) S.fill(X + a - 1, y + 5, Z + 29, X + a + 1, y + 6, Z + 29, B.vertrekbord);
+      // de bagageband: een ovaal in het midden van de hal, met koffers erop
+      for (let a = -8; a <= 8; a++) for (const dz of [17, 19]) S.set(X + a, y + 1, Z + dz, (a + dz) % 5 === 0 ? B.koffer : B.bagageband);
+      S.set(X - 8, y + 1, Z + 18, B.bagageband); S.set(X + 8, y + 1, Z + 18, B.bagageband);
+      S.fill(X - 7, y + 1, Z + 18, X + 7, y + 1, Z + 18, B.ijzerblok);
+      for (const a of [-11, 11]) S.set(X + a, y + 1, Z + 18, B.koffer);
+      for (const a of [-4, 4]) { S.set(X + a, y + 1, Z + 29, B.plantenbak); S.fill(X + a * 5, y + 3, Z + 29, X + a * 5, y + 4, Z + 29, B.reclamebord); }
+      for (const a of [-58, -40, 40, 58]) S.set(X + a, y + 1, Z + 12, B.plantenbak);
       S.set(X - 14, y + 2, Z + 29, B.neon_geel); S.set(X + 15, y + 2, Z + 29, B.neon_roze);
       // de winkeltjes langs de zuidmuur: wandkasten, een toonbank, een lichtreclame en een paar tafeltjes
       for (const [sx, , kast, neon] of AIR_SHOPS) {

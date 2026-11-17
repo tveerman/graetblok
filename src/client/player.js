@@ -15,6 +15,16 @@ const _v = new THREE.Vector3();
 const _L = [0, 0, 0, 0], _P = [0, 0, 0, 0];
 
 const AIR_MAX = 15;        // zoveel tellen kun je onder water blijven
+const _qy = new THREE.Quaternion(), _up = new THREE.Vector3(0, 1, 0);
+// Zeestromingen: brede banen in de zee waar het water een kant op stroomt. Geeft de richting
+// en kracht terug (blokken per tel), of null waar geen stroming is. De banen liggen vast in de
+// wereld, dus je kunt leren waar ze zijn.
+function seaFlow(x, z) {
+  const k = Math.sin(x / 37) + Math.cos(z / 41) + Math.sin((x + z) / 53);
+  if (k < 1.5) return null;
+  const a = Math.sin(x / 90) * 2 + Math.cos(z / 110) * 2, kracht = Math.min(2.6, 1.4 + (k - 1.5) * 2);
+  return { x: Math.cos(a) * kracht, z: Math.sin(a) * kracht };
+}
 const _seat = new THREE.Vector3();
 export class Player {
   constructor(game) {
@@ -443,8 +453,20 @@ export class Player {
     if (this.mountKind === 'dier') speed = this.inWater ? 3.6 : this.rideSp * (inp.sprint ? 1.3 : 1);      // op een rijdier ga je harder
     if (g.trees.ijs) speed *= 1.25;
     const acc = Math.min(1, (this.onGround ? 14 : (this.inWater ? 6 : 4)) * dt);
-    this.vel.x += (wx * speed - this.vel.x) * acc;
-    this.vel.z += (wz * speed - this.vel.z) * acc;
+    // Zeestromingen: in diep, open water word je op sommige plekken meegevoerd. Je ziet het
+    // aan de belletjes die met de stroom mee gaan. Wie tegen de stroom in zwemt komt maar
+    // langzaam vooruit; zwem er schuin uit.
+    let sx = 0, sz = 0;
+    if (this.inWater && !this.mount) {
+      const f = seaFlow(this.pos.x, this.pos.z);
+      if (f && g.world.getBlock(Math.floor(this.pos.x), Math.floor(this.pos.y) - 2, Math.floor(this.pos.z)) === B.water) {
+        sx = f.x; sz = f.z;
+        if (Math.random() < dt * 14) g.particles.add(this.pos.x + (Math.random() - 0.5) * 6, this.pos.y + Math.random() * 1.4, this.pos.z + (Math.random() - 0.5) * 6, f.x * 1.6, 0.1, f.z * 1.6, 0.8, 0.95, 1, 0.6, 1.2, 0);
+        if (!this.stroomT || g.time - this.stroomT > 20) { this.stroomT = g.time; g.ui.toast('🌊 Een sterke stroming! Zwem er schuin uit.'); }
+      }
+    }
+    this.vel.x += (wx * speed + sx - this.vel.x) * acc;
+    this.vel.z += (wz * speed + sz - this.vel.z) * acc;
     if (this.inWater) {
       this.vel.y -= 7 * dt;
       this.vel.y *= 1 - Math.min(1, 2 * dt);
@@ -636,9 +658,10 @@ export class Player {
 
   updateCamera(dt) {
     const g = this.g, cam = g.R.camera, w = g.world;
-    const third = this.cam > 0 || this.mount || this.dead;
+    // in een attractie of het lijnvliegtuig kun je ook door je eigen ogen kijken: dan zit je er echt in
+    const third = this.cam > 0 || (this.mount && this.mountKind !== 'rit') || this.dead;
     const front = this.cam === 2;                 // van voren: de camera staat vóór je en kijkt naar je terug
-    const eyeY = this.pos.y + (this.mount ? 1.25 : EYE) + (this.mountKind === 'dier' || this.mountKind === 'auto' ? this.seatH : 0);
+    const eyeY = this.pos.y + (this.mountKind === 'rit' && !third ? 0.75 : this.mount ? 1.25 : EYE) + (this.mountKind === 'dier' || this.mountKind === 'auto' ? this.seatH : 0);
     const hx = Math.floor(this.pos.x), hz = Math.floor(this.pos.z);
     if (!third) {
       const bob = this.onGround ? Math.sin(this.bobPh) * 0.035 * Math.min(1, this.speedNow / 4) : 0;
@@ -679,7 +702,12 @@ export class Player {
       m.position.copy(this.pos);
       if (this.mountKind === 'dier' || this.mountKind === 'auto') m.position.y += this.seatH - 0.62;      // je zit op zijn rug, of op de stoel
       else if (this.mountKind === 'vlieg' || this.mountKind === 'heli' || this.mountKind === 'rit') m.position.y -= 0.62;
-      m.rotation.y = this.yaw + Math.PI;
+      m.rotation.set(0, this.yaw + Math.PI, 0);
+      // in een attractie zit je zoals het stoeltje staat (schuin in de zweefmolen, met de neus mee in het vliegtuig)
+      if (this.mountKind === 'rit' && this.rideA && this.rideA.seatYaw !== undefined) {
+        this.rideA.seats[this.rideSeat].getWorldQuaternion(m.quaternion);
+        m.quaternion.multiply(_qy.setFromAxisAngle(_up, this.rideA.seatYaw));
+      }
       const a = m.userData.a;
       // het beste harnas uit je rugzak zie je op je poppetje
       let best = null;

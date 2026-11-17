@@ -40,7 +40,19 @@ function stoplicht() {
 function toestelVorm(stoelen) {
   const g = new THREE.Group();
   const wit = new Merge();
-  wit.box(15, 2.2, 2.2, 0, 2.6, 0);                                  // de romp
+  if (!stoelen) wit.box(15, 2.2, 2.2, 0, 2.6, 0);                    // de romp (dicht, voor een geparkeerd vliegtuig)
+  else {
+    // De romp van het lijnvliegtuig is hol: een cabine waar je echt in zit. Hij is opgebouwd
+    // uit dunne platen, zodat je de wanden ook van binnen ziet.
+    wit.box(15, 0.12, 2.2, 0, 3.64, 0);                              // het plafond
+    wit.box(15, 0.12, 2.2, 0, 1.56, 0);                              // de buik
+    for (const z of [-1.05, 1.05]) {
+      wit.box(15, 1.0, 0.1, 0, 2.06, z);                             // de wand onder de ramen
+      wit.box(15, 0.5, 0.1, 0, 3.4, z);                              // en erboven
+      for (let i = 0; i <= 8; i++) wit.box(0.35, 0.6, 0.1, -6.8 + i * 1.7, 2.85, z);      // de stijlen tussen de ramen
+    }
+    wit.box(0.12, 2.1, 2.2, 7.44, 2.6, 0); wit.box(0.12, 2.1, 2.2, -7.44, 2.6, 0);        // de voor- en achterwand
+  }
   wit.box(2, 1.8, 1.8, 8.4, 2.5, 0); wit.box(1.2, 1.2, 1.2, 9.8, 2.3, 0);      // de neus
   wit.box(2.4, 1.6, 1.6, -8.6, 2.9, 0);                              // de staart loopt smal toe
   wit.box(3.2, 0.26, 16, -0.6, 2.2, 0);                             // de vleugels
@@ -52,13 +64,35 @@ function toestelVorm(stoelen) {
   for (const s of [-1, 1]) blauw.box(2.4, 0.9, 0.9, 0.2, 1.5, s * 4.2);         // de motoren
   g.add(blauw.mesh(skinMat(0x2a6ad0, 'glad')));
   const glas = new Merge();
-  glas.box(12, 0.5, 2.26, -0.4, 3.0, 0); glas.box(1.0, 0.6, 1.5, 9.0, 3.1, 0);
+  if (!stoelen) glas.box(12, 0.5, 2.26, -0.4, 3.0, 0);
+  glas.box(1.0, 0.6, 1.5, 9.0, 3.1, 0);
   g.add(glas.mesh(skinMat(0x9fd8f0, 'glad')));
+  if (stoelen) {
+    // de ramen: dun, lichtblauw glas waar je doorheen kijkt
+    const ruit = new Merge();
+    for (const z of [-1.06, 1.06]) ruit.box(14.4, 0.6, 0.03, 0, 2.85, z);
+    g.add(ruit.mesh(new THREE.MeshLambertMaterial({ color: 0xbfe6f8, transparent: true, opacity: 0.25, depthWrite: false })));
+    // binnen: een blauwe loper, zes rijen met aan elke kant een stoel, en lampjes aan het plafond
+    const loper = new Merge(); loper.box(14.6, 0.04, 0.5, 0, 1.67, 0);
+    const stof = new Merge(), grijs = new Merge(), lamp = new Merge();
+    for (let i = 0; i < 6; i++) {
+      const x = 4.6 - i * 1.7;
+      for (const z of [-0.62, 0.62]) {
+        stof.box(0.7, 0.16, 0.7, x, 2.02, z);                        // de zitting
+        stof.box(0.14, 0.95, 0.7, x - 0.42, 2.5, z);                 // de rugleuning
+        grijs.box(0.6, 0.36, 0.1, x, 1.82, z - 0.3); grijs.box(0.6, 0.36, 0.1, x, 1.82, z + 0.3);      // de poten
+        grijs.box(0.6, 0.06, 0.08, x - 0.05, 2.28, z + (z < 0 ? 0.36 : -0.36));                       // de armleuning aan het gangpad
+        const o = new THREE.Object3D(); o.position.set(x, 2.12, z); g.add(o); stoelen.push(o);
+      }
+      lamp.box(0.3, 0.04, 0.3, x, 3.57, 0);
+    }
+    stof.box(14.6, 0.04, 2.0, 0, 1.63, 0);                           // de vloer (donkerblauw tapijt)
+    g.add(loper.mesh(skinMat(0x2a6ad0, 'vacht')), stof.mesh(skinMat(0x3a4a8a, 'vacht')), grijs.mesh(skinMat(0x8a929c, 'metaal')), lamp.mesh(glowMat(0xfff6d8)));
+  }
   const donker = new Merge();
   donker.box(0.3, 1.0, 0.3, 6, 0.8, 0); donker.box(0.5, 0.6, 0.9, 6, 0.3, 0);
   for (const s of [-1, 1]) { donker.box(0.3, 1.0, 0.3, -1, 0.9, s * 2); donker.box(0.7, 0.7, 0.9, -1, 0.35, s * 2); }
   g.add(donker.mesh(skinMat(0x23262c, 'metaal')));
-  if (stoelen) for (let i = 0; i < 6; i++) { const o = new THREE.Object3D(); o.position.set(4 - i * 1.6, 2.5, 0); g.add(o); stoelen.push(o); }
   return g;
 }
 
@@ -89,6 +123,7 @@ export function lijnvlucht() {
     g.position.set(x, y, 0); g.rotation.set(0, kop, 0); g.rotateZ(neus);
   };
   a.pickSeat = () => Math.floor(Math.random() * a.seats.length);
+  a.seatYaw = Math.PI / 2;             // je zit met je neus in de vliegrichting
   a.canBoard = (t) => (((t % F.cyc) + F.cyc) % F.cyc) < F.wacht - 2;
   a.endTime = (t) => t - (((t % F.cyc) + F.cyc) % F.cyc) + F.weg - 0.4;
   return root;
