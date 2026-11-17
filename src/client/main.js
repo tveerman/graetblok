@@ -17,6 +17,7 @@ import { UI } from './ui.js';
 import { connect } from './net.js';
 import { setupOffline } from './offline.js';
 import { RIDES } from '../shared/rides.js';
+import { VEHICLES } from '../shared/vehicles.js';
 import { setCityTime } from './city.js';
 import { Weather } from './weather.js';
 
@@ -327,6 +328,7 @@ class Game {
       case 'zoo': this.zoo = m; ui.refreshZoo(); break;
       case 'veh': p.vehFuel = m.fuel; p.vehDmg = m.dmg; if (m.up) p.vehUp = m.up; break;      // brandstof, schade en upgrades van je voertuig
       case 'garage': ui.openGarage(m); break;
+      case 'farm': ui.openFarm(m); break;
       case 'raceMenu': ui.openRaceMenu(m); break;
       case 'kermis': ui.openKermis(m); break;
       case 'kermisGo': ui.playKermis(m.game); break;
@@ -647,7 +649,7 @@ class Game {
       const steed = p.mount || own || train ? null : this.nearRide();
       const car = p.mount ? null : this.nearVehicle();
       const fair = p.mount || car ? null : this.nearAttraction();
-      this.ui.setRide(fair ? (RIDES[fair.def.ride] ? RIDES[fair.def.ride].knop : '✈️ Meevliegen (5 munten)') : car ? (car.def.veh === 'helikopter' ? '🚁 Instappen' : car.def.veh === 'vliegtuig' ? '✈️ Instappen' : car.def.veh === 'boot' ? '🚤 Instappen' : '🚗 Instappen') : train ? '🚂 Instappen' : steed ? (steed.def.rideFly ? '🪽 Vliegen' : '🐎 Rijden') : !own ? '' : (dragonStage(own.growth) >= 2 ? '🐉 Vliegen' : '🐉 ' + (own.name || 'Draak')));
+      this.ui.setRide(fair ? (RIDES[fair.def.ride] ? RIDES[fair.def.ride].knop : '✈️ Meevliegen (5 munten)') : car ? (car.def.veh === 'helikopter' ? '🚁 Instappen' : car.def.veh === 'vliegtuig' ? '✈️ Instappen' : VEHICLES[car.def.veh] && VEHICLES[car.def.veh].werk ? '🚜 Instappen' : car.def.veh === 'boot' ? '🚤 Instappen' : '🚗 Instappen') : train ? '🚂 Instappen' : steed ? (steed.def.rideFly ? '🪽 Vliegen' : '🐎 Rijden') : !own ? '' : (dragonStage(own.growth) >= 2 ? '🐉 Vliegen' : '🐉 ' + (own.name || 'Draak')));
       this.animalSounds(hd);
       const surf = this.world.get(Math.floor(p.pos.x) >> 4, Math.floor(p.pos.z) >> 4);
       const under = surf ? p.pos.y < surf.hm[(Math.floor(p.pos.x) & 15) * 16 + (Math.floor(p.pos.z) & 15)] - 6 : false;

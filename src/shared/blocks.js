@@ -98,6 +98,17 @@ def(42, 'drakennest', 'Drakennest', { hard: 1, snd: 'grass' });
 def(43, 'scheepswand', 'Scheepswand', { hard: 8, tool: 'pick', tier: 2, snd: 'metal' });
 def(44, 'scheepscomputer', 'Scheepscomputer', { tiles: ['scheepswand', 'scheepscomputer', 'scheepswand'], hard: Infinity, snd: 'metal', interact: true, light: 8 });
 def(45, 'machinekrat', 'Machinekrat', { hard: Infinity, snd: 'metal', interact: true });
+// het landbouwimperium (zie farm.js): de planten zoals ze op de akker staan als ze rijp zijn.
+// drop: null = de server bepaalt wat je krijgt als je oogst.
+const GEWAS = [['wortel', 'Wortelplant'], ['aardappel', 'Aardappelplant'], ['mais', 'Maïsplant'], ['tomaat', 'Tomatenplant'], ['aardbei', 'Aardbeienplant'],
+  ['gouden_tarwe', 'Gouden tarwe'], ['diamantwortel', 'Diamantwortelplant'], ['regenboogmais', 'Regenboogmaïs'], ['maanbes', 'Maanbessenstruik'], ['drakenfruit', 'Drakenfruitplant'],
+  ['sterrenfruit', 'Sterrenfruitplant'], ['eeuwige_plant', 'Eeuwige plant'], ['kristalbloem', 'Kristalbloem'], ['gouden_appel', 'Gouden appelboompje'], ['kosmisch_gewas', 'Kosmisch gewas']];
+GEWAS.forEach(([k, name], i) => def(190 + i, 'g_' + k, name, { ...CROSS, drop: null, glow: i >= 5 ? 9 : 0 }));
+def(205, 'kiem', 'Kiemplantje', { ...CROSS, drop: null });
+def(206, 'sproeier', 'Sproeier', { tiles: ['sproeier_top', 'sproeier', 'ijzerblok'], hard: 1.5, snd: 'metal' });
+def(207, 'melkmachine', 'Melkmachine', { tiles: ['ijzerblok', 'melkmachine', 'ijzerblok'], hard: 2, snd: 'metal', interact: true });
+def(208, 'marktkraam', 'Marktkraam', { tiles: ['luifel', 'marktkraam', 'planken'], hard: 1.5, tool: 'axe', snd: 'wood', interact: true });
+
 // de stad en het vliegveld
 def(172, 'beton', 'Beton', { hard: 3, tool: 'pick' });
 def(173, 'beton_donker', 'Donker beton', { hard: 3, tool: 'pick' });

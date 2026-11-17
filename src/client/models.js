@@ -796,6 +796,20 @@ function voertuig(kind, kleur) {
     part(g, glas, w * 0.7, 0.34, 0.05, 0, 0.78, l * 0.12);                                          // voorruit
     part(g, donker, 0.34, 0.5, 0.3, 0, 0.5, -l * 0.5);                                              // buitenboordmotor
     part(g, donker, w * 0.5, 0.1, 0.36, 0, 0.64, -l * 0.26);                                        // bankje
+  } else if (kind === 'tractor' || kind === 'zaaimachine' || kind === 'combine') {
+    // landbouwmachines: grote achterwielen, kleine voorwielen, een motorkap en een cabine
+    const groot = kind === 'combine';
+    for (const x of [-1, 1]) { wiel(x * (w / 2 - 0.05), -l * 0.26, 0.62, 0.36); wiel(x * (w / 2 - 0.12), l * 0.32, 0.36, 0.26); }
+    part(g, lak, w * 0.62, 0.7, l * 0.5, 0, 1.05, l * 0.22);                                        // de motorkap
+    part(g, donker, w * 0.5, 0.16, l * 0.9, 0, 0.66, 0);
+    part(g, lak, w * 0.86, groot ? 1.1 : 0.5, l * 0.42, 0, groot ? 1.25 : 0.95, -l * 0.24);
+    for (const x of [-1, 1]) for (const z of [-0.42, -0.06]) part(g, donker, 0.08, 0.9, 0.08, x * w * 0.38, h - 0.5, z * l);      // de stijlen van de cabine
+    part(g, lak, w * 0.9, 0.1, l * 0.44, 0, h, -l * 0.24);                                          // het dakje
+    part(g, staal, 0.1, 0.7, 0.1, w * 0.2, 1.7, l * 0.36);                                          // de uitlaat
+    lampen(1.1, l * 0.47, w * 0.2);
+    if (kind === 'tractor') { part(g, staal, w * 1.5, 0.08, 0.1, 0, 0.3, -l * 0.56); for (let i = -2; i <= 2; i++) part(g, staal, 0.08, 0.4, 0.3, i * w * 0.34, 0.2, -l * 0.6); }      // de ploeg
+    else if (kind === 'zaaimachine') { part(g, mat(0xf4f4f0, 'glad'), w * 1.5, 0.5, 0.6, 0, 0.75, -l * 0.6); for (let i = -2; i <= 2; i++) part(g, staal, 0.08, 0.5, 0.08, i * w * 0.34, 0.25, -l * 0.6); }
+    else { part(g, mat(0xd8362c, 'glad'), w * 1.55, 0.5, 0.7, 0, 0.42, l * 0.62); part(g, staal, w * 1.5, 0.3, 0.3, 0, 0.5, l * 0.74); part(g, lak, 0.3, 0.3, 1.6, w * 0.5, h + 0.1, -l * 0.1); }      // de maaibalk en de pijp
   } else if (kind === 'vliegtuig') {
     // een klein propellervliegtuig
     part(g, lak, w * 0.5, 0.9, l * 0.8, 0, 1.0, 0);

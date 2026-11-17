@@ -445,6 +445,14 @@ function spinnenweb() {
   return M.finish();
 }
 
+function gewas(key) {
+  const M = new Model({ ao: 0 });
+  const t = tileId(key), uv = [[0, 1], [1, 1], [1, 0], [0, 0]];
+  M.quad(t, [[0.08, 0, 0.08], [0.92, 0, 0.92], [0.92, 1, 0.92], [0.08, 1, 0.08]], uv);
+  M.quad(t, [[0.08, 0, 0.92], [0.92, 0, 0.08], [0.92, 1, 0.08], [0.08, 1, 0.92]], uv);
+  return M.finish();
+}
+
 // ---------- welk blok krijgt welk model ----------
 // Per blok een lijstje: de mesher kiest er per plek één uit.
 
@@ -464,3 +472,6 @@ TREE_KEYS.forEach((k) => { const t = tileId('lichtvrucht_' + k); BLOCK_MODELS[LI
 BLOCK_MODELS[B.rails] = [railModel(0), railModel(1), railModel(2), railModel(3)];      // recht, bocht, helling, kruising
 BLOCK_MODELS[B.tarwe] = [tarwe(21), tarwe(22), tarwe(23)];
 BLOCK_MODELS[B.spinnenweb] = [spinnenweb()];
+// de gewassen van het Landbouwimperium: twee plaatjes kruislings (weinig driehoeken, dus een
+// groot veld blijft licht voor de tablet)
+for (const k in B) if (k === 'kiem' || k.startsWith('g_')) BLOCK_MODELS[B[k]] = [gewas(k)];

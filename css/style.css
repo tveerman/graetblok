@@ -163,6 +163,7 @@ body.touch #crosshair { opacity: .6; }
 .rank.cur { background: #8a6410; outline: 2px solid #ffe27a; }
 .drow { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 4px 0; font-size: 14px; }
 .drowbtns { display: flex; gap: 6px; flex: 0 0 auto; }
+img.mini { width: 22px; height: 22px; vertical-align: middle; image-rendering: pixelated; }
 .help p { font-size: 13px; }
 .dialog p { font-size: 17px; line-height: 1.45; margin: 8px 0; }
 .dragon p { font-size: 16px; text-align: center; }

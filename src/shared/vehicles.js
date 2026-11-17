@@ -19,6 +19,11 @@ export const VEHICLES = {
   vliegtuig: { name: 'Vliegtuig', soort: 'lucht', max: 26, acc: 6, turn: 2.0, tank: 200, zuinig: 12, size: [1.9, 1.7, 4.6], seat: 0.8, kleur: 0xf4f4f0, prijs: 220, klasse: 'S' },
   helikopter: { name: 'Helikopter', soort: 'lucht', max: 16, acc: 6, turn: 2.0, tank: 150, zuinig: 9, size: [1.7, 1.9, 3.6], seat: 0.8, kleur: 0x1c2028, prijs: 160, klasse: 'A' },
 };
+// landbouwmachines (zie farm.js). werk = wat hij doet terwijl je rijdt: de tractor ploegt gras
+// om tot akker, de zaaimachine plant en de combine oogst, telkens een strook van drie breed.
+VEHICLES.tractor = { open: 1, name: 'Tractor', soort: 'weg', max: 8, acc: 6, turn: 2.0, tank: 150, zuinig: 10, size: [1.6, 1.9, 2.8], seat: 1.1, kleur: 0x3a9a3a, prijs: 80, klasse: 'D', offroad: 1, werk: 'ploeg' };
+VEHICLES.zaaimachine = { open: 1, name: 'Zaaimachine', soort: 'weg', max: 7, acc: 5, turn: 1.9, tank: 150, zuinig: 10, size: [1.9, 1.9, 3.0], seat: 1.1, kleur: 0xd8362c, prijs: 100, klasse: 'D', offroad: 1, werk: 'zaai' };
+VEHICLES.combine = { name: 'Combine', soort: 'weg', max: 7, acc: 5, turn: 1.7, tank: 200, zuinig: 8, size: [1.9, 2.4, 3.6], seat: 1.5, kleur: 0xf0c020, prijs: 150, klasse: 'D', offroad: 1, werk: 'oogst' };
 // de botsauto's van de kermis: die blijven in hun baan, hebben geen brandstof nodig en gaan niet kapot
 VEHICLES.botsauto = { open: 1, kermis: 1, name: 'Botsauto', soort: 'weg', max: 8, acc: 11, turn: 3.4, tank: 100, zuinig: 1e9, size: [1.2, 0.8, 1.7], seat: 0.3, kleur: 0xd8362c, prijs: 0, klasse: 'D' };
 export const VEHICLE_ORDER = ['auto', 'terreinwagen', 'motor', 'quad', 'vrachtwagen', 'bus', 'boot', 'helikopter', 'vliegtuig'];
@@ -51,7 +56,7 @@ export function vehKlasse(V, up) {
 export const ROAD_BONUS = 1.22;       // op asfalt gaat alles ruim een vijfde harder
 
 // voor de server en het scherm is een voertuig een wezen dat stilstaat tot iemand instapt
-for (const k of VEHICLE_ORDER.concat(['botsauto'])) {
+for (const k of VEHICLE_ORDER.concat(['botsauto', 'tractor', 'zaaimachine', 'combine'])) {
   const V = VEHICLES[k];
   V.key = k; V.kind = 'v_' + k;
   MOBS[V.kind] = { name: V.name, model: 'voertuig', veh: k, hp: 1, speed: 0, w: Math.max(V.size[0], V.size[2] * 0.6), h: V.size[1], ai: 'none', tap: true, xp: 0, drops: [] };

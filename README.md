@@ -295,6 +295,24 @@ From Jorian's design document (`spel.txt`), following development phases 1–4, 
   colours and the signs 1-10. In a world from before this version nothing changes in map
   cells where the player had built or dug. Debug: `{c:'site', kind:'stad'|'vliegveld'}`.
   Not in yet: buses and taxis you can ride, a metro, a harbour and more city buildings.
+- **Farming empire (het Landbouwimperium)** – the fifth part of Jorian's plan
+  (`src/shared/farm.js`, `src/server/farm.js`). Crops now really grow: point at farmland
+  (akker) with wheat, a carrot, potato, maize, tomato, strawberry or pumpkin in your hand and
+  it becomes a seedling that ripens by itself (90-200 s; twice as fast within four blocks of
+  a sprinkler or next to water). Breaking a seedling gives the seed back; harvesting a ripe
+  plant gives two to four. Each harvest has a small chance of a magical crop (golden wheat,
+  diamond carrot, rainbow maize, moon berry, dragon fruit, star fruit, eternal plant, crystal
+  flower, golden apple, cosmic crop: all ten from Jorian's list), which can be planted too and
+  sells for much more. Three farm machines are vehicles that work a strip three blocks wide
+  while you drive: the tractor ploughs grass into farmland, the seeder plants what you carry,
+  the combine harvests. The milking machine fills a bucket when a cow is near. The market
+  stall (marktkraam, craft it or buy it from the farmer) opens "Mijn boerderij": sell your
+  produce and food made from it (bread, pizza, chips), buy seeds and machines that unlock
+  with your farm level, and see Jorian's ten farm titles (Beginnende boer ... Keizer van het
+  landbouwimperium) and ten missions with coin rewards. New recipes: pizza, chips from
+  potatoes, popcorn from maize, sprinkler, market stall. A wheat block can no longer be put
+  down as a ripe plant (that duplicated wheat); it is planted like the rest. Not in yet:
+  employees, own shops with customers and prices, greenhouse, windmill, fruit trees.
 - **Story quests** – 18 steps from "chop a tree" to "defeat the Drakenkoning", shown top-left,
   with a compass marker for the early ones.
 

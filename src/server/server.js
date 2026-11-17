@@ -22,6 +22,8 @@ import { zooMethods } from './zoo.js';
 import { vehicleMethods } from './vehicles.js';
 import { kermisMethods } from './kermis.js';
 import { cityMethods } from './city.js';
+import { farmMethods } from './farm.js';
+import { CROP_OF_SEED } from '../shared/farm.js';
 import { WorldGen } from './worldgen.js';
 
 const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
@@ -404,7 +406,8 @@ export class GameServer {
     }
     if (EGG_TYPE[id]) delete this.meta.eggs[p.world + ':' + x + ',' + y + ',' + z];
     if (id === B.broedmachine) this.breakIncubator(p, p.world, x, y, z);
-    if (can) this.dropFor(p, def);
+    if (this.cropBroken(p, w, x, y, z, id)) { /* een gewas: zie farm.js */ }
+    else if (can) this.dropFor(p, def);
     else if (def.tier > 0) this.toast(p, 'Hiervoor heb je een beter houweel nodig.', 'warn');
     if (def.xp && can) this.addXp(p, def.xp);
 
@@ -412,7 +415,7 @@ export class GameServer {
     const above = w.get(x, y + 1, z);
     if (above && BLOCKS[above].support) {
       this.setBlock(w, x, y + 1, z, 0);
-      this.dropFor(p, BLOCKS[above]);
+      if (!this.cropBroken(p, w, x, y + 1, z, above)) this.dropFor(p, BLOCKS[above]);
     }
     if (def.hard >= 0.5) this.wear(p);              // plantjes en bladeren kosten niets
     this.sendInv(p);
@@ -440,6 +443,14 @@ export class GameServer {
     const cur = w.get(x, y, z);
     const reject = () => { this.send(p, { t: 'block', x, y, z, id: w.get(x, y, z) }); this.sendInv(p); };
     if (!s || y < 1 || y >= CH - 1 || !BLOCKS[cur] || !BLOCKS[cur].replace || Math.hypot(x + 0.5 - p.x, y - p.y, z + 0.5 - p.z) > 9) return reject();
+    // iets om te planten: op een akker wordt het een kiemplantje dat vanzelf groeit
+    const crop = CROP_OF_SEED[s.id];
+    if (crop && (s.id >= 256 || s.id === B.tarwe || w.get(x, y - 1, z) === B.akker)) {
+      if (!this.plantAt(w, x, y, z, crop)) { this.toast(p, 'Dit plant je op een akker. Akkergrond maak je van aarde en bladeren, of met een tractor.', 'warn'); return reject(); }
+      s.n--; if (s.n <= 0) p.inv[p.sel] = null;
+      this.sendInv(p);
+      return;
+    }
     if (s.id >= 256) {
       const it = ITEMS[s.id];
       if (it && it.portal) {
@@ -540,6 +551,10 @@ export class GameServer {
       this.useHeart(p, w);
     } else if (id === B.broedmachine) {
       this.useIncubator(p, w, x, y, z);
+    } else if (id === B.marktkraam) {
+      this.sendFarm(p);
+    } else if (id === B.melkmachine) {
+      this.useMilker(p, w, x, y, z);
     } else if (id === B.garage) {
       this.useGarage(p, w, x, y, z);
     } else if (EGG_TYPE[id]) {
@@ -793,6 +808,7 @@ export class GameServer {
         e.x = r.x = p.x; e.y = r.y = p.y - (m.air ? (+m.seat || 0) : 0); e.z = r.z = p.z;
         if (typeof m.ry === 'number') e.yaw = r.yaw = m.ry + Math.PI;      // een model kijkt de andere kant op dan de speler telt
         e.vx = e.vy = e.vz = 0; void V;
+        this.farmWork(p, this.worlds[p.world], e);                    // een tractor, zaaimachine of combine doet zijn werk
       } else if (e && e.def.animal) {
         // op een dier: op de grond staat het dier waar jij staat, in de lucht hangt het onder je
         e.x = p.x; e.y = p.y - (e.def.rideFly ? e.def.seat : 0); e.z = p.z; e.yaw = p.yaw; e.vx = e.vy = e.vz = 0;
@@ -900,6 +916,7 @@ export class GameServer {
     this.updateWeather(active);
     this.updateEggs();
     this.updateIncubators();
+    this.updateCrops();
     for (const wid of active) this.cleanup(this.worlds[wid]);
     // chunks vergeten waar niemand meer is
     if (Math.floor(this.meta.time) % 5 === 0) {
@@ -975,5 +992,5 @@ export class GameServer {
   }
 }
 
-Object.assign(GameServer.prototype, entityMethods, npcMethods, zooMethods, vehicleMethods, kermisMethods, cityMethods);
+Object.assign(GameServer.prototype, entityMethods, npcMethods, zooMethods, vehicleMethods, kermisMethods, cityMethods, farmMethods);
 export { itemName, isNight };

@@ -660,6 +660,57 @@ export class UI {
     this.open('garage', 'Garage', b, true);
   }
 
+  // ---------- de marktkraam van je boerderij ----------
+
+  // Bovenaan je boerderijlevel en titel, dan wat je kunt verkopen, wat je kunt kopen en de missies.
+  openFarm(m) {
+    const g = this.g, send = (o) => g.net.send(Object.assign({ t: 'farm' }, o));
+    const b = el('div', 'garage');
+    const pct = m.next ? Math.round(100 * m.xp / m.next[1]) : 100;
+    b.appendChild(el('div', 'qsec', '<h4>🌾 Level ' + m.level + ' · ' + m.titel + '</h4>' +
+      '<p class="hint">' + m.xp + ' boerderijpunten' + (m.next ? ' · bij ' + m.next[1] + ' word je ' + m.next[0] + ' (' + pct + '%)' : ' · hoger kan niet!') +
+      ' · <img class="mini" src="' + iconURL(I.munt) + '"> ' + m.munten + ' munten</p>' +
+      '<p class="hint">Verkocht: ' + m.verkocht + ' · Verdiend: ' + m.verdiend + ' munten · Magische gewassen ontdekt: ' + m.magie.length + ' van de 10</p>'));
+    // verkopen
+    const vs = el('div', 'qsec');
+    vs.appendChild(el('h4', '', 'Verkopen'));
+    if (!m.sell.length) vs.appendChild(el('p', 'hint', 'Je hebt nu niets om te verkopen. Plant iets op een akker (wijs de akker aan met bijvoorbeeld tarwe of een wortel in je hand), wacht tot het rijp is en oogst het.'));
+    else {
+      let tot = 0;
+      for (const [id, n, prijs] of m.sell) {
+        tot += n * prijs;
+        const r = el('div', 'drow');
+        r.appendChild(el('span', '', '<img class="mini" src="' + iconURL(id) + '"> <b>' + n + ' × ' + itemName(id) + '</b> <small>' + (prijs >= 1 ? prijs + ' munten per stuk' : Math.round(1 / prijs) + ' voor 1 munt') + '</small>'));
+        const btns = el('span', 'drowbtns'), sell = el('button', 'btn small active', 'Verkoop (' + Math.floor(n * prijs + 1e-9) + ')');
+        tap(sell, () => send({ c: 'sell', id }));
+        btns.appendChild(sell); r.appendChild(btns); vs.appendChild(r);
+      }
+      const all = el('button', 'btn small active', '💰 Alles verkopen (ongeveer ' + Math.floor(tot) + ' munten)');
+      tap(all, () => send({ c: 'sellAll' }));
+      vs.appendChild(all);
+    }
+    b.appendChild(vs);
+    // kopen
+    const ks = el('div', 'qsec');
+    ks.appendChild(el('h4', '', 'Kopen'));
+    for (const [k, id, n, prijs, vanaf] of m.shop) {
+      const open = m.level >= vanaf;
+      const r = el('div', 'drow');
+      r.appendChild(el('span', '', '<img class="mini" src="' + iconURL(id) + '"> <b>' + (n > 1 ? n + ' × ' : '') + itemName(id) + '</b>' + (open ? '' : ' <small>🔒 vanaf level ' + vanaf + '</small>')));
+      const btns = el('span', 'drowbtns'), buy = el('button', 'btn small' + (open && m.munten >= prijs ? ' active' : ''), prijs + ' munten');
+      tap(buy, () => { if (open) send({ c: 'buy', k }); });
+      btns.appendChild(buy); r.appendChild(btns); ks.appendChild(r);
+    }
+    ks.appendChild(el('p', 'hint', 'De tractor ploegt gras om tot akker, de zaaimachine plant wat je bij je hebt en de combine oogst: telkens een strook van drie breed terwijl je rijdt. Bij een sproeier of water groeit alles twee keer zo snel.'));
+    b.appendChild(ks);
+    // missies
+    const ms = el('div', 'qsec');
+    ms.appendChild(el('h4', '', 'Missies'));
+    for (const [tekst, nu, n, munten, klaar] of m.missies) ms.appendChild(el('div', 'drow', '<span>' + (klaar ? '✅ ' : '⬜ ') + tekst + ' <small>' + (klaar ? 'gehaald' : nu + ' / ' + n + ' · beloning ' + munten + ' munten') + '</small></span>'));
+    b.appendChild(ms);
+    this.open('farm', 'Mijn boerderij', b, true);
+  }
+
   // ---------- het Dierenboek ----------
 
   // Alle dieren op nummer: wat je al hebt uitgebroed zie je met naam en ei, de rest is een

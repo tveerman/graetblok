@@ -145,6 +145,26 @@ item(364, 'knuffel_klein', 'Kleine knuffel', { icon: ['snack', 'knuffel'], stack
 item(365, 'knuffel_groot', 'Grote knuffelbeer', { icon: ['snack', 'beer'], stack: 16 });
 item(366, 'trofee', 'Gouden trofee', { icon: ['snack', 'trofee'], stack: 16 });
 item(367, 'v_vliegtuig', 'Vliegtuig', { icon: ['car', '#f4f4f0', 'vlieg'], veh: 'vliegtuig', stack: 1 });
+// het landbouwimperium (zie farm.js): wat je oogst. Je plant het weer door het op een akker te zetten.
+item(368, 'wortel', 'Wortel', { icon: ['gewas', 'wortel', '#f08a20'], food: 2 });
+item(369, 'aardappel', 'Aardappel', { icon: ['gewas', 'knol', '#c8a060'], food: 1 });
+item(370, 'mais', 'Maïs', { icon: ['gewas', 'kolf', '#f4d040'], food: 2 });
+item(371, 'tomaat', 'Tomaat', { icon: ['gewas', 'rond', '#e03a2a'], food: 2 });
+item(372, 'aardbei', 'Aardbei', { icon: ['gewas', 'bes', '#e8284a'], food: 2 });
+item(373, 'gouden_tarwe', 'Gouden tarwe', { icon: ['gewas', 'halm', '#ffd23a'], food: 8 });
+item(374, 'diamantwortel', 'Diamantwortel', { icon: ['gewas', 'wortel', '#6fe8f0'], food: 8 });
+item(375, 'regenboogmais', 'Regenboogmaïs', { icon: ['gewas', 'kolf', 'regenboog'], food: 8 });
+item(376, 'maanbes', 'Maanbes', { icon: ['gewas', 'bes', '#b8c8ff'], food: 8 });
+item(377, 'drakenfruit', 'Drakenfruit', { icon: ['gewas', 'rond', '#f040a0'], food: 8 });
+item(378, 'sterrenfruit', 'Sterrenfruit', { icon: ['gewas', 'ster', '#ffe860'], food: 8 });
+item(379, 'eeuwige_plant', 'Eeuwige plant', { icon: ['gewas', 'knol', '#58e890'], food: 8 });
+item(380, 'kristalbloem', 'Kristalbloem', { icon: ['gewas', 'bloem', '#c080ff'], food: 8 });
+item(381, 'gouden_appel', 'Gouden appel', { icon: ['gewas', 'rond', '#ffd23a'], food: 12 });
+item(382, 'kosmisch_gewas', 'Kosmisch gewas', { icon: ['gewas', 'ster', '#8060ff'], food: 12 });
+item(383, 'pizza', 'Pizza', { icon: ['gewas', 'pizza', '#f0c060'], food: 10 });
+item(384, 'v_tractor', 'Tractor', { icon: ['car', '#3a9a3a', 'jeep'], veh: 'tractor', stack: 1 });
+item(385, 'v_zaaimachine', 'Zaaimachine', { icon: ['car', '#d8362c', 'jeep'], veh: 'zaaimachine', stack: 1 });
+item(386, 'v_combine', 'Combine', { icon: ['car', '#f0c020', 'truck'], veh: 'combine', stack: 1 });
 
 export const isBlock = (id) => id > 0 && id < 256;
 export function itemName(id) {
@@ -271,6 +291,11 @@ recipe(I.appeltaart, 1, [[I.appel, 2], [I.tarwe, 2]], 'oven');
 recipe(B.tarwe, 1, [[I.tarwe, 1]]);
 recipe(B.akker, 2, [[B.aarde, 2], ['blad', 2]]);
 recipe(B.hooi, 1, [[I.tarwe, 4]]);
+recipe(I.pizza, 1, [[I.tomaat, 2], [I.tarwe, 2]], 'oven');
+recipe(I.friet, 1, [[I.aardappel, 2]], 'oven');
+recipe(I.popcorn, 2, [[I.mais, 1]], 'oven');
+recipe(B.marktkraam, 1, [[B.planken, 6], [B.wol, 1]], 'werkbank');
+recipe(B.sproeier, 1, [[I.ijzerstaaf, 3], [I.emmer, 1]], 'werkbank');
 recipe(B.stro, 2, [[B.hooi, 1]]);
 recipe(B.bed, 1, [[B.planken, 3], [B.wol, 2]], 'werkbank');
 recipe(B.wol_rood, 1, [[B.wol, 1], [B.bloem_rood, 1]]);

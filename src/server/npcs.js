@@ -30,7 +30,7 @@ export const JOBS = {
     trades: [[M, 2, B.fakkel, 6], [M, 4, B.lantaarn, 1], [M, 6, B.bed, 1], [M, 5, I.emmer, 1], [M, 8, I.boog, 1],
       [B.wol, 2, M, 1], [I.leer, 2, M, 1], [I.draad, 3, M, 1], [I.bot, 3, M, 1]] },
   boer: { title: 'Boer', hi: 'Alles vers van het land.',
-    trades: [[M, 1, I.tarwe, 4], [M, 2, B.pompoen, 1], [M, 1, I.appel, 2], [M, 3, B.hooi, 2], [I.bessen, 8, M, 1],
+    trades: [[M, 5, B.marktkraam, 1], [M, 2, I.wortel, 4], [M, 1, I.tarwe, 4], [M, 2, B.pompoen, 1], [M, 1, I.appel, 2], [M, 3, B.hooi, 2], [I.bessen, 8, M, 1],
       [M, 5, I.ei_basis, 1], [M, 10, I.ei_bos, 1], [M, 12, B.broedmachine, 1]] },
   houthakker: { title: 'Houthakker', hi: 'Hout nodig? Of heb je stammen voor mij?',
     trades: [[M, 1, B.planken, 8], [M, 2, B.stam_eik, 6], [M, 6, I.bijl_ijzer, 1], ['stam', 8, M, 1]] },

@@ -544,6 +544,11 @@ const PX = {
     return c;
   },
   // de stad: beton in platen, een raam met een kozijn (donker of met licht aan) en stoeptegels
+  // de sproeier, de melkmachine en de marktkraam van het Landbouwimperium
+  sproeier: (x, y, u, v) => { const band = v > 0.42 && v < 0.58; return mul(band ? [70, 150, 220] : [150, 158, 170], 0.88 + hash2(x, y, 921) * 0.16); },
+  sproeier_top: (x, y, u, v) => { const d = Math.hypot(u - 0.5, v - 0.5); return d < 0.14 ? [60, 140, 230] : d < 0.34 ? mul([120, 190, 240], 0.9 + hash2(x, y, 922) * 0.2) : mul([150, 158, 170], 0.9 + hash2(x, y, 923) * 0.14); },
+  melkmachine: (x, y, u, v) => { const tank = Math.hypot(u - 0.5, v - 0.42) < 0.26; const vlek = tank && Math.hypot(u - 0.42, v - 0.36) < 0.09; return vlek ? [40, 40, 44] : tank ? [246, 246, 250] : v > 0.78 ? [90, 96, 108] : mul([176, 184, 196], 0.9 + hash2(x, y, 924) * 0.14); },
+  marktkraam: (x, y, u, v) => { if (v < 0.3) return (Math.floor(u * 6) & 1) ? [216, 54, 44] : [244, 244, 240]; if (v < 0.42) return [60, 40, 24]; const plank = Math.floor(v * 8) & 1; return mul([168, 120, 70], (plank ? 0.92 : 1) * (0.92 + hash2(x, y, 925) * 0.14)); },
   beton: (x, y, u, v) => { const n = fbm(u, v, 5, 5, 2, 180); const c = mul([188, 190, 194], 0.9 + n * 0.16 + hash2(x, y, 181) * 0.04); return (x % 32 === 0 || y % 32 === 0) ? mul(c, 0.82) : c; },
   beton_donker: (x, y, u, v) => { const n = fbm(u, v, 5, 5, 2, 182); const c = mul([98, 104, 114], 0.9 + n * 0.16 + hash2(x, y, 183) * 0.04); return (x % 32 === 0 || y % 32 === 0) ? mul(c, 0.8) : c; },
   raam: (x, y, u, v) => {
@@ -1318,6 +1323,47 @@ DRAW.tarwe = (g) => {
     g.strokeStyle = 'rgba(120,84,20,0.7)'; g.lineWidth = 1; g.stroke();
   }
 };
+// De gewassen van het Landbouwimperium: stelen en blad in kleur a, vruchten in kleur c.
+// vorm: 'loof' (wortels en knollen), 'struik', 'hoog' (maïs), 'halm', 'bloem' of 'ster'.
+function gewasTile(vorm, blad, c, magisch) {
+  return (g) => {
+    g.lineCap = 'round';
+    const n = vorm === 'hoog' ? 4 : vorm === 'halm' ? 7 : 5;
+    for (let i = 0; i < n; i++) {
+      const x = 10 + i * (44 / (n - 1)), h = (vorm === 'hoog' ? 52 : vorm === 'loof' ? 26 : vorm === 'halm' ? 46 : 36) + hash2(i, 1, 911) * 8, sw = (hash2(i, 2, 911) - 0.5) * 12;
+      g.strokeStyle = blad; g.lineWidth = vorm === 'hoog' ? 4 : 3;
+      g.beginPath(); g.moveTo(x, 64); g.quadraticCurveTo(x, 44, x + sw, 64 - h); g.stroke();
+      if (vorm !== 'halm') for (const s of [-1, 1]) { g.beginPath(); g.moveTo(x + sw * 0.5, 64 - h * 0.55); g.quadraticCurveTo(x + s * 9, 64 - h * 0.7, x + s * 13, 64 - h * 0.5); g.stroke(); }
+      g.fillStyle = c; g.strokeStyle = 'rgba(0,0,0,0.45)'; g.lineWidth = 1;
+      if (vorm === 'loof') { g.beginPath(); g.moveTo(x - 4, 58); g.lineTo(x + 4, 58); g.lineTo(x, 64); g.closePath(); g.fill(); g.beginPath(); g.ellipse(x, 57, 4.5, 3, 0, 0, 6.3); g.fill(); g.stroke(); }
+      else if (vorm === 'hoog') { g.beginPath(); g.ellipse(x + sw * 0.6 + 4, 64 - h * 0.55, 3.6, 8, 0.3, 0, 6.3); g.fill(); g.stroke(); }
+      else if (vorm === 'halm') { g.beginPath(); g.ellipse(x + sw, 64 - h - 4, 3.6, 10, sw * 0.03, 0, 6.3); g.fill(); g.stroke(); }
+      else if (vorm === 'bloem') { for (let k = 0; k < 5; k++) { g.beginPath(); g.ellipse(x + sw + Math.cos(k * 1.257) * 4, 64 - h + Math.sin(k * 1.257) * 4, 3.4, 3.4, 0, 0, 6.3); g.fill(); } g.fillStyle = '#fff6c0'; g.beginPath(); g.arc(x + sw, 64 - h, 2.4, 0, 6.3); g.fill(); }
+      else if (vorm === 'ster') { g.beginPath(); for (let k = 0; k < 10; k++) { const r = k & 1 ? 2.6 : 6.4, an = k * 0.628 - 1.57; g.lineTo(x + sw + Math.cos(an) * r, 64 - h + Math.sin(an) * r); } g.closePath(); g.fill(); g.stroke(); }
+      else for (const [fx, fy] of [[-5, 0.5], [5, 0.68], [0, 0.86]]) { g.beginPath(); g.arc(x + sw * 0.5 + fx, 64 - h * fy, 4, 0, 6.3); g.fill(); g.stroke(); }
+    }
+    if (magisch) { g.fillStyle = 'rgba(255,255,255,0.95)'; for (let i = 0; i < 7; i++) { const x = 6 + hash2(i, 5, 912) * 52, y = 6 + hash2(i, 6, 912) * 44; g.fillRect(x - 0.8, y - 3, 1.6, 6); g.fillRect(x - 3, y - 0.8, 6, 1.6); } }
+  };
+}
+DRAW.g_wortel = gewasTile('loof', '#4aa03a', '#f08a20');
+DRAW.g_aardappel = gewasTile('loof', '#5a8a3a', '#c8a060');
+DRAW.g_mais = gewasTile('hoog', '#6aa83a', '#f4d040');
+DRAW.g_tomaat = gewasTile('struik', '#3f8f38', '#e03a2a');
+DRAW.g_aardbei = gewasTile('struik', '#4a9a40', '#e8284a');
+DRAW.g_gouden_tarwe = gewasTile('halm', '#e8c040', '#ffe060', true);
+DRAW.g_diamantwortel = gewasTile('loof', '#58c8b0', '#6fe8f0', true);
+DRAW.g_regenboogmais = gewasTile('hoog', '#58b0e8', '#f060c0', true);
+DRAW.g_maanbes = gewasTile('struik', '#7088c8', '#d8e0ff', true);
+DRAW.g_drakenfruit = gewasTile('struik', '#3aa070', '#f040a0', true);
+DRAW.g_sterrenfruit = gewasTile('ster', '#6aa83a', '#ffe860', true);
+DRAW.g_eeuwige_plant = gewasTile('loof', '#30c878', '#a8ffd0', true);
+DRAW.g_kristalbloem = gewasTile('bloem', '#8a70d0', '#c080ff', true);
+DRAW.g_gouden_appel = gewasTile('struik', '#5a9a3a', '#ffd23a', true);
+DRAW.g_kosmisch_gewas = gewasTile('ster', '#5040b0', '#b090ff', true);
+DRAW.kiem = (g) => {
+  g.lineCap = 'round'; g.strokeStyle = '#58b848'; g.lineWidth = 3;
+  for (let i = 0; i < 5; i++) { const x = 10 + i * 11; g.beginPath(); g.moveTo(x, 64); g.lineTo(x, 52); g.stroke(); for (const s of [-1, 1]) { g.beginPath(); g.moveTo(x, 54); g.quadraticCurveTo(x + s * 5, 50, x + s * 6, 46); g.stroke(); } }
+};
 DRAW.spinnenweb = (g) => {
   g.strokeStyle = 'rgba(250,250,255,0.95)'; g.lineWidth = 1.6;
   for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4; g.beginPath(); g.moveTo(32, 32); g.lineTo(32 + Math.cos(a) * 30, 32 + Math.sin(a) * 30); g.stroke(); }
@@ -1867,6 +1913,22 @@ const ICONS = {
       g.fillStyle = '#c0203a'; g.strokeStyle = 'rgba(0,0,0,0.5)'; g.lineWidth = 1.5; g.beginPath(); g.arc(x, y, r, 0, 6.3); g.fill(); g.stroke();
       g.fillStyle = 'rgba(255,255,255,0.5)'; g.beginPath(); g.arc(x - 4, y - 4, 3, 0, 6.3); g.fill();
     }
+  },
+  // wat je oogst op de boerderij: vorm = 'wortel', 'knol', 'kolf', 'rond', 'bes', 'ster', 'bloem', 'halm' of 'pizza'
+  gewas: (g, vorm, c) => {
+    g.strokeStyle = 'rgba(0,0,0,0.6)'; g.lineWidth = 2; g.lineJoin = 'round';
+    if (c === 'regenboog') { const gr = g.createLinearGradient(20, 10, 44, 54); ['#f04040', '#f0a020', '#f0e040', '#40c040', '#4080f0', '#a040e0'].forEach((k, i) => gr.addColorStop(i / 5, k)); c = gr; }
+    g.fillStyle = c;
+    const blad = () => { g.fillStyle = '#4aa03a'; g.beginPath(); g.ellipse(26, 12, 7, 4, -0.5, 0, 6.3); g.fill(); g.stroke(); g.beginPath(); g.ellipse(38, 11, 7, 4, 0.5, 0, 6.3); g.fill(); g.stroke(); g.fillStyle = c; };
+    if (vorm === 'wortel') { blad(); g.beginPath(); g.moveTo(20, 16); g.lineTo(44, 16); g.lineTo(32, 60); g.closePath(); g.fill(); g.stroke(); }
+    else if (vorm === 'knol') { g.beginPath(); g.ellipse(32, 36, 22, 16, -0.3, 0, 6.3); g.fill(); g.stroke(); g.fillStyle = 'rgba(0,0,0,0.25)'; for (const [x, y] of [[24, 32], [38, 30], [34, 42]]) { g.beginPath(); g.arc(x, y, 2, 0, 6.3); g.fill(); } }
+    else if (vorm === 'kolf') { g.beginPath(); g.ellipse(32, 30, 11, 24, 0, 0, 6.3); g.fill(); g.stroke(); g.strokeStyle = 'rgba(0,0,0,0.25)'; g.lineWidth = 1; for (let y = 12; y < 50; y += 6) { g.beginPath(); g.moveTo(23, y); g.lineTo(41, y); g.stroke(); } g.strokeStyle = 'rgba(0,0,0,0.6)'; g.lineWidth = 2; g.fillStyle = '#5aa83a'; g.beginPath(); g.moveTo(18, 60); g.quadraticCurveTo(20, 38, 30, 44); g.lineTo(34, 44); g.quadraticCurveTo(44, 38, 46, 60); g.closePath(); g.fill(); g.stroke(); }
+    else if (vorm === 'rond') { g.beginPath(); g.arc(32, 36, 20, 0, 6.3); g.fill(); g.stroke(); g.fillStyle = '#3f8f38'; g.beginPath(); g.moveTo(32, 18); g.lineTo(24, 12); g.lineTo(32, 14); g.lineTo(40, 12); g.closePath(); g.fill(); g.stroke(); g.fillStyle = 'rgba(255,255,255,0.45)'; g.beginPath(); g.ellipse(25, 29, 5, 3, -0.6, 0, 6.3); g.fill(); }
+    else if (vorm === 'bes') { blad(); g.beginPath(); g.moveTo(16, 20); g.quadraticCurveTo(32, 12, 48, 20); g.quadraticCurveTo(46, 46, 32, 58); g.quadraticCurveTo(18, 46, 16, 20); g.fill(); g.stroke(); g.fillStyle = 'rgba(255,240,180,0.9)'; for (const [x, y] of [[26, 28], [36, 26], [31, 36], [38, 38], [26, 40], [32, 47]]) g.fillRect(x, y, 2, 3); }
+    else if (vorm === 'ster') { g.beginPath(); for (let k = 0; k < 10; k++) { const r = k & 1 ? 11 : 26, an = k * 0.628 - 1.57; g.lineTo(32 + Math.cos(an) * r, 34 + Math.sin(an) * r); } g.closePath(); g.fill(); g.stroke(); }
+    else if (vorm === 'bloem') { for (let k = 0; k < 6; k++) { g.beginPath(); g.ellipse(32 + Math.cos(k * 1.047) * 13, 30 + Math.sin(k * 1.047) * 13, 9, 9, 0, 0, 6.3); g.fill(); g.stroke(); } g.fillStyle = '#fff6c0'; g.beginPath(); g.arc(32, 30, 7, 0, 6.3); g.fill(); g.stroke(); }
+    else if (vorm === 'halm') { g.strokeStyle = '#b89a30'; g.lineWidth = 3; for (const [x, sw] of [[22, -8], [32, 0], [42, 8]]) { g.beginPath(); g.moveTo(32, 60); g.quadraticCurveTo(x, 44, x + sw * 0.4, 30); g.stroke(); } g.strokeStyle = 'rgba(0,0,0,0.5)'; g.lineWidth = 1.5; for (const [x, sw] of [[22, -8], [32, 0], [42, 8]]) { g.beginPath(); g.ellipse(x + sw * 0.4, 20, 5, 13, sw * 0.03, 0, 6.3); g.fill(); g.stroke(); } }
+    else { g.beginPath(); g.arc(32, 34, 24, 0, 6.3); g.fill(); g.stroke(); g.fillStyle = '#e04a30'; g.beginPath(); g.arc(32, 34, 19, 0, 6.3); g.fill(); g.fillStyle = '#ffe9a0'; for (const [x, y] of [[24, 28], [38, 26], [32, 38], [42, 40], [24, 42]]) { g.beginPath(); g.arc(x, y, 4, 0, 6.3); g.fill(); } }
   },
   apple: (g) => {
     g.fillStyle = '#d8281e'; g.strokeStyle = 'rgba(0,0,0,0.5)'; g.lineWidth = 2;
