@@ -126,6 +126,7 @@ export const npcMethods = {
     if (inside) {
       if (p.inSite !== inside.key) {
         p.inSite = inside.key;
+        if (!inside.evil) this.jobVisit(p, inside.key);
         this.toast(p, (inside.kind === 'vliegveld' ? 'Welkom op ' : inside.kind === 'dorp' || inside.kind === 'stad' ? 'Welkom in ' : inside.kind === 'kamp' ? 'Pas op: je bent bij ' : 'Je bent bij ') + inside.name + (inside.evil && inside.kind === 'kasteel' ? '. Het spookt hier...' : inside.kind === 'vliegveld' ? '! Het lijnvliegtuig wacht aan het begin van de startbaan: stap in om mee te vliegen.' : '!'), inside.evil ? 'boss' : 'good');
       }
     } else p.inSite = null;
@@ -408,6 +409,7 @@ export const npcMethods = {
     if (e.veh) { this.useVehicle(p, w, e, hid); return true; }
     if (e.race) return true;
     if (e.def.ride) { this.useRide(p, w, e); return true; }
+    if (hid === I.verband && e.kind === 'dorpeling') { this.jobHeal(p, w, e); return true; }      // de dokter verbindt een dorpeling
     if (e.job && JOBS[e.job] && JOBS[e.job].game) { this.kermisMenu(p, JOBS[e.job].game); return true; }                                              // de auto van een andere coureur
     if (e.job === 'racemeester') { this.raceMenu(p, w, e); return true; }
     if (e.job) {
@@ -431,6 +433,7 @@ export const npcMethods = {
       if (e.sheared !== undefined && this.meta.time - e.sheared < 90) { this.toast(p, 'Dit schaap is net geschoren. De wol moet nog groeien.'); return true; }
       e.sheared = this.meta.time;
       this.giveLoot(p, B.wol, 1 + (this.rnd() < 0.4 ? 1 : 0));
+      this.jobEvent(p, 'verzorg');
       this.fx(w.id, 'wool', e.x, e.y + 0.7, e.z);
       this.sendInv(p);
       return true;
@@ -440,6 +443,7 @@ export const npcMethods = {
       if (this.space(p, I.melk) < 1 && held.n > 1) { this.toast(p, 'Je rugzak is vol!', 'warn'); return true; }
       held.n--; if (held.n <= 0) p.inv[p.sel] = null;
       this.giveLoot(p, I.melk, 1);
+      this.jobEvent(p, 'verzorg');
       this.fx(w.id, 'hearts', e.x, e.y + 1, e.z);
       this.sendInv(p);
       return true;

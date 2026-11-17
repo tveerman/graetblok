@@ -528,6 +528,7 @@ export const entityMethods = {
       if (this.rnd() <= ch) this.giveLoot(p, id, a + Math.floor(this.rnd() * (b - a + 1)));
     }
     p.kills++;
+    if (e.def.ai === 'melee' || e.def.ai === 'ranged' || e.def.boss) this.jobEvent(p, 'versla');
     this.addXp(p, e.def.xp);
     if (duid) {
       const d = p.dragons.find((q) => q.uid === duid);

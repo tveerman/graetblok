@@ -165,6 +165,7 @@ item(383, 'pizza', 'Pizza', { icon: ['gewas', 'pizza', '#f0c060'], food: 10 });
 item(384, 'v_tractor', 'Tractor', { icon: ['car', '#3a9a3a', 'jeep'], veh: 'tractor', stack: 1 });
 item(385, 'v_zaaimachine', 'Zaaimachine', { icon: ['car', '#d8362c', 'jeep'], veh: 'zaaimachine', stack: 1 });
 item(386, 'v_combine', 'Combine', { icon: ['car', '#f0c020', 'truck'], veh: 'combine', stack: 1 });
+item(387, 'verband', 'Verband', { icon: ['gewas', 'knol', '#f4f4f0'], stack: 16 });      // voor de dokter (zie jobs.js)
 
 export const isBlock = (id) => id > 0 && id < 256;
 export function itemName(id) {
@@ -294,6 +295,7 @@ recipe(B.hooi, 1, [[I.tarwe, 4]]);
 recipe(I.pizza, 1, [[I.tomaat, 2], [I.tarwe, 2]], 'oven');
 recipe(I.friet, 1, [[I.aardappel, 2]], 'oven');
 recipe(I.popcorn, 2, [[I.mais, 1]], 'oven');
+recipe(I.verband, 2, [[B.wol, 1]], 'werkbank');
 recipe(B.marktkraam, 1, [[B.planken, 6], [B.wol, 1]], 'werkbank');
 recipe(B.sproeier, 1, [[I.ijzerstaaf, 3], [I.emmer, 1]], 'werkbank');
 recipe(B.stro, 2, [[B.hooi, 1]]);

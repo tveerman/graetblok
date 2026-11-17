@@ -23,6 +23,7 @@ import { vehicleMethods } from './vehicles.js';
 import { kermisMethods } from './kermis.js';
 import { cityMethods } from './city.js';
 import { farmMethods } from './farm.js';
+import { jobMethods } from './jobs.js';
 import { CROP_OF_SEED } from '../shared/farm.js';
 import { WorldGen } from './worldgen.js';
 
@@ -217,6 +218,7 @@ export class GameServer {
     this.sendInv(p); this.sendStats(p); this.sendDragons(p);
     this.spawnOwned(p);
     p.flags['visit_' + p.world] = 1;
+    this.send(p, { t: 'job', job: (p.flags.werk && p.flags.werk.job) || '' });
     this.checkQuests(p, true);
   }
 
@@ -334,6 +336,7 @@ export class GameServer {
     if (left > 0) this.toast(p, 'Je rugzak is vol!', 'warn');
     const key = r.out < 256 ? BLOCKS[r.out].key : ITEMS[r.out].key;
     if (!p.flags['made_' + key]) { p.flags['made_' + key] = 1; this.addXp(p, 4); }
+    this.jobEvent(p, r.out >= 256 && ITEMS[r.out].food ? 'kook' : 'maak');
     this.send(p, { t: 'crafted', id: r.out });
     this.sendInv(p);
     this.checkQuests(p);
@@ -410,6 +413,11 @@ export class GameServer {
     else if (can) this.dropFor(p, def);
     else if (def.tier > 0) this.toast(p, 'Hiervoor heb je een beter houweel nodig.', 'warn');
     if (def.xp && can) this.addXp(p, def.xp);
+    // telt dit voor je beroep?
+    if (id === B.brand) this.jobEvent(p, 'blus');
+    else if (can && def.key.includes('erts')) this.jobEvent(p, 'erts');
+    else if (can && def.key.startsWith('stam_')) this.jobEvent(p, 'hout');
+    else if (can && def.tool === 'pick' && def.solid) this.jobEvent(p, 'steen');
 
     // plantje of fakkel erboven valt om
     const above = w.get(x, y + 1, z);
@@ -489,6 +497,7 @@ export class GameServer {
     }
     if (!p.flags['made_' + def.key] && (def.key === 'werkbank' || def.key === 'kampvuur' || def.key === 'bed')) p.flags['made_' + def.key] = 1;
     s.n--; if (s.n <= 0) p.inv[p.sel] = null;
+    this.jobEvent(p, 'bouw');
     this.sendInv(p);
     this.checkQuests(p);
   }
@@ -551,6 +560,11 @@ export class GameServer {
       this.useHeart(p, w);
     } else if (id === B.broedmachine) {
       this.useIncubator(p, w, x, y, z);
+    } else if (id === B.brand) {
+      this.setBlock(w, x, y, z, 0);
+      this.fx(w.id, 'wool', x + 0.5, y + 0.5, z + 0.5);
+      this.toast(p, '💦 Geblust!', 'good');
+      this.jobEvent(p, 'blus');
     } else if (id === B.marktkraam) {
       this.sendFarm(p);
     } else if (id === B.melkmachine) {
@@ -790,7 +804,9 @@ export class GameServer {
 
   on_move(p, m) {
     if (p.dead) return;
+    const reis = p.mount ? Math.hypot(m.x - p.x, m.z - p.z) : 0;
     p.x = m.x; p.y = m.y; p.z = m.z; p.yaw = m.yaw; p.pitch = m.pitch;
+    if (reis > 0) { const e = this.worlds[p.world].ents.get(p.mount); if (e && !e.def.ride) this.jobTravel(p, e.veh ? e.veh.kind : e.train ? 'trein' : e.dragon ? 'draak' : 'dier', reis); }
     const cx = Math.floor(p.x / 16), cz = Math.floor(p.z / 16);
     if (cx !== p.ccx || cz !== p.ccz) { p.ccx = cx; p.ccz = cz; this.updateWanted(p); }
     if (p.mount) {
@@ -917,6 +933,7 @@ export class GameServer {
     this.updateEggs();
     this.updateIncubators();
     this.updateCrops();
+    for (const q of this.players.values()) this.updateFires(q);
     for (const wid of active) this.cleanup(this.worlds[wid]);
     // chunks vergeten waar niemand meer is
     if (Math.floor(this.meta.time) % 5 === 0) {
@@ -957,6 +974,7 @@ export class GameServer {
     else if (m.c === 'world') this.moveToWorld(p, m.w, m.x === undefined ? p.x : m.x, -1, m.z === undefined ? p.z : m.z);
     else if (m.c === 'xp') this.addXp(p, m.n || 100);
     else if (m.c === 'god') p.god = !!m.v;
+    else if (m.c === 'dag') this.dayShift = m.v | 0;                    // verschuif de echte dag (om het weekend en de werkweek te testen)
     else if (m.c === 'egg') { for (const k in this.meta.eggs) this.meta.eggs[k].prog = 0.95; }
     else if (m.c === 'pet') this.debugPet(p, m.a, m.sh || '');      // meteen een eigen dier, bijv. { c: 'pet', a: 'paard' }
     else if (m.c === 'hatch') { const all = this.incubs(); for (const k in all) for (const e of all[k].eggs) e.left = 1; }      // alle eieren in de broedmachines komen meteen uit
@@ -992,5 +1010,5 @@ export class GameServer {
   }
 }
 
-Object.assign(GameServer.prototype, entityMethods, npcMethods, zooMethods, vehicleMethods, kermisMethods, cityMethods, farmMethods);
+Object.assign(GameServer.prototype, entityMethods, npcMethods, zooMethods, vehicleMethods, kermisMethods, cityMethods, farmMethods, jobMethods);
 export { itemName, isNight };

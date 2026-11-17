@@ -109,6 +109,9 @@ def(206, 'sproeier', 'Sproeier', { tiles: ['sproeier_top', 'sproeier', 'ijzerblo
 def(207, 'melkmachine', 'Melkmachine', { tiles: ['ijzerblok', 'melkmachine', 'ijzerblok'], hard: 2, snd: 'metal', interact: true });
 def(208, 'marktkraam', 'Marktkraam', { tiles: ['luifel', 'marktkraam', 'planken'], hard: 1.5, tool: 'axe', snd: 'wood', interact: true });
 
+// een brandje dat de brandweer moet blussen (zie jobs.js)
+def(209, 'brand', 'Brand', { ...CROSS, tiles: 'kampvuur', light: 13, hard: 0.3, drop: null, interact: true });
+
 // de stad en het vliegveld
 def(172, 'beton', 'Beton', { hard: 3, tool: 'pick' });
 def(173, 'beton_donker', 'Donker beton', { hard: 3, tool: 'pick' });

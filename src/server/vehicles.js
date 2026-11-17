@@ -140,13 +140,13 @@ export const vehicleMethods = {
     const pay = (n) => { if (this.count(p, I.munt) < n) { this.toast(p, 'Daar heb je ' + n + ' munten voor nodig.', 'warn'); return false; } if (n > 0) this.take(p, I.munt, n); return true; };
     if (m.c === 'fix') {
       const cost = Math.ceil(rec.dmg / 12);
-      if (rec.dmg >= 1 && pay(cost)) { rec.dmg = 0; this.toast(p, 'Gerepareerd voor ' + cost + ' munten.', 'good'); }
+      if (rec.dmg >= 1 && pay(cost)) { this.jobEvent(p, 'garage'); rec.dmg = 0; this.toast(p, 'Gerepareerd voor ' + cost + ' munten.', 'good'); }
     } else if (m.c === 'fuel') {
       const cost = Math.ceil((V.tank - rec.fuel) / 30);
-      if (rec.fuel < V.tank - 1 && pay(cost)) { rec.fuel = V.tank; this.toast(p, 'Volgetankt voor ' + cost + ' munten.', 'good'); }
+      if (rec.fuel < V.tank - 1 && pay(cost)) { this.jobEvent(p, 'garage'); rec.fuel = V.tank; this.toast(p, 'Volgetankt voor ' + cost + ' munten.', 'good'); }
     } else if (m.c === 'color') {
       const col = VEH_COLORS[m.i | 0];
-      if (col !== undefined) { rec.color = col; if (e) this.broadcast(w.id, { t: 'entMeta', id: e.id, col }); }
+      if (col !== undefined) { if (rec.color !== col) this.jobEvent(p, 'garage'); rec.color = col; if (e) this.broadcast(w.id, { t: 'entMeta', id: e.id, col }); }
     } else if (m.c === 'name') {
       rec.name = String(m.name || '').replace(/[<>&]/g, '').trim().slice(0, 16);
       if (e) { e.name = rec.name; this.broadcast(w.id, { t: 'entMeta', id: e.id, n: rec.name }); }
@@ -155,7 +155,7 @@ export const vehicleMethods = {
       if (!U) return;
       const up = rec.up || (rec.up = {}), lv = up[m.k] || 0;
       if (lv >= U.prijs.length) return;
-      if (pay(U.prijs[lv])) { up[m.k] = lv + 1; this.fx(w.id, 'hearts', rec.x, rec.y + V.size[1], rec.z); this.toast(p, U.name + ' niveau ' + (lv + 1) + ' ingebouwd!', 'good'); }
+      if (pay(U.prijs[lv])) { this.jobEvent(p, 'garage'); up[m.k] = lv + 1; this.fx(w.id, 'hearts', rec.x, rec.y + V.size[1], rec.z); this.toast(p, U.name + ' niveau ' + (lv + 1) + ' ingebouwd!', 'good'); }
     }
     this.sendInv(p);
     this.sendGarage(p, rec);

@@ -313,6 +313,22 @@ From Jorian's design document (`spel.txt`), following development phases 1–4, 
   potatoes, popcorn from maize, sprinkler, market stall. A wheat block can no longer be put
   down as a ripe plant (that duplicated wheat); it is planted like the rest. Not in yet:
   employees, own shops with customers and prices, greenhouse, windmill, fruit trees.
+- **Jobs (beroepen)** – from Jorian's plan (`src/shared/jobs.js`, `src/server/jobs.js`). The
+  💼 button (or J) opens "Mijn werk": pick one of 15 jobs (fire brigade, police, doctor, train
+  driver, bus driver, courier, pilot, captain, farmer, miner, cook, animal keeper, builder,
+  mechanic, forester) and switch whenever you like; every job keeps its own level. Each
+  working day you get three tasks and each week one week task, with amounts that differ per
+  day and grow with your level. The game ticks them off itself by counting what you really
+  do (blocks mined or placed, crops harvested, things cooked or crafted, monsters defeated,
+  distance driven, sailed or flown per kind of vehicle, villages reached, garage jobs, animals
+  cared for, goods sold). A finished task pays your wage (3 + level coins) and work points;
+  ten ranks from Stagiair to Legende, a present from the boss at level 3 (the job's vehicle
+  or tool), medals at levels 3, 6 and 10, and a bonus for finishing all tasks on consecutive
+  working days. Jorian's weekend rule uses the real date: Saturday and Sunday are always
+  free. Special mechanics: for the fire brigade small fires break out nearby (tap to put
+  out), the doctor bandages villagers (bandage: one wool gives two). Your job's work clothes
+  (colour and cap) show on your character. Debug: `{c:'dag', v:n}` shifts the real day by n.
+  Not in yet: three kinds of coins, the bank, your own shop with staff, achievements.
 - **Player character with a skeleton** (`src/client/rig.js`) – the human, elf and robot you
   can play are built on one rig with joints (hips, knees, ankles, spine, neck, shoulders,
   elbows). The animation computes joint angles: knees bend while the leg swings forward, the

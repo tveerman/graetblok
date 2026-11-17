@@ -466,6 +466,7 @@ BLOCK_MODELS[B.bessenstruik] = [bessenstruik()];
 BLOCK_MODELS[B.dode_struik] = [dodeStruik()];
 BLOCK_MODELS[B.fakkel] = [fakkel()];
 BLOCK_MODELS[B.kampvuur] = [kampvuur()];
+BLOCK_MODELS[B.brand] = [kampvuur()];
 BLOCK_MODELS[B.gloeipaddenstoel] = [paddenstoelen('turkoois', true)];
 ZWAM_KEYS.forEach((k) => { BLOCK_MODELS[B['gloeizwam_' + k]] = [paddenstoelen(k, false)]; });
 TREE_KEYS.forEach((k) => { const t = tileId('lichtvrucht_' + k); BLOCK_MODELS[LIFE_VINES[k]] = [rank(t, 0), rank(t, 1), rank(t, 2)]; });

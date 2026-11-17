@@ -6,6 +6,7 @@ import { WORLDS, WORLD_ORDER, CRASH } from '../shared/worlds.js';
 import { DRAGONS, dragonStage, STAGE_NAMES } from '../shared/mobs.js';
 import { iconURL, eggURL } from './textures.js';
 import { KERMIS_GAMES } from '../shared/rides.js';
+import { JOBS as WORK, JOB_RANKS, jobLevel, jobMedal, jobSalary } from '../shared/jobs.js';
 import { VEHICLES, VEH_COLORS, UPGRADES, UPGRADE_ORDER, vehStats } from '../shared/vehicles.js';
 import { ANIMALS, ANIMAL_LIST, EGG_KINDS, EGG_ORDER, RARITY, RARITIES, SHINIES, SHINY, ZOO_REWARDS, MAX_OUT } from '../shared/animals.js';
 
@@ -58,6 +59,7 @@ export class UI {
     tap($('btnInv'), () => this.toggleInventory());
     tap($('btnQuest'), () => this.modal === 'quest' ? this.close() : this.openQuest());
     tap($('btnZoo'), () => this.modal === 'zoo' ? this.close() : this.openZoo());
+    tap($('btnJob'), () => this.modal === 'werk' ? this.close() : g.net.send({ t: 'werk' }));
     tap($('btnCam'), () => g.toggleCam());
     tap($('btnMenu'), () => this.modal === 'pause' ? this.close() : this.openPause());
     tap($('btnFull'), () => g.toggleFullscreen());
@@ -658,6 +660,50 @@ export class UI {
     b.appendChild(us);
     b.appendChild(el('p', 'hint', 'Nitro gebruik je met de sprintknop (stick helemaal naar voren, of shift). De springknop is de handrem: daarmee kun je driften.'));
     this.open('garage', 'Garage', b, true);
+  }
+
+  // ---------- mijn werk ----------
+
+  // Bovenaan welke dag het is en wat je vandaag moet doen; daaronder alle beroepen om uit te kiezen.
+  openWork(m) {
+    const g = this.g, send = (o) => g.net.send(Object.assign({ t: 'werk' }, o));
+    const b = el('div', 'garage');
+    const J = m.job ? WORK[m.job] : null;
+    const kop = el('div', 'qsec');
+    if (!J) kop.innerHTML = '<h4>Vandaag is het ' + m.dag + '</h4><p class="hint">Je hebt nog geen beroep. Kies er hieronder een: je krijgt elke werkdag drie opdrachten en elke week een weekopdracht. Het spel ziet zelf wanneer je ze af hebt.</p>';
+    else {
+      const pct = m.next ? Math.round(100 * m.xp / m.next[1]) : 100;
+      kop.innerHTML = '<h4>' + J.icon + ' ' + J.name + ' · ' + m.rang + ' (level ' + m.level + ') ' + jobMedal(m.level) + '</h4>' +
+        '<p class="hint">Vandaag is het ' + m.dag + ' · loon ' + m.loon + ' munten per opdracht · ' + m.xp + ' werkpunten' + (m.next ? ', bij ' + m.next[1] + ' word je ' + m.next[0] + ' (' + pct + '%)' : '') +
+        (m.reeks > 1 ? ' · 🔥 ' + m.reeks + ' werkdagen op rij' : '') + '</p>' +
+        (m.cadeau ? '<p class="hint">🎁 Op level ' + m.cadeau[2] + ' krijg je van je baas: ' + (m.cadeau[1] > 1 ? m.cadeau[1] + ' × ' : '') + itemName(m.cadeau[0]) + '.</p>' : '');
+    }
+    b.appendChild(kop);
+    if (J) {
+      const ts = el('div', 'qsec');
+      if (m.vrij) ts.innerHTML = '<h4>🎈 Weekend!</h4><p class="hint">Op zaterdag en zondag ben je altijd vrij. Maandag staan er weer nieuwe opdrachten klaar.</p>';
+      else {
+        ts.appendChild(el('h4', '', 'Werk van vandaag'));
+        const rij = ([tekst, v, n, klaar], extra) => ts.appendChild(el('div', 'drow', '<span>' + (klaar ? '✅ ' : '⬜ ') + tekst + ' <small>' + (klaar ? 'af' : v + ' / ' + n) + (extra || '') + '</small></span>'));
+        for (const t of m.taken) rij(t);
+        ts.appendChild(el('h4', '', 'Weekopdracht'));
+        rij(m.week, m.week[3] ? '' : ' · ' + m.week[4] + ' munten');
+      }
+      b.appendChild(ts);
+    }
+    const ks = el('div', 'qsec');
+    ks.appendChild(el('h4', '', J ? 'Ander beroep kiezen' : 'Kies een beroep'));
+    for (const [k, xp] of m.jobs) {
+      const W = WORK[k], lv = jobLevel(xp);
+      const r = el('div', 'drow');
+      r.appendChild(el('span', '', W.icon + ' <b>' + W.name + '</b> <small>' + JOB_RANKS[lv - 1][0] + ' · level ' + lv + ' ' + jobMedal(lv) + ' · ' + jobSalary(lv) + ' munten per opdracht</small>'));
+      const btns = el('span', 'drowbtns'), kies = el('button', 'btn small' + (k === m.job ? '' : ' active'), k === m.job ? 'Dit doe je nu' : 'Kiezen');
+      tap(kies, () => { if (k !== m.job) send({ c: 'kies', job: k }); });
+      btns.appendChild(kies); r.appendChild(btns); ks.appendChild(r);
+    }
+    ks.appendChild(el('p', 'hint', 'Je kunt altijd wisselen: elk beroep houdt zijn eigen level. In je werkkleding zie je jezelf als je de camera omzet (📷).'));
+    b.appendChild(ks);
+    this.open('werk', 'Mijn werk', b, true);
   }
 
   // ---------- de marktkraam van je boerderij ----------

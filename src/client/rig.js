@@ -89,6 +89,12 @@ export function buildRig(look) {
     const hair = mat(hairC, 'vacht');
     part(head, hair, S.head + 0.04, 0.1, S.head + 0.04, 0, h2 + 0.01, 0);
     part(head, hair, S.head + 0.04, 0.3, 0.1, 0, 0.05, -h2 + 0.02);
+    if (look && look.cap !== undefined && !elf) {
+      // de pet van je werkkleding
+      const pet = mat(look.cap, 'glad');
+      part(head, pet, S.head + 0.07, 0.13, S.head + 0.07, 0, h2 + 0.06, 0);
+      part(head, pet, S.head * 0.8, 0.04, 0.18, 0, h2 + 0.01, h2 + 0.1);
+    }
     if (elf) {
       // grote puntoren die schuin naar buiten steken
       a.oren = [-1, 1].map((s) => {

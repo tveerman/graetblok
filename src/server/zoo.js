@@ -86,6 +86,7 @@ export const zooMethods = {
   },
 
   hatchAnimal(p, inc, eggKind) {
+    this.jobEvent(p, 'verzorg');
     const w = this.worlds[inc.w];
     const a = rollAnimal(eggKind, () => this.rnd()), sh = rollShiny(() => this.rnd());
     // het dier springt naast de machine op de grond (niet erbovenop, anders staan ze op elkaar)

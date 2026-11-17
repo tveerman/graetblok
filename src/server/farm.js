@@ -71,6 +71,7 @@ export const farmMethods = {
     const [id, a, b] = C.oogst, n = a + Math.floor(rnd() * (b - a + 1));
     this.giveLoot(p, id, n, true);
     F.oogst[key] = (F.oogst[key] || 0) + n;
+    this.jobEvent(p, 'oogst', n);
     const found = (k) => {
       this.giveLoot(p, I[k], 1, true);
       if (!F.magie[k]) { F.magie[k] = 1; this.toast(p, '✨ Je hebt een magisch gewas ontdekt: ' + CROPS[k].name + '! Zet het op een akker om er meer van te kweken.', 'rank'); }
@@ -132,6 +133,7 @@ export const farmMethods = {
       F.rest = som - munten;
       if (munten > 0) this.giveLoot(p, I.munt, munten, true);
       F.verkocht += n; F.verdiend += munten;
+      this.jobEvent(p, 'verkoop', n);
       this.farmXp(p, Math.max(1, Math.round(n * prijs)));
       return munten;
     };
@@ -169,6 +171,7 @@ export const farmMethods = {
     F.melkT = this.meta.time;
     this.take(p, I.emmer, 1);
     this.giveLoot(p, I.melk, 1);
+    this.jobEvent(p, 'verzorg');
     this.farmXp(p, 2);
     this.sendInv(p);
   },

@@ -18,6 +18,7 @@ import { connect } from './net.js';
 import { setupOffline } from './offline.js';
 import { RIDES } from '../shared/rides.js';
 import { VEHICLES } from '../shared/vehicles.js';
+import { JOBS as WORK } from '../shared/jobs.js';
 import { setCityTime } from './city.js';
 import { Weather } from './weather.js';
 
@@ -330,6 +331,8 @@ class Game {
       case 'veh': p.vehFuel = m.fuel; p.vehDmg = m.dmg; if (m.up) p.vehUp = m.up; break;      // brandstof, schade en upgrades van je voertuig
       case 'garage': ui.openGarage(m); break;
       case 'farm': ui.openFarm(m); break;
+      case 'werk': ui.openWork(m); break;
+      case 'job': this.setJob(m.job); break;
       case 'raceMenu': ui.openRaceMenu(m); break;
       case 'kermis': ui.openKermis(m); break;
       case 'kermisGo': ui.playKermis(m.game); break;
@@ -434,6 +437,13 @@ class Game {
     if (this.net) this.net.send({ t: 'sel', i: this.sel });
     this.ui.setInv();
     this.sound.play('click', 0.6);
+  }
+
+  // je beroep bepaalt je werkkleding: de kleur van je kleren en een pet
+  setJob(job) {
+    this.job = job || '';
+    const J = WORK[this.job];
+    if (this.player) this.player.setLook(J ? Object.assign({}, this.look, { shirt: J.kleur, cap: J.pet }) : this.look);
   }
 
   // drie standen: door je eigen ogen (met je armen in beeld), van achteren, en van voren
@@ -568,6 +578,7 @@ class Game {
     if (code === 'Escape') { if (ui.modalOpen()) ui.close(); else ui.openPause(); return; }
     if (code === 'KeyE' || code === 'Tab') { ui.toggleInventory(); return; }
     if (code === 'KeyQ') { if (ui.modal === 'quest') ui.close(); else ui.openQuest(); return; }
+    if (code === 'KeyJ') { if (ui.modal === 'werk') ui.close(); else if (!ui.modalOpen()) this.net.send({ t: 'werk' }); return; }
     if (code === 'KeyB') { if (ui.modal === 'zoo') ui.close(); else if (!ui.modalOpen()) ui.openZoo(); return; }
     if (ui.modalOpen()) { if (code === 'Enter' && ui.modal === 'dialog') ui.close(); return; }
     if (code.startsWith('Digit')) { const n = parseInt(code.slice(5), 10); if (n >= 1 && n <= 9) this.select(n - 1); return; }
