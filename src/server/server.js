@@ -26,6 +26,7 @@ import { farmMethods } from './farm.js';
 import { jobMethods } from './jobs.js';
 import { secretMethods } from './secrets.js';
 import { techMethods } from './tech.js';
+import { mapMethods } from './map.js';
 import { CROP_OF_SEED } from '../shared/farm.js';
 import { WorldGen } from './worldgen.js';
 
@@ -250,6 +251,7 @@ export class GameServer {
     this.spawnOwned(p);
     p.flags['visit_' + p.world] = 1;
     this.send(p, { t: 'job', job: (p.flags.werk && p.flags.werk.job) || '' });
+    this.send(p, { t: 'mark', m: p.flags.kaartMark && p.flags.kaartMark.w === p.world ? p.flags.kaartMark : null });
     this.checkQuests(p, true);
   }
 
@@ -1067,5 +1069,5 @@ export class GameServer {
   }
 }
 
-Object.assign(GameServer.prototype, entityMethods, npcMethods, zooMethods, vehicleMethods, kermisMethods, cityMethods, farmMethods, jobMethods, secretMethods, techMethods);
+Object.assign(GameServer.prototype, entityMethods, npcMethods, zooMethods, vehicleMethods, kermisMethods, cityMethods, farmMethods, jobMethods, secretMethods, techMethods, mapMethods);
 export { itemName, isNight };

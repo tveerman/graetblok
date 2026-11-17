@@ -338,6 +338,8 @@ class Game {
       case 'puzzel': ui.openPuzzle(m); break;
       case 'code': { const c = window.prompt('De gouden tempeldeur\n' + m.hint, ''); if (c !== null) this.net.send({ t: 'code', code: c }); break; }
       case 'job': this.setJob(m.job); break;
+      case 'kaart': ui.openMap(m); break;
+      case 'mark': this.mark = m.m; break;
       case 'raceMenu': ui.openRaceMenu(m); break;
       case 'kermis': ui.openKermis(m); break;
       case 'kermisGo': ui.playKermis(m.game); break;
@@ -605,6 +607,7 @@ class Game {
     if (code === 'Escape') { if (ui.modalOpen()) ui.close(); else ui.openPause(); return; }
     if (code === 'KeyE' || code === 'Tab') { ui.toggleInventory(); return; }
     if (code === 'KeyQ') { if (ui.modal === 'quest') ui.close(); else ui.openQuest(); return; }
+    if (code === 'KeyM') { if (ui.modal === 'kaart') ui.close(); else if (!ui.modalOpen()) this.net.send({ t: 'kaart', stap: 12 }); return; }
     if (code === 'KeyJ') { if (ui.modal === 'werk') ui.close(); else if (!ui.modalOpen()) this.net.send({ t: 'werk' }); return; }
     if (code === 'KeyB') { if (ui.modal === 'zoo') ui.close(); else if (!ui.modalOpen()) ui.openZoo(); return; }
     if (ui.modalOpen()) { if (code === 'Enter' && ui.modal === 'dialog') ui.close(); return; }

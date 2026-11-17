@@ -22,7 +22,7 @@
   "src/client/ui.js",
   "src/client/weather.js",
   "src/server/entities.js",
-  "src/server/kermis.js", "src/server/city.js", "src/server/farm.js", "src/server/jobs.js", "src/server/secrets.js", "src/server/tech.js",
+  "src/server/kermis.js", "src/server/city.js", "src/server/farm.js", "src/server/jobs.js", "src/server/secrets.js", "src/server/tech.js", "src/server/map.js",
   "src/server/npcs.js",
   "src/server/quests.js",
   "src/server/server.js",

@@ -420,6 +420,15 @@ From Jorian's design document (`spel.txt`), following development phases 1–4, 
   ash and linden are new logs and leaves that count as wood for every recipe. Wide rivers
   (about 30 blocks across, two deep, sandy banks) wind through everything except the ocean.
   Debug: `{c:'streek', k:'oceaan'|'woestijn'|'gebergte'|'zwammen'|'kristal'|'oerwoud'|'wilgen'|'linden'|'essen'|'rivier'}`.
+- **World map and marker** (`src/server/map.js`, `openMap` in `src/client/ui.js`) – the 🗺️
+  button (or M) opens a map of the world you are in, also of places you have never been:
+  the server computes 128 by 128 samples of the terrain (ground kind and height) and the
+  screen colours them with height shading. Four zoom levels from 512 to 10240 blocks across,
+  arrows to move the view, icons and names for villages, castles, the city, the airport and
+  the other places, your own position and direction, the tree of life and the spaceship. A
+  tap on the map sets a marker; it is saved with the player, shown on the map, and always on
+  the compass (📍 with the distance, and an arrow when it lies behind you). The map and
+  work buttons are created by the script when an old cached page lacks them.
 - **Player character with a skeleton** (`src/client/rig.js`) – the human, elf and robot you
   can play are built on one rig with joints (hips, knees, ankles, spine, neck, shoulders,
   elbows). The animation computes joint angles: knees bend while the leg swings forward, the

@@ -13,6 +13,9 @@ import { ANIMALS, ANIMAL_LIST, EGG_KINDS, EGG_ORDER, RARITY, RARITIES, SHINIES, 
 const EGG_PATS = ['vlek', 'blad', 'golf', 'ster', 'barst', 'streep'];
 const hexCol = (n) => '#' + (n | 0).toString(16).padStart(6, '0');
 // het ei van één dier: de kleuren van het dier zelf, met een patroon dat bij zijn nummer hoort
+// de kleuren van de kaart, per kleurnummer van de server (zie server/map.js)
+const MAP_COLORS = [[150, 200, 240], [70, 140, 220], [36, 84, 170], [240, 110, 30], [226, 208, 150], [104, 168, 78], [52, 118, 56], [240, 244, 250], [134, 134, 138],
+  [180, 220, 240], [110, 84, 60], [62, 60, 66], [230, 90, 40], [60, 170, 160], [170, 100, 220], [96, 70, 130], [70, 56, 90], [120, 112, 108], [190, 226, 150]];
 function animalEgg(a, dark) { return eggURL(hexCol(a.spec.c), hexCol(a.spec.c2 === undefined ? a.spec.c : a.spec.c2), EGG_PATS[a.nr % EGG_PATS.length], dark); }
 
 const $ = (id) => document.getElementById(id);
@@ -59,7 +62,12 @@ export class UI {
     tap($('btnInv'), () => this.toggleInventory());
     tap($('btnQuest'), () => this.modal === 'quest' ? this.close() : this.openQuest());
     tap($('btnZoo'), () => this.modal === 'zoo' ? this.close() : this.openZoo());
+    if (!$('btnJob')) { const k = el('button', '', '💼'); k.id = 'btnJob'; k.title = 'Mijn werk (J)'; const voor = $('btnCam'); voor.parentNode.insertBefore(k, voor); }
     tap($('btnJob'), () => this.modal === 'werk' ? this.close() : g.net.send({ t: 'werk' }));
+    // (Staat de knop niet in de pagina, omdat de browser nog een oude index.html bewaart, dan
+    // maken we hem hier zelf. Anders start het spel niet.)
+    if (!$('btnMap')) { const k = el('button', '', '🗺️'); k.id = 'btnMap'; k.title = 'Kaart (M)'; const voor = $('btnCam'); voor.parentNode.insertBefore(k, voor); }
+    tap($('btnMap'), () => this.modal === 'kaart' ? this.close() : g.net.send({ t: 'kaart', stap: 12 }));
     tap($('btnCam'), () => g.toggleCam());
     tap($('btnMenu'), () => this.modal === 'pause' ? this.close() : this.openPause());
     tap($('btnFull'), () => g.toggleFullscreen());
@@ -185,6 +193,7 @@ export class UI {
       this.cmpBaan = el('span', 'cship', '🏁'); strip.appendChild(this.cmpBaan);
       this.cmpPark = el('span', 'cship', '🎡'); strip.appendChild(this.cmpPark);
       this.cmpStad = el('span', 'cship', '🏙️'); strip.appendChild(this.cmpStad);
+      this.cmpPin = el('span', 'cship', '📍'); strip.appendChild(this.cmpPin);
       this.cmpToren = el('span', 'cship', '🗼'); strip.appendChild(this.cmpToren);
       this.cmpDool = el('span', 'cship', '🌿'); strip.appendChild(this.cmpDool);
       this.cmpTempel = el('span', 'cship', '🏛️'); strip.appendChild(this.cmpTempel);
@@ -227,6 +236,16 @@ export class UI {
       this.cmpMark.style.left = (W / 2 + (c / 1.75) * (W / 2)) + 'px';
       extra += '  ◆ ' + Math.round(Math.hypot(dx, dz)) + ' m';
     } else this.cmpMark.style.display = 'none';
+    // de markering die je zelf op de kaart hebt gezet: altijd op het kompas, met de afstand erbij
+    const pin = this.g.mark;
+    if (pin && pin.w === worldId) {
+      const dx = pin.x - pos.x, dz = pin.z - pos.z;
+      let rel = Math.atan2(dx, -dz) - heading;
+      while (rel > Math.PI) rel -= 2 * Math.PI; while (rel < -Math.PI) rel += 2 * Math.PI;
+      this.cmpPin.style.display = '';
+      this.cmpPin.style.left = (W / 2 + (Math.max(-1.7, Math.min(1.7, rel)) / 1.75) * (W / 2)) + 'px';
+      extra += '  📍 ' + Math.round(Math.hypot(dx, dz)) + ' m' + (Math.abs(rel) > 1.75 ? (rel > 0 ? ' →' : ' ←') : '');
+    } else this.cmpPin.style.display = 'none';
     const txt = Math.floor(pos.x) + ', ' + Math.floor(pos.y) + ', ' + Math.floor(pos.z) + extra;
     if (this._coord !== txt) { this._coord = txt; $('coords').textContent = txt; }
   }
@@ -734,6 +753,70 @@ export class UI {
       info.textContent = 'Schuif de blokjes tot ze op volgorde staan: 1, 2, 3 bovenaan en het lege vakje rechtsonder.';
     }
     this.open('puzzel', '🧩 Puzzel van kamer ' + m.kamer, b);
+  }
+
+  // ---------- de wereldkaart ----------
+
+  // De server stuurt een raster van kleurnummers en hoogtes; hier wordt er een plaatje van
+  // gemaakt. Tik op de kaart om een markering te zetten: die staat daarna op je kompas.
+  openMap(m) {
+    const g = this.g, N = m.n, STEPS = [4, 12, 32, 80];
+    const send = (o) => g.net.send(Object.assign({ t: 'kaart', x: m.x, z: m.z, stap: m.stap }, o));
+    const b = el('div', 'kaart');
+    const half = N / 2 * m.stap;
+    b.appendChild(el('p', 'hint', m.wereld + ' · je ziet ' + (2 * half) + ' bij ' + (2 * half) + ' blokken. Tik op de kaart om een markering te zetten; je kompas wijst er dan naartoe.'));
+    const cv = el('canvas'); cv.width = cv.height = N * 4;
+    b.appendChild(cv);
+    const c = cv.getContext('2d');
+    // het land: kleur per soort grond, lichter naarmate het hoger ligt, met een schaduwrandje op hellingen
+    const img = c.createImageData(N, N), d = img.data;
+    for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+      const q = i + j * N, kl = MAP_COLORS[m.k[q]] || MAP_COLORS[8], h = m.h[q];
+      let f = m.k[q] <= 3 ? 1 : 0.72 + Math.min(0.5, (h - 40) / 110);
+      if (m.k[q] > 3 && i > 0 && j > 0) f *= 1 + Math.max(-0.22, Math.min(0.22, (h - m.h[q - 1 - N]) * 0.05));
+      d[q * 4] = Math.min(255, kl[0] * f); d[q * 4 + 1] = Math.min(255, kl[1] * f); d[q * 4 + 2] = Math.min(255, kl[2] * f); d[q * 4 + 3] = 255;
+    }
+    const klein = document.createElement('canvas'); klein.width = klein.height = N; klein.getContext('2d').putImageData(img, 0, 0);
+    c.imageSmoothingEnabled = false;
+    c.drawImage(klein, 0, 0, N * 4, N * 4);
+    // van blokken naar plek op het plaatje
+    const X = (x) => (x - m.x + half) / (2 * half) * cv.width, Z = (z) => (z - m.z + half) / (2 * half) * cv.height;
+    c.textAlign = 'center'; c.textBaseline = 'middle';
+    const ICON = { 0: '🏠', 1: '🏰', 2: '🏰', 3: '⛺', 4: '🏁', 5: '🎡', 6: '🏙️', 7: '✈️', 8: '🗼', 9: '🌿', 10: '🏛️', 20: '🌳', 21: '🚀' };
+    for (const [code, sx, sz, name] of m.sites) {
+      if (Math.abs(sx - m.x) > half || Math.abs(sz - m.z) > half) continue;
+      const groot = code === 6 || code === 7 || code >= 20;
+      if (m.stap >= 80 && !groot && code !== 1 && code !== 2 && code !== 0) continue;        // op de grootste kaart alleen de belangrijkste plekken
+      c.font = (groot ? 22 : m.stap >= 80 ? 11 : 16) + 'px sans-serif';
+      c.fillText(ICON[code] || '•', X(sx), Z(sz));
+      if (name && (groot || m.stap <= 12)) { c.font = 'bold 11px sans-serif'; c.lineWidth = 3; c.strokeStyle = 'rgba(0,0,0,0.75)'; c.strokeText(name, X(sx), Z(sz) + 16); c.fillStyle = '#fff'; c.fillText(name, X(sx), Z(sz) + 16); }
+    }
+    if (m.mark) { c.font = '26px sans-serif'; c.fillText('📍', X(m.mark.x), Z(m.mark.z) - 10); }
+    // de speler: een pijltje in de kijkrichting
+    if (Math.abs(m.px - m.x) < half && Math.abs(m.pz - m.z) < half) {
+      c.save(); c.translate(X(m.px), Z(m.pz)); c.rotate(-m.yaw);
+      c.fillStyle = '#ff3030'; c.strokeStyle = '#fff'; c.lineWidth = 2;
+      c.beginPath(); c.moveTo(0, -11); c.lineTo(8, 9); c.lineTo(0, 4); c.lineTo(-8, 9); c.closePath(); c.fill(); c.stroke();
+      c.restore();
+    }
+    tap(cv, (ev) => {
+      const r = cv.getBoundingClientRect(), t = ev && ev.changedTouches ? ev.changedTouches[0] : ev;
+      if (!t || t.clientX === undefined) return;
+      const mx = m.x - half + (t.clientX - r.left) / r.width * 2 * half, mz = m.z - half + (t.clientY - r.top) / r.height * 2 * half;
+      send({ c: 'mark', mx, mz });
+    });
+    // knoppen: in- en uitzoomen, schuiven, terug naar jezelf, markering weghalen
+    const rij = el('div', 'btnrow');
+    const knop = (tekst, fn, aan = true) => { const k = el('button', 'btn small' + (aan ? ' active' : ''), tekst); tap(k, () => { if (aan) fn(); }); rij.appendChild(k); };
+    const si = STEPS.indexOf(m.stap);
+    knop('➕ Dichterbij', () => send({ stap: STEPS[si - 1] }), si > 0);
+    knop('➖ Verder weg', () => send({ stap: STEPS[si + 1] }), si < STEPS.length - 1);
+    knop('⬆️', () => send({ z: m.z - half })); knop('⬇️', () => send({ z: m.z + half })); knop('⬅️', () => send({ x: m.x - half })); knop('➡️', () => send({ x: m.x + half }));
+    knop('🧭 Naar mij', () => g.net.send({ t: 'kaart', stap: m.stap }));
+    if (m.mark) { knop('📍 Naar markering', () => send({ x: m.mark.x, z: m.mark.z })); knop('❌ Markering weg', () => send({ c: 'wis' })); }
+    b.appendChild(rij);
+    b.appendChild(el('p', 'hint', '🔴 pijltje = jij · 📍 = je markering · noorden is boven' + (m.mark ? ' · markering op ' + m.mark.x + ', ' + m.mark.z : '')));
+    this.open('kaart', '🗺️ Kaart', b, true);
   }
 
   // ---------- de fabrieksmachine ----------
