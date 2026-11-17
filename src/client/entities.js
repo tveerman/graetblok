@@ -4,12 +4,14 @@ import { MOBS, PROJ, dragonScale } from '../shared/mobs.js';
 import { buildModel, animate, setDragonGrowth, wagonModel } from './models.js';
 import { railAt, railDirOf, railTrace } from '../shared/rails.js';
 import { glowTex, nameTex } from './textures.js';
+import { BoxBatch } from './boxbatch.js';
 
 const DELAY = 0.12;   // we tonen wezens een klein beetje in het verleden, dat oogt vloeiend
 
 export class Entities {
-  constructor(scene, particles) {
+  constructor(scene, particles, renderer) {
     this.scene = scene;
+    this.batch = renderer ? new BoxBatch(scene, renderer) : null;      // alle doosjes van alle wezens in één tekenopdracht
     this.particles = particles;
     this.map = new Map();
     this.projs = new Map();
@@ -27,6 +29,7 @@ export class Entities {
   clear() {
     for (const e of this.map.values()) { this.scene.remove(e.group); if (e.wagons) for (const w of e.wagons) this.scene.remove(w); }
     this.map.clear();
+    if (this.batch) this.batch.clear();
     for (const p of this.projs.values()) this.scene.remove(p.obj);
     this.projs.clear();
     this.ridden = 0;
@@ -40,6 +43,7 @@ export class Entities {
     group.position.set(m.x, m.y, m.z);
     group.rotation.y = m.yaw;
     this.scene.add(group);
+    if (this.batch) this.batch.adopt(group);
     const e = {
       id: m.id, kind: m.k, def, group, scale: m.s, rc: m.rc || 0, owner: m.o || null, dtype: m.d || null, name: m.n || null, growth: m.g || 0,
       px: m.x, py: m.y, pz: m.z, pyaw: m.yaw, pt: this.clock,
@@ -83,15 +87,17 @@ export class Entities {
       g.scale.copy(e.group.scale); g.position.copy(e.group.position); g.rotation.copy(e.group.rotation);
       if (e.tag) { e.group.remove(e.tag); g.add(e.tag); }
       if (e.bar) { e.group.remove(e.bar); g.add(e.bar); }
-      this.scene.remove(e.group); this.scene.add(g); e.group = g;
+      this.scene.remove(e.group); this.scene.add(g);
+      if (this.batch) { this.batch.release(e.group); this.batch.adopt(g); }
+      e.group = g;
     }
   }
 
   // ---------- treinen: de wagons rijden achter de locomotief aan ----------
 
   setWagons(e, n) {
-    while (e.wagons.length > n) this.scene.remove(e.wagons.pop());
-    while (e.wagons.length < n) { const w = wagonModel(e.wagons.length); w.rotation.order = 'YXZ'; this.scene.add(w); e.wagons.push(w); }
+    while (e.wagons.length > n) { const w = e.wagons.pop(); this.scene.remove(w); if (this.batch) this.batch.release(w); }
+    while (e.wagons.length < n) { const w = wagonModel(e.wagons.length); w.rotation.order = 'YXZ'; this.scene.add(w); if (this.batch) this.batch.adopt(w); e.wagons.push(w); }
     e.trail = null;
   }
 
@@ -144,7 +150,8 @@ export class Entities {
     const e = this.map.get(id);
     if (!e) return;
     this.scene.remove(e.group);
-    if (e.wagons) for (const w of e.wagons) this.scene.remove(w);
+    if (this.batch) this.batch.release(e.group);
+    if (e.wagons) for (const w of e.wagons) { this.scene.remove(w); if (this.batch) this.batch.release(w); }
     this.map.delete(id);
   }
 

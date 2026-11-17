@@ -479,7 +479,16 @@ export class Renderer {
     }
   }
 
-  render() { this.r.render(this.scene, this.camera); }
+  render() {
+    // Eerst rekenen we zelf uit waar alles staat, dan lezen we de doosjes van de wezens af
+    // (zie boxbatch.js) en pas dan tekent three.js, zonder dat rekenwerk nog eens te doen.
+    const s = this.scene;
+    s.updateMatrixWorld();
+    if (this.batch) this.batch.update();
+    s.matrixWorldAutoUpdate = false;
+    this.r.render(s, this.camera);
+    s.matrixWorldAutoUpdate = true;
+  }
 }
 
 function id_vuur(w) { return w === 'vuur'; }

@@ -45,7 +45,8 @@ class Game {
     // meting voor het pauzemenu: waar gaat de tijd van een beeld heen? (zie perfText)
     this.perf = { k: 0, n: 0, bouw: 0, spel: 0, teken: 0, traag: 0, lang: 0, text: '' };
     this.particles = new Particles(this.R.scene);
-    this.ents = new Entities(this.R.scene, this.particles);
+    this.ents = new Entities(this.R.scene, this.particles, this.R.r);
+    this.R.batch = this.ents.batch;
     this.ents.blocks = this.world;
     this.sky = new Weather(this.R.scene, this.world, touch);        // regen, sneeuw en onweer
     this.sites = [];                                                // dorpen en kastelen in de buurt (voor het kompas)

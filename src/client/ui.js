@@ -165,7 +165,9 @@ export class UI {
   frame(yaw, pos, worldId, sites) {
     const heading = -yaw;
     const strip = $('compassStrip');
-    const W = strip.clientWidth || 300;
+    // de breedte opvragen dwingt de browser de hele pagina opnieuw op te maken: alleen als het venster verandert
+    if (!this._cmpW) { this._cmpW = strip.clientWidth || 300; if (!this._cmpL) { this._cmpL = true; window.addEventListener('resize', () => { this._cmpW = 0; }); } }
+    const W = this._cmpW;
     const place = (node, bearing) => {
       let rel = bearing - heading;
       while (rel > Math.PI) rel -= 2 * Math.PI; while (rel < -Math.PI) rel += 2 * Math.PI;

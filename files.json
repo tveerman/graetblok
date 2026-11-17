@@ -6,6 +6,7 @@
   "vendor/three.module.min.js",
   "src/client/audio.js",
   "src/client/blockmodels.js",
+  "src/client/boxbatch.js",
   "src/client/chunks.js",
   "src/client/entities.js",
   "src/client/input.js",

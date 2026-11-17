@@ -523,6 +523,30 @@ unchanged and remains the default. There are still no real shadows or post-proce
 - One draw call per chunk and pass, no shadows; lighting is baked into vertices and day/night
   is a single uniform.
 - World generation and creature simulation run in the worker, off the render thread.
+- **Creatures are drawn in two draw calls** (`src/client/boxbatch.js`). A creature is built
+  from boxes (a cow 23, a dragon 42) and each box used to be its own draw call, a head with a
+  face even six; a village cost 300 to 500 calls for a few thousand triangles. Now every plain
+  box of every creature goes into one of two instanced lists (lit boxes with a skin, and
+  glowing boxes). The models and their animation are unchanged: each frame the batch reads
+  where every box is (`matrixWorld`) and three.js skips the box itself (`layers.mask = 0`).
+  The skins live together on one 1024 px atlas; a new skin is uploaded as one small tile.
+  Wings, wheels and see-through ghosts are still drawn the old way. Measured at the same
+  spot in a village with 36 creatures: 433 calls before, 127 after (iPad simulator, Safari:
+  338-382 before, 131-137 after).
+- **Keep the chunk mesher in small functions.** `mesh()` in `src/client/chunks.js` used to be
+  one function of 350 lines. Safari's JavaScript engine kept throwing its optimised version
+  away and ran it in the slowest compiled tier: 3.4 ms per chunk, against 0.4 ms in Chrome.
+  Split into one function per step and per block shape it takes 0.21 ms in the same engine
+  (0.33 ms measured inside Safari in the simulator), with byte-identical geometry. Check
+  with `jsc --sample` (see below) after changing the mesher; a line like
+  `Baseline: 86%` in the tier breakdown means the same thing happened again.
+- The server tick is not a bottleneck: 0.01 to 0.02 ms per tick with 14 to 39 creatures
+  (start, village, city, airport, fairground, castle), measured in the same engine.
+- Measuring without an iPad: macOS ships Safari's engine as a command line tool,
+  `/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc`. `jsc -m
+  file.mjs` runs a module that imports `src/client/chunks.js` or `src/server/server.js`
+  (the vendored three.js loads without a page), and `--sample` prints the hottest functions
+  and in which tier they ran.
 - "Mooie graphics" costs two texture lookups and per-pixel lighting for every block pixel, and
   about 50 MB of texture memory; the pause menu shows the frame rate and resolution so you
   can see what a device can handle.

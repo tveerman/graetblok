@@ -119,6 +119,371 @@ class Buf {
 const bufs = [new Buf(16384), new Buf(8192), new Buf(4096)];
 let DET = new Uint32Array(8192);     // de driehoeken van fijne plantonderdelen (zie de mesher)
 
+// ---------- de mesher ----------
+// De mesher is in losse, kleine functies geknipt. Dat is niet alleen voor de leesbaarheid: de
+// JavaScript-motor van Safari (op de iPad) maakt van één heel grote functie geen snelle code,
+// en dan duurt het opbouwen van een chunk acht keer zo lang. Houd deze functies dus klein.
+const NB = [];            // de negen chunks rond de chunk die we opbouwen (of undefined)
+let DETN = 0;             // hoeveel driehoek-nummers van fijne plantonderdelen er in DET staan
+
+// 1. blokken met een randje van de buren kopiëren; geeft de hoogste laag die we moeten bekijken
+function fillPad(world, c) {
+  const { cx, cz } = c;
+  pad.fill(0);
+  let maxY = c.maxY;
+  const nb = NB; nb.length = 0;
+  for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) {
+    const n = (dx || dz) ? world.get(cx + dx, cz + dz) : c;
+    nb.push(n);
+    if (n && n.maxY > maxY) maxY = n.maxY;
+  }
+  maxY = Math.min(CH - 1, maxY + 1);
+  for (let px = 0; px < PW; px++) {
+    const wx = px - 1, ncx = wx < 0 ? 0 : (wx > 15 ? 2 : 1), lx = wx & 15;
+    for (let pz = 0; pz < PW; pz++) {
+      const wz = pz - 1, ncz = wz < 0 ? 0 : (wz > 15 ? 2 : 1), lz = wz & 15;
+      const n = nb[ncx * 3 + ncz];
+      const o = (px * PW + pz) * PH;
+      pad[o] = B.oergesteente;
+      if (!n) continue;
+      const src = idx(lx, 0, lz);
+      const top = Math.min(maxY, n.maxY);
+      for (let y = 0; y <= top; y++) pad[o + 1 + y] = n.b[src + y];
+    }
+  }
+  return maxY;
+}
+
+// 2. zonlicht: per kolom de "hoogte waar het licht vandaan komt"
+function sunHeights() {
+  const nb = NB;
+  for (let ex = 0; ex < 26; ex++) for (let ez = 0; ez < 26; ez++) {
+    const wx = ex - 5, wz = ez - 5;
+    const n = nb[(wx < 0 ? 0 : (wx > 15 ? 2 : 1)) * 3 + (wz < 0 ? 0 : (wz > 15 ? 2 : 1))];
+    EFF[ex * 26 + ez] = n ? n.hm[(wx & 15) * 16 + (wz & 15)] + 1 : 32000;
+  }
+  for (let ex = 0; ex < 26; ex++) for (let ez = 0; ez < 26; ez++) if (EFF[ex * 26 + ez] === 32000) {
+    const cxx = Math.min(20, Math.max(5, ex)), czz = Math.min(20, Math.max(5, ez));
+    EFF[ex * 26 + ez] = EFF[cxx * 26 + czz];
+  }
+  let A = EFF, Bf = EFF2;
+  for (let it = 0; it < 4; it++) {
+    for (let ex = 0; ex < 26; ex++) for (let ez = 0; ez < 26; ez++) {
+      const i = ex * 26 + ez;
+      let v = A[i];
+      if (ex > 0 && A[i - 26] + 2 < v) v = A[i - 26] + 2;
+      if (ex < 25 && A[i + 26] + 2 < v) v = A[i + 26] + 2;
+      if (ez > 0 && A[i - 1] + 2 < v) v = A[i - 1] + 2;
+      if (ez < 25 && A[i + 1] + 2 < v) v = A[i + 1] + 2;
+      Bf[i] = v;
+    }
+    const t = A; A = Bf; Bf = t;
+  }
+  return A;   // E[(px+4)*26 + (pz+4)] hoort bij pad-kolom (px, pz)
+}
+
+// 3. licht van fakkels, kristallen, lava...; geeft terug of er zulk licht is
+function blockLight() {
+  const nb = NB;
+  let hasBL = false;
+  for (let k = 0; k < 9; k++) {
+    const n = nb[k];
+    if (!n || !n.emit.length) continue;
+    const ox = (Math.floor(k / 3) - 1) * 16, oz = (k % 3 - 1) * 16;
+    const em = n.emit;
+    for (let i = 0; i < em.length; i += 4) {
+      const ex = em[i] + ox, ey = em[i + 1], ez = em[i + 2] + oz, L = em[i + 3];
+      const r = Math.ceil(L / 2);
+      if (ex + r < -1 || ex - r > 16 || ez + r < -1 || ez - r > 16) continue;
+      if (!hasBL) { BL.fill(0); hasBL = true; }
+      const x0 = Math.max(-1, ex - r), x1 = Math.min(16, ex + r), z0 = Math.max(-1, ez - r), z1 = Math.min(16, ez + r);
+      const y0 = Math.max(0, ey - r), y1 = Math.min(CH - 1, ey + r);
+      for (let x = x0; x <= x1; x++) for (let z = z0; z <= z1; z++) {
+        const o = ((x + 1) * PW + (z + 1)) * PH + 1;
+        const dxz = (x - ex) * (x - ex) + (z - ez) * (z - ez);
+        for (let y = y0; y <= y1; y++) {
+          const v = L - 2 * Math.sqrt(dxz + (y - ey) * (y - ey));
+          if (v > BL[o + y]) BL[o + y] = v;
+        }
+      }
+    }
+  }
+  return hasBL;
+}
+
+// 4. de vlakken van één blok, per vorm een functie
+function cubeAt(x, y, z, p, id, col, E, hasBL, uvT) {
+  const pass = B_PASS[id];
+  const buf = bufs[pass];
+  const selfL = LIGHT[id];
+  const gl = pass === 2 ? 0 : GLOW[id] * 4, sw = pass === 2 ? 0 : SWAY[id];
+  for (let f = 0; f < 6; f++) {
+    const np = p + NSTR[f];
+    const nid = pad[np];
+    if (B_OPAQUE[nid]) continue;
+    if (nid === id && pass !== 0) continue;
+    // licht in het vakje vóór dit vlak
+    const ncol = col + CSTR[f], ny = y + YOFF[f];
+    const ecol = (((ncol / PW) | 0) + 4) * 26 + (ncol % PW) + 4;
+    let sl = 15 - (E[ecol] - ny);
+    if (sl > 15) sl = 15; else if (sl < 0) sl = 0;
+    let bl = hasBL ? BL[np] : 0;
+    if (selfL > bl) bl = selfL;
+    const sh = SHADE[f], ls = HQ_MESH ? 1 : sh;
+    const sky = SKY_LUT[sl] * ls * 255, blk = BLK_LUT[bl] * ls * 255, amb = sh * 255;
+    const tile = f === 2 ? T_TOP[id] : (f === 3 ? T_BOTTOM[id] : T_SIDE[id]);
+    const u0 = uvT[tile * 4], v0 = uvT[tile * 4 + 1], du = uvT[tile * 4 + 2] - u0, dv = uvT[tile * 4 + 3] - v0;
+    buf.need(4);
+    const nv = buf.nv;
+    let a0 = 3, a1 = 3, a2 = 3, a3 = 3;
+    for (let k = 0; k < 4; k++) {
+      const fk = f * 4 + k;
+      const s1 = B_OPAQUE[pad[np + AO1[fk]]], s2 = B_OPAQUE[pad[np + AO2[fk]]];
+      const ao = (s1 && s2) ? 0 : 3 - s1 - s2 - B_OPAQUE[pad[np + AO1[fk] + AO2[fk]]];
+      if (k === 0) a0 = ao; else if (k === 1) a1 = ao; else if (k === 2) a2 = ao; else a3 = ao;
+      const af = AO_F[ao];
+      const vi = nv + k;
+      buf.pos[vi * 3] = x + FC[fk * 3]; buf.pos[vi * 3 + 1] = y + FC[fk * 3 + 1]; buf.pos[vi * 3 + 2] = z + FC[fk * 3 + 2];
+      buf.uv[vi * 2] = u0 + FUV[fk * 2] * du; buf.uv[vi * 2 + 1] = v0 + FUV[fk * 2 + 1] * dv;
+      buf.light[vi * 4] = sky * af; buf.light[vi * 4 + 1] = blk * af; buf.light[vi * 4 + 2] = amb * af;
+      buf.light[vi * 4 + 3] = (gl ? Math.round(gl * (0.7 + 0.3 * sh * af)) : 0) + sw;
+    }
+    const ni = buf.ni;
+    if (a0 + a2 >= a1 + a3) {
+      buf.idx[ni] = nv; buf.idx[ni + 1] = nv + 1; buf.idx[ni + 2] = nv + 2; buf.idx[ni + 3] = nv; buf.idx[ni + 4] = nv + 2; buf.idx[ni + 5] = nv + 3;
+    } else {
+      buf.idx[ni] = nv + 1; buf.idx[ni + 1] = nv + 2; buf.idx[ni + 2] = nv + 3; buf.idx[ni + 3] = nv + 1; buf.idx[ni + 4] = nv + 3; buf.idx[ni + 5] = nv;
+    }
+    buf.nv += 4; buf.ni += 6;
+  }
+}
+
+// laag blok (bed): lager dan een heel blok; het hoofdeind krijgt een plank die omhoog steekt
+function lowAt(x, y, z, p, id, col, E, hasBL, uvT) {
+  const buf = bufs[0];
+  const h = B_HEIGHT[id];
+  const bed = B_BED[id];
+  const dir = bed ? (bed - 1) & 3 : 3;
+  const endFace = bed > 4 ? DIR_FACE[dir] : -1;
+  const ownE = (x + 5) * 26 + z + 5;
+  for (let f = 0; f < 6; f++) {
+    const np = p + NSTR[f];
+    const nid = pad[np];
+    if (f !== 2) {
+      if (B_OPAQUE[nid]) continue;
+      if (f !== 3 && B_SHAPE[nid] === SHAPE_LOW) continue;      // twee helften sluiten op elkaar aan
+    }
+    let sl, bl;
+    if (f === 2) { sl = 15 - (E[ownE] - y); bl = hasBL ? BL[p] : 0; }
+    else {
+      const ncol = col + CSTR[f];
+      sl = 15 - (E[(((ncol / PW) | 0) + 4) * 26 + (ncol % PW) + 4] - (y + YOFF[f]));
+      bl = hasBL ? BL[np] : 0;
+    }
+    if (sl > 15) sl = 15; else if (sl < 0) sl = 0;
+    const sh = SHADE[f], ls = HQ_MESH ? 1 : sh;
+    const sky = SKY_LUT[sl] * ls * 255, blk = BLK_LUT[bl] * ls * 255, amb = sh * 255;
+    const fh = f === endFace ? 1 : h;
+    const tile = f === 2 ? T_TOP[id] : (f === 3 ? T_BOTTOM[id] : (f === endFace ? T_BED_END : T_SIDE[id]));
+    const u0 = uvT[tile * 4], v0 = uvT[tile * 4 + 1], du = uvT[tile * 4 + 2] - u0, dv = uvT[tile * 4 + 3] - v0;
+    buf.need(4);
+    const nv = buf.nv;
+    for (let k = 0; k < 4; k++) {
+      const fk = f * 4 + k, vi = nv + k;
+      const cx = FC[fk * 3], cy = FC[fk * 3 + 1], cz = FC[fk * 3 + 2];
+      let uu = FUV[fk * 2], vv = FUV[fk * 2 + 1];
+      if (f === 2) {
+        // bovenkant draaien: de bovenrand van het plaatje ligt aan de kant van het hoofdeind
+        if (dir === 3) { uu = cx; vv = cz; } else if (dir === 1) { uu = 1 - cx; vv = 1 - cz; }
+        else if (dir === 0) { uu = cz; vv = 1 - cx; } else { uu = 1 - cz; vv = cx; }
+      }
+      buf.pos[vi * 3] = x + cx; buf.pos[vi * 3 + 1] = y + cy * fh; buf.pos[vi * 3 + 2] = z + cz;
+      buf.uv[vi * 2] = u0 + uu * du; buf.uv[vi * 2 + 1] = v0 + vv * dv;
+      buf.light[vi * 4] = sky; buf.light[vi * 4 + 1] = blk; buf.light[vi * 4 + 2] = amb; buf.light[vi * 4 + 3] = 0;
+    }
+    const ni = buf.ni;
+    buf.idx[ni] = nv; buf.idx[ni + 1] = nv + 1; buf.idx[ni + 2] = nv + 2; buf.idx[ni + 3] = nv; buf.idx[ni + 4] = nv + 2; buf.idx[ni + 5] = nv + 3;
+    buf.nv += 4; buf.ni += 6;
+  }
+  if (endFace >= 0) {
+    // de binnenkant van het hoofdeinde: het stuk plank boven het matras
+    const f = endFace;
+    let sl = 15 - (E[ownE] - y);
+    if (sl > 15) sl = 15; else if (sl < 0) sl = 0;
+    const bl = hasBL ? BL[p] : 0;
+    const sky = SKY_LUT[sl] * 0.8 * 255, blk = BLK_LUT[bl] * 0.8 * 255;
+    const u0 = uvT[T_BED_END * 4], v0 = uvT[T_BED_END * 4 + 1], du = uvT[T_BED_END * 4 + 2] - u0, dv = uvT[T_BED_END * 4 + 3] - v0;
+    buf.need(4);
+    const nv = buf.nv;
+    for (let k = 0; k < 4; k++) {
+      const fk = f * 4 + (3 - k), vi = nv + k;             // omgekeerde volgorde: het vlak kijkt naar binnen
+      buf.pos[vi * 3] = x + FC[fk * 3]; buf.pos[vi * 3 + 1] = y + h + FC[fk * 3 + 1] * (1 - h); buf.pos[vi * 3 + 2] = z + FC[fk * 3 + 2];
+      buf.uv[vi * 2] = u0 + FUV[fk * 2] * du; buf.uv[vi * 2 + 1] = v0 + FUV[fk * 2 + 1] * (1 - h) * dv;
+      buf.light[vi * 4] = sky; buf.light[vi * 4 + 1] = blk; buf.light[vi * 4 + 2] = 204; buf.light[vi * 4 + 3] = 0;
+    }
+    const ni = buf.ni;
+    buf.idx[ni] = nv; buf.idx[ni + 1] = nv + 1; buf.idx[ni + 2] = nv + 2; buf.idx[ni + 3] = nv; buf.idx[ni + 4] = nv + 2; buf.idx[ni + 5] = nv + 3;
+    buf.nv += 4; buf.ni += 6;
+  }
+}
+
+// een rond 3D-ei
+function eggAt(x, y, z, p, id, E, hasBL, uvT) {
+  const buf = bufs[0];
+  const ecol = (x + 5) * 26 + z + 5;
+  let sl = 15 - (E[ecol] - y);
+  if (sl > 15) sl = 15; else if (sl < 0) sl = 0;
+  let bl = hasBL ? BL[p] : 0;
+  if (LIGHT[id] > bl) bl = LIGHT[id];
+  const skyL = SKY_LUT[sl] * 255, blkL = BLK_LUT[bl] * 255;
+  const tile = T_TOP[id];
+  const u0 = uvT[tile * 4], v0 = uvT[tile * 4 + 1], du = uvT[tile * 4 + 2] - u0, dv = uvT[tile * 4 + 3] - v0;
+  buf.need(EGG_SEG * (EGG_RINGS - 1) * 4);
+  for (let j = 0; j < EGG_RINGS - 1; j++) {
+    for (let i = 0; i < EGG_SEG; i++) {
+      const nv = buf.nv;
+      // vier hoeken: (ring, segment), tegen de klok in van buitenaf gezien
+      for (let k = 0; k < 4; k++) {
+        const rj = k < 2 ? j : j + 1, si = (k === 0 || k === 3) ? i + 1 : i;
+        const cs = EGG_COS[si], sn = EGG_SIN[si], r = EGG_R[rj];
+        const dot = cs * EGG_NR[rj] * EGG_LX + EGG_NY[rj] * EGG_LY + sn * EGG_NR[rj] * EGG_LZ;
+        const sh = 0.5 + 0.5 * (dot > 0 ? dot : 0);
+        const vi = nv + k;
+        buf.pos[vi * 3] = x + 0.5 + cs * r; buf.pos[vi * 3 + 1] = y + EGG_Y[rj]; buf.pos[vi * 3 + 2] = z + 0.5 + sn * r;
+        buf.uv[vi * 2] = u0 + (si / EGG_SEG) * du; buf.uv[vi * 2 + 1] = v0 + (1 - rj / (EGG_RINGS - 1)) * dv;
+        buf.light[vi * 4] = skyL * sh; buf.light[vi * 4 + 1] = blkL * sh; buf.light[vi * 4 + 2] = 255 * sh; buf.light[vi * 4 + 3] = 0;
+      }
+      const ni = buf.ni;
+      buf.idx[ni] = nv; buf.idx[ni + 1] = nv + 1; buf.idx[ni + 2] = nv + 2; buf.idx[ni + 3] = nv; buf.idx[ni + 4] = nv + 2; buf.idx[ni + 5] = nv + 3;
+      buf.nv += 4; buf.ni += 6;
+    }
+  }
+}
+
+// Klein ding (plantje, paddenstoel, fakkel, vuur, rank): een 3D-model uit blockmodels.js.
+// Elke plek krijgt zijn eigen draaiing, plekje en hoogte, afgeleid van waar hij staat.
+function crossAt(x, y, z, p, id, E, hasBL, uvT, cx, cz) {
+  const models = BLOCK_MODELS[id];
+  if (!models) return false;
+  const buf = bufs[1];
+  const ecol = (x + 5) * 26 + z + 5;
+  let sl = 15 - (E[ecol] - y);
+  if (sl > 15) sl = 15; else if (sl < 0) sl = 0;
+  let bl = hasBL ? BL[p] : 0;
+  if (LIGHT[id] > bl) bl = LIGHT[id];
+  const sky = SKY_LUT[sl] * 242, blk = BLK_LUT[bl] * 255;
+  const wx = cx * 16 + x, wz = cz * 16 + z;
+  const h1 = hash2(wx, wz, 7001), h2 = hash2(wx, wz, 7002);
+  let M = models[(h1 * models.length) | 0];
+  let cs = 1, sn = 0;
+  if (id === RAILS) {
+    // rails: het stuk (recht, bocht, helling, kruising) hangt af van de rails ernaast
+    for (let d = 0; d < 4; d++) { const np = p + RAIL_STR[d]; RL[d] = pad[np] === RAILS ? 1 : pad[np + 1] === RAILS ? 2 : pad[np - 1] === RAILS ? 3 : 0; }
+    const rs = railShape(RL), q = rs & 3;
+    M = models[rs >> 2];
+    cs = q === 0 ? 1 : q === 2 ? -1 : 0; sn = q === 1 ? 1 : q === 3 ? -1 : 0;
+  } else if (M.rot === 2) { cs = Math.cos(h2 * 6.2832); sn = Math.sin(h2 * 6.2832); }
+  else if (M.rot === 1) { const q = (h2 * 4) | 0; cs = q === 0 ? 1 : q === 2 ? -1 : 0; sn = q === 1 ? 1 : q === 3 ? -1 : 0; }
+  const ox = x + 0.5 + (hash2(wx, wz, 7003) - 0.5) * 2 * M.jit, oz = z + 0.5 + (hash2(wx, wz, 7004) - 0.5) * 2 * M.jit;
+  const sy = 1 + (hash2(wx, wz, 7005) - 0.5) * 2 * M.vary;
+  const gB = GLOW[id];
+  const mp = M.pos, mu = M.uv, mn = M.nrm, mf = M.flags;
+  buf.need(M.n * 4);
+  for (let q = 0; q < M.n; q++) {
+    // hoe licht dit vlak is: van boven lichter, en een beetje afhankelijk van de kant
+    const nx = mn[q * 3], nz = mn[q * 3 + 2];
+    let sh = 0.72 + 0.22 * mn[q * 3 + 1] + 0.1 * ((nx * cs - nz * sn) * 0.75 + (nx * sn + nz * cs) * 0.35);
+    if (sh > 1) sh = 1;
+    const ls = HQ_MESH ? 1 : sh;
+    const tile = M.tile[q];
+    const u0 = uvT[tile * 4], v0 = uvT[tile * 4 + 1], du = uvT[tile * 4 + 2] - u0, dv = uvT[tile * 4 + 3] - v0;
+    const g4 = (M.glow[q] < 0 ? gB : M.glow[q]) * 4;
+    const nv = buf.nv;
+    for (let k = 0; k < 4; k++) {
+      const vi = nv + k, si = q * 4 + k;
+      const px = mp[si * 3] - 0.5, py = mp[si * 3 + 1], pz = mp[si * 3 + 2] - 0.5;
+      buf.pos[vi * 3] = ox + px * cs - pz * sn; buf.pos[vi * 3 + 1] = y + py * sy; buf.pos[vi * 3 + 2] = oz + px * sn + pz * cs;
+      buf.uv[vi * 2] = u0 + mu[si * 2] * du; buf.uv[vi * 2 + 1] = v0 + mu[si * 2 + 1] * dv;
+      const ao = M.ao ? 0.66 + 0.34 * (py > 0.4 ? 1 : py * 2.5) : 1;          // vlak bij de grond wat donkerder
+      buf.light[vi * 4] = sky * ls * ao; buf.light[vi * 4 + 1] = blk * ls * ao; buf.light[vi * 4 + 2] = 242 * sh * ao;
+      buf.light[vi * 4 + 3] = g4 + mf[si];
+    }
+    if (q < M.lod) {
+      const ni = buf.ni;
+      buf.idx[ni] = nv; buf.idx[ni + 1] = nv + 1; buf.idx[ni + 2] = nv + 2; buf.idx[ni + 3] = nv; buf.idx[ni + 4] = nv + 2; buf.idx[ni + 5] = nv + 3;
+      buf.ni += 6;
+    } else {
+      // fijne onderdelen (extra sprieten, besjes): die komen achteraan in de lijst, zodat
+      // we ze voor chunks ver weg kunnen overslaan (zie setDetail)
+      if (DETN + 6 > DET.length) { const d = new Uint32Array(DET.length * 2); d.set(DET); DET = d; }
+      DET[DETN] = nv; DET[DETN + 1] = nv + 1; DET[DETN + 2] = nv + 2; DET[DETN + 3] = nv; DET[DETN + 4] = nv + 2; DET[DETN + 5] = nv + 3;
+      DETN += 6;
+    }
+    buf.nv += 4;
+  }
+  return true;
+}
+
+function liquidAt(x, y, z, p, id, col, E, hasBL, uvT) {
+  const lava = id === B.lava;
+  const buf = bufs[lava ? 0 : 2];
+  const above = pad[p + 1];
+  const hgt = above === id ? 1 : 0.86;
+  for (let f = 0; f < 6; f++) {
+    const np = p + NSTR[f];
+    const nid = pad[np];
+    if (nid === id || B_OPAQUE[nid]) continue;
+    if (f !== 2 && nid !== 0 && B_SHAPE[nid] !== SHAPE_CROSS && B_PASS[nid] === 0) continue;
+    const ncol = col + CSTR[f], ny = y + YOFF[f];
+    const ecol = (((ncol / PW) | 0) + 4) * 26 + (ncol % PW) + 4;
+    let sl = 15 - (E[ecol] - ny);
+    if (sl > 15) sl = 15; else if (sl < 0) sl = 0;
+    const sh = SHADE[f], ls = HQ_MESH ? 1 : sh;
+    const sky = SKY_LUT[sl] * ls * 255;
+    const blk = lava ? 255 : (hasBL ? BLK_LUT[BL[np]] * ls * 255 : 0);
+    const tile = T_TOP[id];
+    const u0 = uvT[tile * 4], v0 = uvT[tile * 4 + 1], du = uvT[tile * 4 + 2] - u0, dv = uvT[tile * 4 + 3] - v0;
+    buf.need(4);
+    const nv = buf.nv;
+    for (let k = 0; k < 4; k++) {
+      const fk = f * 4 + k, vi = nv + k;
+      const cy = FC[fk * 3 + 1];
+      buf.pos[vi * 3] = x + FC[fk * 3]; buf.pos[vi * 3 + 1] = y + cy * hgt; buf.pos[vi * 3 + 2] = z + FC[fk * 3 + 2];
+      buf.uv[vi * 2] = u0 + FUV[fk * 2] * du; buf.uv[vi * 2 + 1] = v0 + FUV[fk * 2 + 1] * dv;
+      buf.light[vi * 4] = sky; buf.light[vi * 4 + 1] = blk; buf.light[vi * 4 + 2] = sh * 255; buf.light[vi * 4 + 3] = (cy && hgt < 1) ? 255 : 0;
+    }
+    const ni = buf.ni;
+    buf.idx[ni] = nv; buf.idx[ni + 1] = nv + 1; buf.idx[ni + 2] = nv + 2; buf.idx[ni + 3] = nv; buf.idx[ni + 4] = nv + 2; buf.idx[ni + 5] = nv + 3;
+    buf.nv += 4; buf.ni += 6;
+  }
+}
+
+// alle blokken van de chunk langs; geeft de laagste en hoogste laag met iets erin (in LOHI)
+const LOHI = [0, 0];
+function emitFaces(cx, cz, maxY, E, hasBL, uvT) {
+  let loY = CH, hiY = 0;
+  for (let x = 0; x < CS; x++) for (let z = 0; z < CS; z++) {
+    const col = (x + 1) * PW + (z + 1);
+    const base = col * PH + 1;
+    for (let y = 1; y <= maxY; y++) {
+      const p = base + y;
+      const id = pad[p];
+      if (id === 0) continue;
+      const shape = B_SHAPE[id];
+      if (shape === SHAPE_CUBE) {
+        // een blok dat aan alle kanten is ingesloten heeft geen enkel zichtbaar vlak
+        if (B_OPAQUE[pad[p + SX]] + B_OPAQUE[pad[p - SX]] + B_OPAQUE[pad[p + 1]] + B_OPAQUE[pad[p - 1]] + B_OPAQUE[pad[p + SZ]] + B_OPAQUE[pad[p - SZ]] !== 6) cubeAt(x, y, z, p, id, col, E, hasBL, uvT);
+      } else if (shape === SHAPE_LOW) lowAt(x, y, z, p, id, col, E, hasBL, uvT);
+      else if (shape === SHAPE_EGG) eggAt(x, y, z, p, id, E, hasBL, uvT);
+      else if (shape === SHAPE_CROSS) { if (!crossAt(x, y, z, p, id, E, hasBL, uvT, cx, cz)) continue; }
+      else if (shape === SHAPE_LIQUID) liquidAt(x, y, z, p, id, col, E, hasBL, uvT);
+      else continue;
+      if (y < loY) loY = y; if (y > hiY) hiY = y;
+    }
+  }
+  LOHI[0] = loY; LOHI[1] = hiY;
+}
+
 export class ChunkWorld {
   constructor(scene, atlas, materials) {
     this.scene = scene;
@@ -297,340 +662,16 @@ export class ChunkWorld {
     return done;
   }
 
-  // ---------- de mesher ----------
-
   mesh(c) {
     const { cx, cz } = c;
-    // 1. blokken met een randje van de buren kopiëren
-    pad.fill(0);
-    let maxY = c.maxY;
-    const nb = [];
-    for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) {
-      const n = (dx || dz) ? this.get(cx + dx, cz + dz) : c;
-      nb.push(n);
-      if (n && n.maxY > maxY) maxY = n.maxY;
-    }
-    maxY = Math.min(CH - 1, maxY + 1);
-    for (let px = 0; px < PW; px++) {
-      const wx = px - 1, ncx = wx < 0 ? 0 : (wx > 15 ? 2 : 1), lx = wx & 15;
-      for (let pz = 0; pz < PW; pz++) {
-        const wz = pz - 1, ncz = wz < 0 ? 0 : (wz > 15 ? 2 : 1), lz = wz & 15;
-        const n = nb[ncx * 3 + ncz];
-        const o = (px * PW + pz) * PH;
-        pad[o] = B.oergesteente;
-        if (!n) continue;
-        const src = idx(lx, 0, lz);
-        const top = Math.min(maxY, n.maxY);
-        for (let y = 0; y <= top; y++) pad[o + 1 + y] = n.b[src + y];
-      }
-    }
-
-    // 2. zonlicht: per kolom de "hoogte waar het licht vandaan komt"
-    for (let ex = 0; ex < 26; ex++) for (let ez = 0; ez < 26; ez++) {
-      const wx = ex - 5, wz = ez - 5;
-      const n = nb[(wx < 0 ? 0 : (wx > 15 ? 2 : 1)) * 3 + (wz < 0 ? 0 : (wz > 15 ? 2 : 1))];
-      EFF[ex * 26 + ez] = n ? n.hm[(wx & 15) * 16 + (wz & 15)] + 1 : 32000;
-    }
-    for (let ex = 0; ex < 26; ex++) for (let ez = 0; ez < 26; ez++) if (EFF[ex * 26 + ez] === 32000) {
-      const cxx = Math.min(20, Math.max(5, ex)), czz = Math.min(20, Math.max(5, ez));
-      EFF[ex * 26 + ez] = EFF[cxx * 26 + czz];
-    }
-    let A = EFF, Bf = EFF2;
-    for (let it = 0; it < 4; it++) {
-      for (let ex = 0; ex < 26; ex++) for (let ez = 0; ez < 26; ez++) {
-        const i = ex * 26 + ez;
-        let v = A[i];
-        if (ex > 0 && A[i - 26] + 2 < v) v = A[i - 26] + 2;
-        if (ex < 25 && A[i + 26] + 2 < v) v = A[i + 26] + 2;
-        if (ez > 0 && A[i - 1] + 2 < v) v = A[i - 1] + 2;
-        if (ez < 25 && A[i + 1] + 2 < v) v = A[i + 1] + 2;
-        Bf[i] = v;
-      }
-      const t = A; A = Bf; Bf = t;
-    }
-    const E = A;   // E[(px+4)*26 + (pz+4)] hoort bij pad-kolom (px, pz)
-
-    // 3. licht van fakkels, kristallen, lava...
-    let hasBL = false;
-    for (let k = 0; k < 9; k++) {
-      const n = nb[k];
-      if (!n || !n.emit.length) continue;
-      const ox = (Math.floor(k / 3) - 1) * 16, oz = (k % 3 - 1) * 16;
-      const em = n.emit;
-      for (let i = 0; i < em.length; i += 4) {
-        const ex = em[i] + ox, ey = em[i + 1], ez = em[i + 2] + oz, L = em[i + 3];
-        const r = Math.ceil(L / 2);
-        if (ex + r < -1 || ex - r > 16 || ez + r < -1 || ez - r > 16) continue;
-        if (!hasBL) { BL.fill(0); hasBL = true; }
-        const x0 = Math.max(-1, ex - r), x1 = Math.min(16, ex + r), z0 = Math.max(-1, ez - r), z1 = Math.min(16, ez + r);
-        const y0 = Math.max(0, ey - r), y1 = Math.min(CH - 1, ey + r);
-        for (let x = x0; x <= x1; x++) for (let z = z0; z <= z1; z++) {
-          const o = ((x + 1) * PW + (z + 1)) * PH + 1;
-          const dxz = (x - ex) * (x - ex) + (z - ez) * (z - ez);
-          for (let y = y0; y <= y1; y++) {
-            const v = L - 2 * Math.sqrt(dxz + (y - ey) * (y - ey));
-            if (v > BL[o + y]) BL[o + y] = v;
-          }
-        }
-      }
-    }
-
-    // 4. vlakken maken
+    const maxY = fillPad(this, c);
+    const E = sunHeights();
+    const hasBL = blockLight();
     for (const b of bufs) b.reset();
-    let detN = 0;
-    const uvT = this.uv;
-    let loY = CH, hiY = 0;
-    for (let x = 0; x < CS; x++) for (let z = 0; z < CS; z++) {
-      const col = (x + 1) * PW + (z + 1);
-      const base = col * PH + 1;
-      for (let y = 1; y <= maxY; y++) {
-        const p = base + y;
-        const id = pad[p];
-        if (id === 0) continue;
-        const shape = B_SHAPE[id];
-        if (shape === SHAPE_CUBE) {
-          const pass = B_PASS[id];
-          const buf = bufs[pass];
-          const selfL = LIGHT[id];
-          const gl = pass === 2 ? 0 : GLOW[id] * 4, sw = pass === 2 ? 0 : SWAY[id];
-          for (let f = 0; f < 6; f++) {
-            const np = p + NSTR[f];
-            const nid = pad[np];
-            if (B_OPAQUE[nid]) continue;
-            if (nid === id && pass !== 0) continue;
-            // licht in het vakje vóór dit vlak
-            const ncol = col + CSTR[f], ny = y + YOFF[f];
-            const ecol = (((ncol / PW) | 0) + 4) * 26 + (ncol % PW) + 4;
-            let sl = 15 - (E[ecol] - ny);
-            if (sl > 15) sl = 15; else if (sl < 0) sl = 0;
-            let bl = hasBL ? BL[np] : 0;
-            if (selfL > bl) bl = selfL;
-            const sh = SHADE[f], ls = HQ_MESH ? 1 : sh;
-            const sky = SKY_LUT[sl] * ls * 255, blk = BLK_LUT[bl] * ls * 255, amb = sh * 255;
-            const tile = f === 2 ? T_TOP[id] : (f === 3 ? T_BOTTOM[id] : T_SIDE[id]);
-            const u0 = uvT[tile * 4], v0 = uvT[tile * 4 + 1], du = uvT[tile * 4 + 2] - u0, dv = uvT[tile * 4 + 3] - v0;
-            buf.need(4);
-            const nv = buf.nv;
-            let a0 = 3, a1 = 3, a2 = 3, a3 = 3;
-            for (let k = 0; k < 4; k++) {
-              const fk = f * 4 + k;
-              const s1 = B_OPAQUE[pad[np + AO1[fk]]], s2 = B_OPAQUE[pad[np + AO2[fk]]];
-              const ao = (s1 && s2) ? 0 : 3 - s1 - s2 - B_OPAQUE[pad[np + AO1[fk] + AO2[fk]]];
-              if (k === 0) a0 = ao; else if (k === 1) a1 = ao; else if (k === 2) a2 = ao; else a3 = ao;
-              const af = AO_F[ao];
-              const vi = nv + k;
-              buf.pos[vi * 3] = x + FC[fk * 3]; buf.pos[vi * 3 + 1] = y + FC[fk * 3 + 1]; buf.pos[vi * 3 + 2] = z + FC[fk * 3 + 2];
-              buf.uv[vi * 2] = u0 + FUV[fk * 2] * du; buf.uv[vi * 2 + 1] = v0 + FUV[fk * 2 + 1] * dv;
-              buf.light[vi * 4] = sky * af; buf.light[vi * 4 + 1] = blk * af; buf.light[vi * 4 + 2] = amb * af;
-              buf.light[vi * 4 + 3] = (gl ? Math.round(gl * (0.7 + 0.3 * sh * af)) : 0) + sw;
-            }
-            const ni = buf.ni;
-            if (a0 + a2 >= a1 + a3) {
-              buf.idx[ni] = nv; buf.idx[ni + 1] = nv + 1; buf.idx[ni + 2] = nv + 2; buf.idx[ni + 3] = nv; buf.idx[ni + 4] = nv + 2; buf.idx[ni + 5] = nv + 3;
-            } else {
-              buf.idx[ni] = nv + 1; buf.idx[ni + 1] = nv + 2; buf.idx[ni + 2] = nv + 3; buf.idx[ni + 3] = nv + 1; buf.idx[ni + 4] = nv + 3; buf.idx[ni + 5] = nv;
-            }
-            buf.nv += 4; buf.ni += 6;
-          }
-          if (y < loY) loY = y; if (y > hiY) hiY = y;
-        } else if (shape === SHAPE_LOW) {
-          // laag blok (bed): lager dan een heel blok; het hoofdeind krijgt een plank die omhoog steekt
-          const buf = bufs[0];
-          const h = B_HEIGHT[id];
-          const bed = B_BED[id];
-          const dir = bed ? (bed - 1) & 3 : 3;
-          const endFace = bed > 4 ? DIR_FACE[dir] : -1;
-          const ownE = (x + 5) * 26 + z + 5;
-          for (let f = 0; f < 6; f++) {
-            const np = p + NSTR[f];
-            const nid = pad[np];
-            if (f !== 2) {
-              if (B_OPAQUE[nid]) continue;
-              if (f !== 3 && B_SHAPE[nid] === SHAPE_LOW) continue;      // twee helften sluiten op elkaar aan
-            }
-            let sl, bl;
-            if (f === 2) { sl = 15 - (E[ownE] - y); bl = hasBL ? BL[p] : 0; }
-            else {
-              const ncol = col + CSTR[f];
-              sl = 15 - (E[(((ncol / PW) | 0) + 4) * 26 + (ncol % PW) + 4] - (y + YOFF[f]));
-              bl = hasBL ? BL[np] : 0;
-            }
-            if (sl > 15) sl = 15; else if (sl < 0) sl = 0;
-            const sh = SHADE[f], ls = HQ_MESH ? 1 : sh;
-            const sky = SKY_LUT[sl] * ls * 255, blk = BLK_LUT[bl] * ls * 255, amb = sh * 255;
-            const fh = f === endFace ? 1 : h;
-            const tile = f === 2 ? T_TOP[id] : (f === 3 ? T_BOTTOM[id] : (f === endFace ? T_BED_END : T_SIDE[id]));
-            const u0 = uvT[tile * 4], v0 = uvT[tile * 4 + 1], du = uvT[tile * 4 + 2] - u0, dv = uvT[tile * 4 + 3] - v0;
-            buf.need(4);
-            const nv = buf.nv;
-            for (let k = 0; k < 4; k++) {
-              const fk = f * 4 + k, vi = nv + k;
-              const cx = FC[fk * 3], cy = FC[fk * 3 + 1], cz = FC[fk * 3 + 2];
-              let uu = FUV[fk * 2], vv = FUV[fk * 2 + 1];
-              if (f === 2) {
-                // bovenkant draaien: de bovenrand van het plaatje ligt aan de kant van het hoofdeind
-                if (dir === 3) { uu = cx; vv = cz; } else if (dir === 1) { uu = 1 - cx; vv = 1 - cz; }
-                else if (dir === 0) { uu = cz; vv = 1 - cx; } else { uu = 1 - cz; vv = cx; }
-              }
-              buf.pos[vi * 3] = x + cx; buf.pos[vi * 3 + 1] = y + cy * fh; buf.pos[vi * 3 + 2] = z + cz;
-              buf.uv[vi * 2] = u0 + uu * du; buf.uv[vi * 2 + 1] = v0 + vv * dv;
-              buf.light[vi * 4] = sky; buf.light[vi * 4 + 1] = blk; buf.light[vi * 4 + 2] = amb; buf.light[vi * 4 + 3] = 0;
-            }
-            const ni = buf.ni;
-            buf.idx[ni] = nv; buf.idx[ni + 1] = nv + 1; buf.idx[ni + 2] = nv + 2; buf.idx[ni + 3] = nv; buf.idx[ni + 4] = nv + 2; buf.idx[ni + 5] = nv + 3;
-            buf.nv += 4; buf.ni += 6;
-          }
-          if (endFace >= 0) {
-            // de binnenkant van het hoofdeinde: het stuk plank boven het matras
-            const f = endFace;
-            let sl = 15 - (E[ownE] - y);
-            if (sl > 15) sl = 15; else if (sl < 0) sl = 0;
-            const bl = hasBL ? BL[p] : 0;
-            const sky = SKY_LUT[sl] * 0.8 * 255, blk = BLK_LUT[bl] * 0.8 * 255;
-            const u0 = uvT[T_BED_END * 4], v0 = uvT[T_BED_END * 4 + 1], du = uvT[T_BED_END * 4 + 2] - u0, dv = uvT[T_BED_END * 4 + 3] - v0;
-            buf.need(4);
-            const nv = buf.nv;
-            for (let k = 0; k < 4; k++) {
-              const fk = f * 4 + (3 - k), vi = nv + k;             // omgekeerde volgorde: het vlak kijkt naar binnen
-              buf.pos[vi * 3] = x + FC[fk * 3]; buf.pos[vi * 3 + 1] = y + h + FC[fk * 3 + 1] * (1 - h); buf.pos[vi * 3 + 2] = z + FC[fk * 3 + 2];
-              buf.uv[vi * 2] = u0 + FUV[fk * 2] * du; buf.uv[vi * 2 + 1] = v0 + FUV[fk * 2 + 1] * (1 - h) * dv;
-              buf.light[vi * 4] = sky; buf.light[vi * 4 + 1] = blk; buf.light[vi * 4 + 2] = 204; buf.light[vi * 4 + 3] = 0;
-            }
-            const ni = buf.ni;
-            buf.idx[ni] = nv; buf.idx[ni + 1] = nv + 1; buf.idx[ni + 2] = nv + 2; buf.idx[ni + 3] = nv; buf.idx[ni + 4] = nv + 2; buf.idx[ni + 5] = nv + 3;
-            buf.nv += 4; buf.ni += 6;
-          }
-          if (y < loY) loY = y; if (y > hiY) hiY = y;
-        } else if (shape === SHAPE_EGG) {
-          // een rond 3D-ei
-          const buf = bufs[0];
-          const ecol = (x + 5) * 26 + z + 5;
-          let sl = 15 - (E[ecol] - y);
-          if (sl > 15) sl = 15; else if (sl < 0) sl = 0;
-          let bl = hasBL ? BL[p] : 0;
-          if (LIGHT[id] > bl) bl = LIGHT[id];
-          const skyL = SKY_LUT[sl] * 255, blkL = BLK_LUT[bl] * 255;
-          const tile = T_TOP[id];
-          const u0 = uvT[tile * 4], v0 = uvT[tile * 4 + 1], du = uvT[tile * 4 + 2] - u0, dv = uvT[tile * 4 + 3] - v0;
-          buf.need(EGG_SEG * (EGG_RINGS - 1) * 4);
-          for (let j = 0; j < EGG_RINGS - 1; j++) {
-            for (let i = 0; i < EGG_SEG; i++) {
-              const nv = buf.nv;
-              // vier hoeken: (ring, segment), tegen de klok in van buitenaf gezien
-              for (let k = 0; k < 4; k++) {
-                const rj = k < 2 ? j : j + 1, si = (k === 0 || k === 3) ? i + 1 : i;
-                const cs = EGG_COS[si], sn = EGG_SIN[si], r = EGG_R[rj];
-                const dot = cs * EGG_NR[rj] * EGG_LX + EGG_NY[rj] * EGG_LY + sn * EGG_NR[rj] * EGG_LZ;
-                const sh = 0.5 + 0.5 * (dot > 0 ? dot : 0);
-                const vi = nv + k;
-                buf.pos[vi * 3] = x + 0.5 + cs * r; buf.pos[vi * 3 + 1] = y + EGG_Y[rj]; buf.pos[vi * 3 + 2] = z + 0.5 + sn * r;
-                buf.uv[vi * 2] = u0 + (si / EGG_SEG) * du; buf.uv[vi * 2 + 1] = v0 + (1 - rj / (EGG_RINGS - 1)) * dv;
-                buf.light[vi * 4] = skyL * sh; buf.light[vi * 4 + 1] = blkL * sh; buf.light[vi * 4 + 2] = 255 * sh; buf.light[vi * 4 + 3] = 0;
-              }
-              const ni = buf.ni;
-              buf.idx[ni] = nv; buf.idx[ni + 1] = nv + 1; buf.idx[ni + 2] = nv + 2; buf.idx[ni + 3] = nv; buf.idx[ni + 4] = nv + 2; buf.idx[ni + 5] = nv + 3;
-              buf.nv += 4; buf.ni += 6;
-            }
-          }
-          if (y < loY) loY = y; if (y > hiY) hiY = y;
-        } else if (shape === SHAPE_CROSS) {
-          // Klein ding (plantje, paddenstoel, fakkel, vuur, rank): een 3D-model uit blockmodels.js.
-          // Elke plek krijgt zijn eigen draaiing, plekje en hoogte, afgeleid van waar hij staat.
-          const models = BLOCK_MODELS[id];
-          if (!models) continue;
-          const buf = bufs[1];
-          const ecol = (x + 5) * 26 + z + 5;
-          let sl = 15 - (E[ecol] - y);
-          if (sl > 15) sl = 15; else if (sl < 0) sl = 0;
-          let bl = hasBL ? BL[p] : 0;
-          if (LIGHT[id] > bl) bl = LIGHT[id];
-          const sky = SKY_LUT[sl] * 242, blk = BLK_LUT[bl] * 255;
-          const wx = cx * 16 + x, wz = cz * 16 + z;
-          const h1 = hash2(wx, wz, 7001), h2 = hash2(wx, wz, 7002);
-          let M = models[(h1 * models.length) | 0];
-          let cs = 1, sn = 0;
-          if (id === RAILS) {
-            // rails: het stuk (recht, bocht, helling, kruising) hangt af van de rails ernaast
-            for (let d = 0; d < 4; d++) { const np = p + RAIL_STR[d]; RL[d] = pad[np] === RAILS ? 1 : pad[np + 1] === RAILS ? 2 : pad[np - 1] === RAILS ? 3 : 0; }
-            const rs = railShape(RL), q = rs & 3;
-            M = models[rs >> 2];
-            cs = q === 0 ? 1 : q === 2 ? -1 : 0; sn = q === 1 ? 1 : q === 3 ? -1 : 0;
-          } else if (M.rot === 2) { cs = Math.cos(h2 * 6.2832); sn = Math.sin(h2 * 6.2832); }
-          else if (M.rot === 1) { const q = (h2 * 4) | 0; cs = q === 0 ? 1 : q === 2 ? -1 : 0; sn = q === 1 ? 1 : q === 3 ? -1 : 0; }
-          const ox = x + 0.5 + (hash2(wx, wz, 7003) - 0.5) * 2 * M.jit, oz = z + 0.5 + (hash2(wx, wz, 7004) - 0.5) * 2 * M.jit;
-          const sy = 1 + (hash2(wx, wz, 7005) - 0.5) * 2 * M.vary;
-          const gB = GLOW[id];
-          const mp = M.pos, mu = M.uv, mn = M.nrm, mf = M.flags;
-          buf.need(M.n * 4);
-          for (let q = 0; q < M.n; q++) {
-            // hoe licht dit vlak is: van boven lichter, en een beetje afhankelijk van de kant
-            const nx = mn[q * 3], nz = mn[q * 3 + 2];
-            let sh = 0.72 + 0.22 * mn[q * 3 + 1] + 0.1 * ((nx * cs - nz * sn) * 0.75 + (nx * sn + nz * cs) * 0.35);
-            if (sh > 1) sh = 1;
-            const ls = HQ_MESH ? 1 : sh;
-            const tile = M.tile[q];
-            const u0 = uvT[tile * 4], v0 = uvT[tile * 4 + 1], du = uvT[tile * 4 + 2] - u0, dv = uvT[tile * 4 + 3] - v0;
-            const g4 = (M.glow[q] < 0 ? gB : M.glow[q]) * 4;
-            const nv = buf.nv;
-            for (let k = 0; k < 4; k++) {
-              const vi = nv + k, si = q * 4 + k;
-              const px = mp[si * 3] - 0.5, py = mp[si * 3 + 1], pz = mp[si * 3 + 2] - 0.5;
-              buf.pos[vi * 3] = ox + px * cs - pz * sn; buf.pos[vi * 3 + 1] = y + py * sy; buf.pos[vi * 3 + 2] = oz + px * sn + pz * cs;
-              buf.uv[vi * 2] = u0 + mu[si * 2] * du; buf.uv[vi * 2 + 1] = v0 + mu[si * 2 + 1] * dv;
-              const ao = M.ao ? 0.66 + 0.34 * (py > 0.4 ? 1 : py * 2.5) : 1;          // vlak bij de grond wat donkerder
-              buf.light[vi * 4] = sky * ls * ao; buf.light[vi * 4 + 1] = blk * ls * ao; buf.light[vi * 4 + 2] = 242 * sh * ao;
-              buf.light[vi * 4 + 3] = g4 + mf[si];
-            }
-            if (q < M.lod) {
-              const ni = buf.ni;
-              buf.idx[ni] = nv; buf.idx[ni + 1] = nv + 1; buf.idx[ni + 2] = nv + 2; buf.idx[ni + 3] = nv; buf.idx[ni + 4] = nv + 2; buf.idx[ni + 5] = nv + 3;
-              buf.ni += 6;
-            } else {
-              // fijne onderdelen (extra sprieten, besjes): die komen achteraan in de lijst, zodat
-              // we ze voor chunks ver weg kunnen overslaan (zie setDetail)
-              if (detN + 6 > DET.length) { const d = new Uint32Array(DET.length * 2); d.set(DET); DET = d; }
-              DET[detN] = nv; DET[detN + 1] = nv + 1; DET[detN + 2] = nv + 2; DET[detN + 3] = nv; DET[detN + 4] = nv + 2; DET[detN + 5] = nv + 3;
-              detN += 6;
-            }
-            buf.nv += 4;
-          }
-          if (y < loY) loY = y; if (y > hiY) hiY = y;
-        } else if (shape === SHAPE_LIQUID) {
-          const lava = id === B.lava;
-          const buf = bufs[lava ? 0 : 2];
-          const above = pad[p + 1];
-          const hgt = above === id ? 1 : 0.86;
-          for (let f = 0; f < 6; f++) {
-            const np = p + NSTR[f];
-            const nid = pad[np];
-            if (nid === id || B_OPAQUE[nid]) continue;
-            if (f !== 2 && nid !== 0 && B_SHAPE[nid] !== SHAPE_CROSS && B_PASS[nid] === 0) continue;
-            const ncol = col + CSTR[f], ny = y + YOFF[f];
-            const ecol = (((ncol / PW) | 0) + 4) * 26 + (ncol % PW) + 4;
-            let sl = 15 - (E[ecol] - ny);
-            if (sl > 15) sl = 15; else if (sl < 0) sl = 0;
-            const sh = SHADE[f], ls = HQ_MESH ? 1 : sh;
-            const sky = SKY_LUT[sl] * ls * 255;
-            const blk = lava ? 255 : (hasBL ? BLK_LUT[BL[np]] * ls * 255 : 0);
-            const tile = T_TOP[id];
-            const u0 = uvT[tile * 4], v0 = uvT[tile * 4 + 1], du = uvT[tile * 4 + 2] - u0, dv = uvT[tile * 4 + 3] - v0;
-            buf.need(4);
-            const nv = buf.nv;
-            for (let k = 0; k < 4; k++) {
-              const fk = f * 4 + k, vi = nv + k;
-              const cy = FC[fk * 3 + 1];
-              buf.pos[vi * 3] = x + FC[fk * 3]; buf.pos[vi * 3 + 1] = y + cy * hgt; buf.pos[vi * 3 + 2] = z + FC[fk * 3 + 2];
-              buf.uv[vi * 2] = u0 + FUV[fk * 2] * du; buf.uv[vi * 2 + 1] = v0 + FUV[fk * 2 + 1] * dv;
-              buf.light[vi * 4] = sky; buf.light[vi * 4 + 1] = blk; buf.light[vi * 4 + 2] = sh * 255; buf.light[vi * 4 + 3] = (cy && hgt < 1) ? 255 : 0;
-            }
-            const ni = buf.ni;
-            buf.idx[ni] = nv; buf.idx[ni + 1] = nv + 1; buf.idx[ni + 2] = nv + 2; buf.idx[ni + 3] = nv; buf.idx[ni + 4] = nv + 2; buf.idx[ni + 5] = nv + 3;
-            buf.nv += 4; buf.ni += 6;
-          }
-          if (y < loY) loY = y; if (y > hiY) hiY = y;
-        }
-      }
-    }
+    DETN = 0;
+    emitFaces(cx, cz, maxY, E, hasBL, this.uv);
+    let loY = LOHI[0], hiY = LOHI[1];
+    const detN = DETN;
 
     // 5. naar three.js
     if (hiY < loY) { loY = 0; hiY = 1; }
