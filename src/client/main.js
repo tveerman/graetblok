@@ -20,6 +20,7 @@ import { RIDES } from '../shared/rides.js';
 import { VEHICLES } from '../shared/vehicles.js';
 import { JOBS as WORK } from '../shared/jobs.js';
 import { setCityTime } from './city.js';
+import { Fish } from './fish.js';
 import { Weather } from './weather.js';
 
 const $ = (id) => document.getElementById(id);
@@ -441,6 +442,28 @@ class Game {
     this.sound.play('click', 0.6);
   }
 
+  // Waar sta je? Om de paar tellen kijken we rond: hoeveel bladeren er om je heen hangen
+  // (bos), of je op een grote droge zandvlakte staat (woestijn) en of je in een stad bent.
+  // Daar hangen de geluiden van af: vogels, een ratelslang, een toeterende auto.
+  surroundings(dt) {
+    this.omgT = (this.omgT || 0) - dt;
+    if (this.omg && this.omgT > 0) return this.omg;
+    this.omgT = 2;
+    const p = this.player.pos, w = this.world, py = Math.floor(p.y);
+    let blad = 0, zand = 0, nat = 0;
+    for (let i = 0; i < 24; i++) {
+      const a = i * 2.4, r = 3 + (i % 4) * 3, x = Math.floor(p.x + Math.cos(a) * r), z = Math.floor(p.z + Math.sin(a) * r);
+      for (const dy of [2, 5, 8, 11]) { const id = w.getBlock(x, py + dy, z); if (id > 0 && BLOCKS[id] && BLOCKS[id].key.includes('blad')) { blad++; break; } }
+    }
+    for (let i = 0; i < 9; i++) {
+      const a = i * 0.785, r = i === 8 ? 0 : 7, x = Math.floor(p.x + Math.cos(a) * r), z = Math.floor(p.z + Math.sin(a) * r);
+      for (let y = py + 3; y >= py - 5; y--) { const id = w.getBlock(x, y, z); if (id <= 0) continue; if (id === B.zand) zand++; else if (id === B.water) nat++; break; }
+    }
+    const stad = !!this.sites && this.sites.some((s) => s[0] === 6 && Math.abs(s[1] - p.x) < 90 && Math.abs(s[2] - p.z) < 90);
+    this.omg = { bos: Math.min(1, blad / 9), zand: zand >= 8 && nat === 0, stad };
+    return this.omg;
+  }
+
   // je beroep bepaalt je werkkleding: de kleur van je kleren en een pet
   setJob(job) {
     this.job = job || '';
@@ -650,6 +673,8 @@ class Game {
     } else {
       p.update(dt);
       setCityTime(this.gameTime);
+      if (!this.fish) this.fish = new Fish(this.R.scene, this.world);
+      this.fish.update(dt, p.pos);
       this.ents.update(dt, this.time, p);
       this.sky.update(dt, this.R.camera, this.particles);
       this.weather(dt);
@@ -672,7 +697,8 @@ class Game {
       this.animalSounds(hd);
       const surf = this.world.get(Math.floor(p.pos.x) >> 4, Math.floor(p.pos.z) >> 4);
       const under = surf ? p.pos.y < surf.hm[(Math.floor(p.pos.x) & 15) * 16 + (Math.floor(p.pos.z) & 15)] - 6 : false;
-      this.sound.ambience(hd, { world: this.worldId, under, day: this.R.dayF, flying: !!p.mount && p.mountKind !== 'trein' && p.mountKind !== 'dier' && p.mountKind !== 'auto' && (p.speedNow > 4 || (p.mountKind === 'rit' && p.rideV > 0.12)), rain: Math.max(this.sky.rain, this.sky.snow * 0.25), roof: this.sky.roof });
+      const om = this.surroundings(hd);
+      this.sound.ambience(hd, { world: this.worldId, under, bos: om.bos, zand: om.zand, stad: om.stad, day: this.R.dayF, flying: !!p.mount && p.mountKind !== 'trein' && p.mountKind !== 'dier' && p.mountKind !== 'auto' && (p.speedNow > 4 || (p.mountKind === 'rit' && p.rideV > 0.12)), rain: Math.max(this.sky.rain, this.sky.snow * 0.25), roof: this.sky.roof });
     }
     const t3 = performance.now();
     this.R.render();
@@ -755,6 +781,7 @@ const MOTE_COLORS = {
   vuur: [[1, 0.6, 0.2], [1, 0.9, 0.5], [1, 0.4, 0.6]],
   schaduw: [[0.8, 0.5, 1], [1, 0.5, 0.9], [0.5, 0.7, 1]],
   wolken: [[1, 0.95, 0.6], [1, 1, 1], [1, 0.7, 0.85]],
+  dino: [[0.7, 1, 0.4], [1, 1, 0.6], [0.5, 0.9, 0.5]],
 };
 
 // Het spel starten zodra de pagina er staat. (Dit bestand wordt vanuit index.html geladen met

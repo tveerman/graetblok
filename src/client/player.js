@@ -542,6 +542,18 @@ export class Player {
     // wolkenwereld op 168): er dwars doorheen en erbovenuit.
     const top = (g.worldId === 'wolken' ? 168 : 152) + 46;
     if (this.pos.y > top) { this.pos.y = top; this.vel.y = Math.min(0, this.vel.y); }
+    // Een draak, vliegend dier, helikopter of vliegtuig kan niet door water of lava vliegen:
+    // je blijft er vlak boven hangen.
+    {
+      const wx = Math.floor(this.pos.x), wz = Math.floor(this.pos.z);
+      let wy = Math.floor(this.pos.y - below - 0.05);
+      const nat = (y) => { const id = g.world.getBlock(wx, y, wz); return id > 0 && B_SHAPE[id] === SHAPE_LIQUID; };
+      if (nat(wy)) {
+        while (nat(wy + 1)) wy++;
+        this.pos.y = wy + 1 + below + 0.06;
+        if (this.vel.y < 0) this.vel.y = 0;
+      }
+    }
     this.onGround = false; this.inWater = false;
     this.fallPeak = this.pos.y;
     this.speedNow = Math.hypot(this.vel.x, this.vel.z);

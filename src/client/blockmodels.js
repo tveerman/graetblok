@@ -476,3 +476,4 @@ BLOCK_MODELS[B.spinnenweb] = [spinnenweb()];
 // de gewassen van het Landbouwimperium: twee plaatjes kruislings (weinig driehoeken, dus een
 // groot veld blijft licht voor de tablet)
 for (const k in B) if (k === 'kiem' || k.startsWith('g_')) BLOCK_MODELS[B[k]] = [gewas(k)];
+BLOCK_MODELS[B.varen] = [gewas('varen')];

@@ -14,6 +14,7 @@ const SPAWNS = {
   ijs: [['ijswolf', 3, 'any'], ['pluizel', 2, 'day'], ['ijswolf', 4, 'night'], ['hert', 2, 'day'], ['beer', 1, 'day'], ['schaap', 1, 'day'], ['skelet', 2, 'night'], ['wildedraak', 1, 'sky']],
   vuur: [['vuurgeest', 4, 'any'], ['golem', 2, 'any'], ['skelet', 2, 'any'], ['wildedraak', 1, 'sky']],
   schaduw: [['schim', 3, 'any'], ['kruiper', 3, 'any'], ['pluizel', 2, 'any'], ['spin', 3, 'any'], ['skelet', 2, 'any'], ['wolf', 1, 'any'], ['wildedraak', 1, 'sky']],
+  dino: [['oerraptor', 3, 'any'], ['oertriceratops', 2, 'day'], ['oerstego', 2, 'day'], ['oerbrachio', 1, 'day'], ['oertrex', 1, 'any'], ['pluizel', 2, 'day'], ['oerraptor', 2, 'night'], ['spin', 2, 'cave'], ['wildedraak', 1, 'sky']],
   wolken: [['stormvleugel', 3, 'any'], ['pluizel', 3, 'any'], ['hert', 2, 'any'], ['schaap', 1, 'any'], ['wildedraak', 1, 'sky']],
 };
 // deze wezens doe je geen pijn: dorpelingen, ridders, boomwachters en treinen
@@ -577,7 +578,8 @@ export const entityMethods = {
     if (e.veh) { this.pickVehicle(p, w, e); return; }
     if (FRIEND[e.def.ai]) { if (this.meta.time - (p.sorryT || 0) > 4) { p.sorryT = this.meta.time; this.toast(p, 'Niet slaan! Dat is een vriend.', 'warn'); } return; }
     const s = p.inv[p.sel], it = s && ITEMS[s.id];
-    const dmg = ((it && it.dmg) || 1) + Math.floor(p.level / 5);
+    let dmg = ((it && it.dmg) || 1) + Math.floor(p.level / 5);
+    if (this.meta.trees.dino) dmg = Math.ceil(dmg * 1.3);         // Oerkracht: de kracht van de Oerboom
     this.damageEntity(w, e, dmg, p, e.x - p.x, e.z - p.z);
     if (this.wear(p)) this.sendInv(p);
   },

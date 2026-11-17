@@ -73,6 +73,7 @@ export const vehicleMethods = {
     }
     if (e.rider || p.mount || p.dead) return;
     p.mount = e.id; e.rider = p.id;
+    if (rec.leen) this.toast(p, 'Je leent de ' + (rec.name || V.name).toLowerCase() + ' van de stad. Laat je hem staan, dan rijdt hij vanzelf weer verder.', 'good');
     this.send(p, { t: 'mount', id: e.id, s: 1, k: V.soort === 'lucht' ? 'heli' : 'auto', veh: rec.kind, seat: V.seat, yaw: e.yaw - Math.PI, fuel: rec.fuel, tank: V.tank, dmg: rec.dmg, up: rec.up || {} });
   },
 
@@ -95,6 +96,7 @@ export const vehicleMethods = {
     const s = p.inv[p.sel], it = s && ITEMS[s.id];
     const rec = e.veh, V = VEHICLES[rec.kind];
     if (V.kermis) { this.toast(p, 'De botsauto\'s blijven op de kermis.'); return; }
+    if (rec.leen) { this.toast(p, 'Deze ' + V.name.toLowerCase() + ' is van de stad. Je mag erin rijden, maar niet meenemen.'); return; }
     if (!it || it.tool !== 'pick') { this.toast(p, 'Sla met een houweel op de ' + V.name.toLowerCase() + ' om hem weer mee te nemen.'); return; }
     (p.flags.veh || (p.flags.veh = {}))[rec.kind] = { fuel: Math.round(rec.fuel), dmg: Math.round(rec.dmg), name: rec.name || '', color: rec.color, up: rec.up || {} };
     this.giveLoot(p, I['v_' + rec.kind], 1);

@@ -166,6 +166,10 @@ item(384, 'v_tractor', 'Tractor', { icon: ['car', '#3a9a3a', 'jeep'], veh: 'trac
 item(385, 'v_zaaimachine', 'Zaaimachine', { icon: ['car', '#d8362c', 'jeep'], veh: 'zaaimachine', stack: 1 });
 item(386, 'v_combine', 'Combine', { icon: ['car', '#f0c020', 'truck'], veh: 'combine', stack: 1 });
 item(387, 'verband', 'Verband', { icon: ['gewas', 'knol', '#f4f4f0'], stack: 16 });      // voor de dokter (zie jobs.js)
+// de Oerwereld
+item(388, 'fossiel', 'Fossiel', { icon: ['bone'] });
+item(389, 'kern_dino', 'Oerportaalkern', { icon: ['core', '#b6ff4a'], portal: 'dino', stack: 4 });
+item(390, 'oerhart', 'Oerhart', { icon: ['heart', '#b6ff4a'], stack: 1 });
 
 export const isBlock = (id) => id > 0 && id < 256;
 export function itemName(id) {
@@ -295,6 +299,12 @@ recipe(B.hooi, 1, [[I.tarwe, 4]]);
 recipe(I.pizza, 1, [[I.tomaat, 2], [I.tarwe, 2]], 'oven');
 recipe(I.friet, 1, [[I.aardappel, 2]], 'oven');
 recipe(I.popcorn, 2, [[I.mais, 1]], 'oven');
+recipe(B.schap_brood, 1, [[B.planken, 3], [I.brood, 1]], 'werkbank');
+recipe(B.schap_groente, 1, [[B.planken, 3], [I.appel, 2]], 'werkbank');
+recipe(B.schap_flessen, 1, [[B.planken, 3], [B.glas, 1]], 'werkbank');
+recipe(B.schap_gereedschap, 1, [[B.planken, 3], [I.ijzerstaaf, 1]], 'werkbank');
+recipe(B.schap_juwelen, 1, [[B.planken, 3], [I.goudstaaf, 1]], 'werkbank');
+recipe(I.kern_dino, 1, [[I.machineonderdeel, 2], [I.bot, 6], [I.kristal, 3]], 'werkbank');
 recipe(B.schakelaar_uit, 1, [[B.steenblok, 1], [I.stok, 1]], 'werkbank');
 recipe(B.drukplaat, 2, [[B.steenblok, 1]], 'werkbank');
 recipe(B.deur_boekenkast, 1, [[B.boekenkast, 1], [I.ijzerstaaf, 1]], 'werkbank');

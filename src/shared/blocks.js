@@ -138,6 +138,26 @@ def(228, 'tempeldeur_open', 'Open tempeldeur', OPEN);
 def(229, 'kijker', 'Uitkijkpost', { tiles: ['kijker_top', 'kijker', 'steenblok'], hard: Infinity, interact: true });
 def(230, 'tempelsteen', 'Tempelsteen', { tiles: 'tempelsteen', hard: Infinity });
 
+// de Oerwereld
+def(231, 'portaal_dino', 'Portaal naar de Oerwereld', { pass: 2, solid: false, opaque: false, hard: Infinity, light: 12 });
+def(234, 'levensblad_oer', 'Blad van de Oerboom', { pass: 1, opaque: false, hard: Infinity, snd: 'leaf' });
+def(235, 'varen', 'Varen', { ...CROSS, replace: true });
+def(236, 'stam_reus', 'Reuzenstam', { ...LOG, tiles: ['stam_eik_top', 'stam_reus', 'stam_eik_top'] });
+def(237, 'blad_reus', 'Reuzenblad', { ...LEAF });
+def(238, 'fossiel_erts', 'Fossiel in steen', { hard: 3, tool: 'pick', tier: 1, drop: [388, 1, 1], xp: 4 });
+def(239, 'modder', 'Modder', { hard: 0.6, snd: 'grass' });
+
+// wandkasten met producten voor in de winkels, en koraal voor op de zeebodem
+const SCHAP = { hard: 1.5, tool: 'axe', snd: 'wood' };
+def(240, 'schap_brood', 'Wandkast met brood', { ...SCHAP, tiles: ['planken', 'schap_brood', 'planken'] });
+def(241, 'schap_groente', 'Wandkast met groente en fruit', { ...SCHAP, tiles: ['planken', 'schap_groente', 'planken'] });
+def(242, 'schap_flessen', 'Wandkast met flessen en potten', { ...SCHAP, tiles: ['planken', 'schap_flessen', 'planken'] });
+def(243, 'schap_gereedschap', 'Wandkast met gereedschap', { ...SCHAP, tiles: ['planken', 'schap_gereedschap', 'planken'] });
+def(244, 'schap_juwelen', 'Wandkast met juwelen', { ...SCHAP, tiles: ['planken', 'schap_juwelen', 'planken'], light: 5 });
+def(245, 'koraal_roze', 'Roze koraal', { hard: 0.8, snd: 'stone' });
+def(246, 'koraal_oranje', 'Oranje koraal', { hard: 0.8, snd: 'stone' });
+def(247, 'koraal_blauw', 'Blauw koraal', { hard: 0.8, snd: 'stone', light: 4 });
+
 // de stad en het vliegveld
 def(172, 'beton', 'Beton', { hard: 3, tool: 'pick' });
 def(173, 'beton_donker', 'Donker beton', { hard: 3, tool: 'pick' });
@@ -257,9 +277,11 @@ def(164, 'botten', 'Bottenstapel', { hard: 1.5, drop: [299, 2, 4] });
 // Lichtranken hangen uit de kruin, lichtvruchten zitten er als lampionnen tussen. Ze horen
 // bij de boom (je kunt ze niet weghakken). Zwammen, zwamhoeden, mos en bloemen kun je wel
 // meenemen om er zelf mee te bouwen.
-export const TREE_KEYS = ['groen', 'ijs', 'vuur', 'schaduw', 'wolken'];
+export const TREE_KEYS = ['groen', 'ijs', 'vuur', 'schaduw', 'wolken', 'dino'];
+// (de Oerwereld kwam er later bij: zijn rank en vrucht hebben een eigen nummer)
+const rankId = (k, i) => k === 'dino' ? 232 : 120 + i, vruchtId = (k, i) => k === 'dino' ? 233 : 138 + i;
 const RANK = { shape: SHAPE_CROSS, pass: 1, solid: false, opaque: false, hard: Infinity, snd: 'leaf', light: 8, glow: 15 };
-TREE_KEYS.forEach((k, i) => def(120 + i, 'lichtrank_' + k, 'Lichtrank', { ...RANK }));
+TREE_KEYS.forEach((k, i) => def(rankId(k, i), 'lichtrank_' + k, 'Lichtrank', { ...RANK }));
 export const ZWAM_KEYS = ['blauw', 'roze', 'groen', 'oranje', 'paars'];
 const ZWAM_NAMES = ['Blauwe', 'Roze', 'Groene', 'Oranje', 'Paarse'];
 ZWAM_KEYS.forEach((k, i) => def(125 + i, 'gloeizwam_' + k, ZWAM_NAMES[i] + ' gloeizwam', { ...CROSS, light: 9, glow: 15 }));
@@ -267,7 +289,7 @@ ZWAM_KEYS.forEach((k, i) => def(130 + i, 'zwamhoed_' + k, ZWAM_NAMES[i] + ' zwam
 def(135, 'zwamsteel', 'Zwamsteel', { tiles: ['zwamsteel_top', 'zwamsteel', 'zwamsteel_top'], hard: 0.8, tool: 'axe', snd: 'wood', glow: 4 });
 def(136, 'gloeimos', 'Gloeimos', { tiles: ['gloeimos_top', 'gloeimos_side', 'aarde'], hard: 0.7, snd: 'grass', glow: 5 });
 def(137, 'lichtbloem', 'Lichtbloem', { ...CROSS, light: 8, glow: 15 });
-TREE_KEYS.forEach((k, i) => def(138 + i, 'lichtvrucht_' + k, 'Lichtvrucht', { hard: Infinity, snd: 'glass', light: 13, glow: 15 }));
+TREE_KEYS.forEach((k, i) => def(vruchtId(k, i), 'lichtvrucht_' + k, 'Lichtvrucht', { hard: Infinity, snd: 'glass', light: 13, glow: 15 }));
 
 // Een bed is twee blokken lang: een voeteneind en een hoofdeind. Er zijn vier richtingen
 // (waar het hoofdeind ligt, gezien vanaf het voeteneind): 0 = +x, 1 = +z, 2 = -x, 3 = -z.
@@ -324,14 +346,14 @@ for (const b of BLOCKS) {
   if (bp) B_BED[b.id] = 1 + bp.d + (bp.head ? 4 : 0);
 }
 
-export const LIFE_LEAVES = { groen: B.levensblad_groot, ijs: B.levensblad_ijs, vuur: B.levensblad_vuur, schaduw: B.levensblad_schaduw, wolken: B.levensblad_hemel };
+export const LIFE_LEAVES = { groen: B.levensblad_groot, ijs: B.levensblad_ijs, vuur: B.levensblad_vuur, schaduw: B.levensblad_schaduw, wolken: B.levensblad_hemel, dino: B.levensblad_oer };
 export const LIFE_VINES = {}, LIFE_FRUIT = {};
-TREE_KEYS.forEach((k, i) => { LIFE_VINES[k] = 120 + i; LIFE_FRUIT[k] = 138 + i; });
+TREE_KEYS.forEach((k, i) => { LIFE_VINES[k] = rankId(k, i); LIFE_FRUIT[k] = vruchtId(k, i); });
 export const ZWAMMEN = ZWAM_KEYS.map((k, i) => 125 + i), ZWAMHOEDEN = ZWAM_KEYS.map((k, i) => 130 + i);
-export const LOGS = [B.stam_eik, B.stam_den, B.stam_berk, B.stam_schaduw, B.stam_verkoold, B.stam_hemel];
-export const LEAVES = [B.blad_eik, B.blad_den, B.blad_berk, B.blad_schaduw, B.blad_goud];
+export const LOGS = [B.stam_eik, B.stam_den, B.stam_berk, B.stam_schaduw, B.stam_verkoold, B.stam_hemel, B.stam_reus];
+export const LEAVES = [B.blad_eik, B.blad_den, B.blad_berk, B.blad_schaduw, B.blad_goud, B.blad_reus];
 export const EGGS = { vuur: B.ei_vuur, ijs: B.ei_ijs, natuur: B.ei_natuur, bliksem: B.ei_bliksem, schaduw: B.ei_schaduw, robot: B.ei_robot, goud: B.ei_goud, kristal: B.ei_kristal };
 export const EGG_TYPE = {};
 for (const k in EGGS) EGG_TYPE[EGGS[k]] = k;
-export const PORTAL_TO = { [B.portaal_groen]: 'groen', [B.portaal_ijs]: 'ijs', [B.portaal_vuur]: 'vuur', [B.portaal_schaduw]: 'schaduw', [B.portaal_wolken]: 'wolken' };
-export const PORTAL_BLOCK = { groen: B.portaal_groen, ijs: B.portaal_ijs, vuur: B.portaal_vuur, schaduw: B.portaal_schaduw, wolken: B.portaal_wolken };
+export const PORTAL_TO = { [B.portaal_groen]: 'groen', [B.portaal_ijs]: 'ijs', [B.portaal_vuur]: 'vuur', [B.portaal_schaduw]: 'schaduw', [B.portaal_wolken]: 'wolken', [B.portaal_dino]: 'dino' };
+export const PORTAL_BLOCK = { groen: B.portaal_groen, ijs: B.portaal_ijs, vuur: B.portaal_vuur, schaduw: B.portaal_schaduw, wolken: B.portaal_wolken, dino: B.portaal_dino };

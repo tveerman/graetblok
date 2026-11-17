@@ -12,7 +12,7 @@
 import { CH, TICK_MS, INV_SIZE, HOTBAR, DAY_LENGTH, DAY_FRAC, RANKS, SECRET_RANK, chunkKey, clamp, dayPhase, isNight, xpNeed } from '../shared/constants.js';
 import { B, BLOCKS, B_SHAPE, EGG_TYPE, PORTAL_TO, PORTAL_BLOCK, SHAPE_LIQUID, BED_DIRS, bedFoot, bedHead, bedPart, isBed } from '../shared/blocks.js';
 import { I, ITEMS, RECIPES, matches, maxStack, itemName } from '../shared/items.js';
-import { WORLDS, WORLD_ORDER, SPAWN } from '../shared/worlds.js';
+import { WORLDS, WORLD_ORDER, STORY_WORLDS, SPAWN } from '../shared/worlds.js';
 import { hash3, mulberry32 } from '../shared/noise.js';
 import { ServerWorld } from './world.js';
 import { QUESTS, computerLines } from './quests.js';
@@ -209,7 +209,7 @@ export class GameServer {
   maxHp(p) { let n = 0; for (const k in this.meta.trees) if (this.meta.trees[k]) n++; return 20 + n * 4; }
   rank(p) {
     const t = this.meta.trees;
-    if (p.flags.oer && WORLD_ORDER.every((k) => t[k])) return SECRET_RANK;
+    if (p.flags.oer && STORY_WORLDS.every((k) => t[k])) return SECRET_RANK;
     let r = RANKS[0].name;
     for (const k of RANKS) if (p.level >= k.level) r = k.name;
     return r;
@@ -685,7 +685,7 @@ export class GameServer {
       return;
     }
     const r = mulberry32((hash3(x, y, z, this.meta.seed) * 4294967296) >>> 0);
-    const crystal = { groen: I.kristal, ijs: I.ijskristal, vuur: I.vuurkristal, schaduw: I.schaduwkristal, wolken: I.hemelkristal }[w.id];
+    const crystal = { groen: I.kristal, ijs: I.ijskristal, vuur: I.vuurkristal, schaduw: I.schaduwkristal, wolken: I.hemelkristal, dino: I.fossiel }[w.id];
     const table = [[I.munt, 4, 9], [I.munt, 3, 6], [I.ijzerstaaf, 2, 4], [I.goudstaaf, 1, 3], [crystal, 1, 3], [I.pijl, 6, 12], [I.drankje, 1, 2], [I.machineonderdeel, 1, 2], [I.bessen, 3, 6], [B.gloeikristal, 1, 3], [B.fakkel, 4, 8], [I.steenkool, 3, 6], [I.appel, 2, 4]];
     const rolls = 3 + Math.floor(r() * 2);
     for (let i = 0; i < rolls; i++) {

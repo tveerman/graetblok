@@ -345,6 +345,10 @@ const PX = {
     return n < 0.42 ? mix([70, 14, 4], [230, 70, 8], n / 0.42) : mix([230, 70, 8], [255, 226, 90], Math.min(1, (n - 0.42) / 0.3));
   },
   stam_eik: bark([62, 46, 28], [122, 94, 60], 80),
+  // de Oerwereld: bemoste reuzenstam, donker reuzenblad, modder en een fossiel in de rots
+  stam_reus: (x, y, u, v) => { const c = bark([54, 40, 26], [104, 82, 52], 941)(x, y, u, v); const mos = hash2(Math.floor(u * 9), Math.floor(v * 9), 942) < 0.22 * (1.2 - v); return mos ? mix(c, [70, 130, 50], 0.7) : c; },
+  blad_reus: leaves([22, 78, 30], [64, 136, 52], 943),
+  modder: (x, y, u, v) => mul(mix(dirt(x, y, u, v), [70, 52, 34], 0.6), 0.86 + hash2(x >> 2, y >> 2, 944) * 0.14),
   stam_eik_top: logTop([196, 158, 104], [150, 112, 66], [92, 70, 44], 81),
   stam_den: bark([50, 32, 22], [112, 72, 48], 82, 12),
   stam_den_top: logTop([190, 140, 90], [140, 92, 56], [80, 52, 36], 83),
@@ -374,6 +378,7 @@ const PX = {
   blad_goud: leaves([196, 146, 30], [252, 220, 96], 104, 0.4),
   planken: PLANK,
   steenkool_erts: ore(steen, [24, 24, 28], [70, 70, 78], 110),
+  fossiel_erts: (x, y, u, v) => { const d = Math.hypot(u - 0.5, v - 0.5), a = Math.atan2(v - 0.5, u - 0.5); const spiraal = d < 0.34 && Math.abs(((d * 9 - a / 6.283 + 10) % 1) - 0.5) < 0.2; const rib = d < 0.34 && Math.abs(((a * 2.2) % 1 + 1) % 1 - 0.5) < 0.08; return spiraal ? (rib ? [150, 136, 110] : [226, 214, 186]) : steen(x, y, u, v); },
   ijzer_erts: ore(steen, [168, 112, 78], [232, 190, 150], 111),
   goud_erts: ore(steen, [214, 160, 20], [255, 240, 130], 112),
   kristal_erts: ore(steen, [40, 190, 210], [220, 255, 255], 113),
@@ -544,6 +549,10 @@ const PX = {
     return c;
   },
   // de stad: beton in platen, een raam met een kozijn (donker of met licht aan) en stoeptegels
+  // koraal: een bobbelig blok met gaatjes
+  koraal_roze: (x, y, u, v) => { cell(u, v, 5, 971); return mul(mix([240, 110, 160], [255, 190, 210], hash2(x >> 1, y >> 1, 972)), 0.82 + hash2(Math.floor(u * 10), Math.floor(v * 10), 973) * 0.3); },
+  koraal_oranje: (x, y, u, v) => mul(mix([240, 130, 40], [255, 200, 110], hash2(x >> 1, y >> 1, 974)), 0.8 + hash2(Math.floor(u * 8), Math.floor(v * 8), 975) * 0.34),
+  koraal_blauw: (x, y, u, v) => mul(mix([50, 120, 230], [140, 220, 250], hash2(x >> 1, y >> 1, 976)), 0.8 + hash2(Math.floor(u * 9), Math.floor(v * 9), 977) * 0.34),
   // de sproeier, de melkmachine en de marktkraam van het Landbouwimperium
   sproeier: (x, y, u, v) => { const band = v > 0.42 && v < 0.58; return mul(band ? [70, 150, 220] : [150, 158, 170], 0.88 + hash2(x, y, 921) * 0.16); },
   sproeier_top: (x, y, u, v) => { const d = Math.hypot(u - 0.5, v - 0.5); return d < 0.14 ? [60, 140, 230] : d < 0.34 ? mul([120, 190, 240], 0.9 + hash2(x, y, 922) * 0.2) : mul([150, 158, 170], 0.9 + hash2(x, y, 923) * 0.14); },
@@ -632,6 +641,7 @@ const PX = {
   portaal_vuur: swirl([150, 30, 0], [255, 210, 80], 164),
   portaal_schaduw: swirl([50, 10, 110], [210, 140, 255], 165),
   portaal_wolken: swirl([190, 150, 60], [255, 252, 220], 166),
+  portaal_dino: swirl([60, 110, 20], [220, 255, 120], 167),
   levenshout: (x, y, u, v) => {
     const b = bark([64, 44, 26], [132, 98, 60], 167, 8)(x, y, u, v);
     const vein = Math.abs(vn(u * 6, v * 4, 6, 4, 168) - 0.5);
@@ -647,6 +657,7 @@ const PX = {
   levensblad_vuur: leaves([220, 60, 10], [255, 190, 50], 172, 0.5, [255, 250, 180]),
   levensblad_schaduw: leaves([120, 30, 200], [230, 110, 250], 173, 0.5, [255, 210, 255]),
   levensblad_hemel: leaves([240, 200, 70], [255, 250, 210], 174, 0.5, [255, 255, 255]),
+  levensblad_oer: leaves([70, 150, 20], [190, 240, 70], 176, 0.5, [244, 255, 190]),
   levensblad_dor: leaves([84, 76, 62], [128, 116, 96], 175, 0.3),
   levenshart: (x, y, u, v) => {
     const X = (u - 0.5) * 2.7, Y = (0.46 - v) * 2.7;
@@ -865,7 +876,7 @@ const zwamKleur = {
   oranje: [[236, 104, 14], [255, 220, 120]], paars: [[120, 40, 226], [222, 176, 255]],
   turkoois: [[16, 150, 150], [150, 250, 236]],
 };
-const rankKleur = { groen: [[60, 220, 170], [224, 255, 240]], ijs: [[90, 180, 255], [236, 250, 255]], vuur: [[255, 130, 30], [255, 240, 170]], schaduw: [[170, 70, 255], [246, 214, 255]], wolken: [[255, 206, 80], [255, 252, 224]] };
+const rankKleur = { groen: [[60, 220, 170], [224, 255, 240]], ijs: [[90, 180, 255], [236, 250, 255]], vuur: [[255, 130, 30], [255, 240, 170]], schaduw: [[170, 70, 255], [246, 214, 255]], wolken: [[255, 206, 80], [255, 252, 224]], dino: [[170, 240, 60], [244, 255, 200]] };
 
 Object.assign(PX, {
   koper_erts: ore(steen, [186, 96, 44], [255, 180, 116], 300),
@@ -1386,6 +1397,35 @@ DRAW.g_eeuwige_plant = gewasTile('loof', '#30c878', '#a8ffd0', true);
 DRAW.g_kristalbloem = gewasTile('bloem', '#8a70d0', '#c080ff', true);
 DRAW.g_gouden_appel = gewasTile('struik', '#5a9a3a', '#ffd23a', true);
 DRAW.g_kosmisch_gewas = gewasTile('ster', '#5040b0', '#b090ff', true);
+// Wandkasten voor in de winkels: een houten kast met drie planken vol spullen.
+function schapTile(teken) {
+  return (g) => {
+    g.fillStyle = '#6a4a2a'; g.fillRect(0, 0, 64, 64);
+    g.fillStyle = '#3a2816'; g.fillRect(3, 3, 58, 58);
+    for (let r = 0; r < 3; r++) {
+      const y = 3 + r * 20;
+      g.fillStyle = '#8a6238'; g.fillRect(3, y + 16, 58, 4);
+      for (let c = 0; c < 4; c++) teken(g, 6 + c * 14, y + 1, 12, 15, r * 4 + c);
+    }
+    g.strokeStyle = '#4a321c'; g.lineWidth = 2; g.strokeRect(1, 1, 62, 62);
+  };
+}
+const kies = (lijst, i, zaad) => lijst[Math.floor(hash2(i, zaad, 961) * lijst.length) % lijst.length];
+DRAW.schap_brood = schapTile((g, x, y, w, h, i) => { g.fillStyle = kies(['#c88a44', '#b8763a', '#d8a45c', '#a86a34'], i, 1); g.beginPath(); g.ellipse(x + w / 2, y + h - 5, w / 2 - 1, 5, 0, 0, 6.3); g.fill(); g.strokeStyle = 'rgba(80,44,16,0.8)'; g.lineWidth = 1; for (let k = -1; k <= 1; k++) { g.beginPath(); g.moveTo(x + w / 2 + k * 3 - 1, y + h - 8); g.lineTo(x + w / 2 + k * 3 + 1, y + h - 4); g.stroke(); } });
+DRAW.schap_groente = schapTile((g, x, y, w, h, i) => { const k = kies(['#e03a2a', '#f08a20', '#5ab03a', '#f4d040', '#e8284a'], i, 2); g.fillStyle = k; for (const [dx, dy] of [[3, h - 4], [8, h - 4], [5.5, h - 9]]) { g.beginPath(); g.arc(x + dx, y + dy, 3.2, 0, 6.3); g.fill(); } g.fillStyle = 'rgba(255,255,255,0.4)'; g.fillRect(x + 2, y + h - 6, 1.5, 1.5); });
+DRAW.schap_flessen = schapTile((g, x, y, w, h, i) => { for (let k = 0; k < 2; k++) { g.fillStyle = kies(['#3f8a4a', '#8a4ad0', '#d0362f', '#e8b02a', '#3a6ab8', '#f2f0ea'], i * 2 + k, 3); g.fillRect(x + 1 + k * 6, y + 5, 4, h - 5); g.fillRect(x + 2 + k * 6, y + 1, 2, 5); g.fillStyle = 'rgba(255,255,255,0.5)'; g.fillRect(x + 1 + k * 6, y + 8, 1, 5); } });
+DRAW.schap_gereedschap = schapTile((g, x, y, w, h, i) => { const t = Math.floor(hash2(i, 4, 961) * 3); g.strokeStyle = '#8a5a2c'; g.lineWidth = 2; g.beginPath(); g.moveTo(x + w / 2, y + h - 1); g.lineTo(x + w / 2, y + 4); g.stroke(); g.fillStyle = '#c8ced8'; if (t === 0) g.fillRect(x + 1, y + 2, w - 2, 4); else if (t === 1) { g.beginPath(); g.moveTo(x + 1, y + 6); g.lineTo(x + w - 1, y + 6); g.lineTo(x + w / 2, y + 1); g.closePath(); g.fill(); } else { g.fillRect(x + w / 2 - 1, y + 1, 5, 3); g.fillRect(x + w / 2 - 4, y + 1, 3, 6); } });
+DRAW.schap_juwelen = schapTile((g, x, y, w, h, i) => { g.fillStyle = '#3a1c4a'; g.fillRect(x, y + h - 4, w, 4); g.fillStyle = kies(['#5fe3e8', '#ff3a5a', '#ffd23a', '#7aff8a', '#c080ff'], i, 5); g.beginPath(); g.moveTo(x + w / 2, y + 3); g.lineTo(x + w - 2, y + 8); g.lineTo(x + w / 2, y + h - 3); g.lineTo(x + 2, y + 8); g.closePath(); g.fill(); g.fillStyle = 'rgba(255,255,255,0.7)'; g.fillRect(x + w / 2 - 1, y + 5, 2, 2); });
+DRAW.varen = (g) => {
+  g.lineCap = 'round';
+  for (let i = 0; i < 6; i++) {
+    const a = -1.25 + i * 0.5, len = 44 + hash2(i, 1, 951) * 12, x0 = 32, y0 = 64;
+    const x1 = x0 + Math.sin(a) * len * 0.7, y1 = y0 - Math.cos(a) * len;
+    g.strokeStyle = '#2f7a34'; g.lineWidth = 2.6; g.beginPath(); g.moveTo(x0, y0); g.quadraticCurveTo(x0 + Math.sin(a) * 8, y0 - len * 0.7, x1, y1); g.stroke();
+    g.strokeStyle = i & 1 ? '#4aa84a' : '#3c9440'; g.lineWidth = 2;
+    for (let k = 1; k <= 7; k++) { const t = k / 8, px = x0 + (x1 - x0) * t, py = y0 + (y1 - y0) * t - Math.sin(t * 3.14) * 6, s = 7 * (1 - t * 0.7); g.beginPath(); g.moveTo(px - s, py + 2); g.lineTo(px, py); g.lineTo(px + s, py + 2); g.stroke(); }
+  }
+};
 DRAW.kiem = (g) => {
   g.lineCap = 'round'; g.strokeStyle = '#58b848'; g.lineWidth = 3;
   for (let i = 0; i < 5; i++) { const x = 10 + i * 11; g.beginPath(); g.moveTo(x, 64); g.lineTo(x, 52); g.stroke(); for (const s of [-1, 1]) { g.beginPath(); g.moveTo(x, 54); g.quadraticCurveTo(x + s * 5, 50, x + s * 6, 46); g.stroke(); } }

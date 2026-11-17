@@ -346,6 +346,39 @@ From Jorian's design document (`spel.txt`), following development phases 1–4, 
   the player had built or dug. Debug: `{c:'site', kind:'tempel'|'doolhof'|'wachttoren'}`.
   Not in yet: secret doors inside castles, parkour, ruins to restore, collecting and the
   museum, fishing.
+- **The Oerwereld (prehistoric world)** – the first of Jorian's new worlds, world key
+  `dino`. A warm jungle of hills, lakes with muddy shores, the odd volcano with lava in its
+  crater, ferns everywhere and giant trees towering over the rest. Wild dinosaurs live
+  there, built from the animal shapes of the Dierenboek: raptors and the occasional T-rex
+  attack, triceratops and stegosaurus roam in herds, brachiosaurus walks alone. Fossils sit
+  in the rock. It works like the other worlds: craft an Oerportaalkern (2 machine parts,
+  6 bones, 3 crystals; no other world needed first), find the Oerboom in the north-east,
+  defeat its guardian the Oerdinosaurus (drops the Oerhart, fossils and two prehistoric
+  eggs) and restore the tree for two extra hearts and Oerkracht (you hit 30% harder). A
+  quest for it follows the Drakenkoning. The secret rank still only needs the five original
+  trees. New blocks: fern, giant trunk, giant leaf, mud, fossil in stone. Debug:
+  `{c:'world', w:'dino'}`.
+- **More music and sounds of the surroundings** – every world now has three to five songs
+  (own key, tempo, chord progression, lead sound and a calm or arpeggio accompaniment) that
+  take turns: four pieces of one song, then the next (`SONGS` and `nextSong` in
+  `src/client/audio.js`). Every two seconds the game looks around the player
+  (`surroundings` in `main.js`): among leaves you hear many more and more varied birds
+  (trill, two-note call, rising whistle, cuckoo), on a large dry sand plain a rattlesnake now
+  and then, and in a city a car horn. There is no desert yet, so the rattlesnake waits for
+  the desert world.
+- **Borrowing city traffic** – the cars, taxi, bus and lorry driving through the city can be
+  entered and driven like your own vehicle. They belong to the city: you cannot pick them up,
+  and twelve seconds after you get out they join the traffic again, refuelled and repaired.
+  Drive one out of the city and it stays where you leave it until nobody is near.
+- **Shops, fish and coral** – five craftable wall cabinets full of goods (bread, fruit and
+  vegetables, bottles, tools, jewels) line the walls of the six city shops, each shop with
+  its own kind; the airport terminal has four small shops along its south wall (baker,
+  chips, sweets, general store) with a counter, cabinets, a neon sign and tables. Small
+  coloured fish swim in any water near the player (`src/client/fish.js`: sixteen fish drawn
+  in one call, client-side only; they dart away when you come close), and coral reefs in
+  three colours grow on the bottom of water at least three blocks deep. A dragon, flying
+  animal, helicopter or plane can no longer fly through water or lava: it stays just above
+  the surface.
 - **Player character with a skeleton** (`src/client/rig.js`) – the human, elf and robot you
   can play are built on one rig with joints (hips, knees, ankles, spine, neck, shoulders,
   elbows). The animation computes joint angles: knees bend while the leg swings forward, the

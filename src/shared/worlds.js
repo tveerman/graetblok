@@ -48,9 +48,22 @@ export const WORLDS = {
     tree: { key: 'wolken', name: 'De Hemelboom', x: 0, z: -260, y: 84, guardian: 'stormwachter', beam: 0xffe98a },
     power: 'Veervoet: je kunt hoger springen en vallen doet geen pijn.',
   },
+  // De Oerwereld: Jorians eerste nieuwe wereld. Een warm oerwoud met reuzenbomen, varens,
+  // vulkanen en dinosaurussen. (De sleutel is 'dino', want 'oer' is al het Oerwapen.)
+  dino: {
+    name: 'Oerwereld',
+    cycle: true,
+    sky: { dayTop: 0x3a9ad0, dayHor: 0xd8f0c8, nightTop: 0x050a0c, nightHor: 0x12241c, duskHor: 0xf0a04a },
+    minLight: 0.06, nightLight: 0.2,
+    water: 0x2a8a7a,
+    tree: { key: 'dino', name: 'De Oerboom', x: 190, z: -180, y: SEA + 6, guardian: 'oerdinosaurus', beam: 0xb6ff4a },
+    power: 'Oerkracht: je slaat harder.',
+  },
 };
 
-export const WORLD_ORDER = ['groen', 'ijs', 'vuur', 'schaduw', 'wolken'];
+export const WORLD_ORDER = ['groen', 'ijs', 'vuur', 'schaduw', 'wolken', 'dino'];
+// de vijf werelden van het oorspronkelijke verhaal (voor de geheime rang)
+export const STORY_WORLDS = ['groen', 'ijs', 'vuur', 'schaduw', 'wolken'];
 
 // Vaste plekken in de groene wereld
 export const CRASH = { x: 12, z: 8, y: SEA + 5 };

@@ -23,6 +23,14 @@ export const MOBS = {
     drops: [[I.schaduwhart, 1, 1, 1], [I.schaduwkristal, 6, 8, 1], [I.drakenschub, 3, 3, 1]] },
   stormwachter: { name: 'Stormwachter, bewaker van de Hemelboom', model: 'vleugel', scale: 3.2, hp: 320, dmg: 6, speed: 7, w: 3.0, h: 1.8, ai: 'boss', boss: 'wolken', proj: 'bliksem', fly: true, xp: 380,
     drops: [[I.hemelhart, 1, 1, 1], [I.hemelkristal, 6, 8, 1], [I.drakenschub, 4, 4, 1]] },
+  // de Oerwereld: wilde dino's (hun vorm komt uit de dierenlijst, zie animals.js)
+  oerraptor: { name: 'Wilde raptor', model: 'dier', animal: 'velociraptor', hp: 18, dmg: 4, speed: 4.6, w: 0.8, h: 1.1, ai: 'melee', xp: 12, drops: [[I.rauw_vlees, 1, 1, 0.7], [I.leer, 1, 1, 0.4], [I.bot, 1, 2, 0.4]] },
+  oertrex: { name: 'Wilde T-rex', model: 'dier', animal: 'trex', hp: 60, dmg: 7, speed: 3.6, w: 1.6, h: 2.6, ai: 'melee', xp: 40, drops: [[I.rauw_vlees, 2, 4, 1], [I.bot, 2, 4, 1], [I.fossiel, 1, 1, 0.5]] },
+  oertriceratops: { name: 'Triceratops', model: 'dier', animal: 'triceratops', hp: 30, speed: 1.5, w: 1.6, h: 1.6, ai: 'passive', herd: [2, 4], xp: 6, drops: [[I.rauw_vlees, 1, 3, 1], [I.leer, 1, 2, 0.8]] },
+  oerstego: { name: 'Stegosaurus', model: 'dier', animal: 'stegosaurus', hp: 30, speed: 1.4, w: 1.6, h: 1.6, ai: 'passive', herd: [2, 3], xp: 6, drops: [[I.rauw_vlees, 1, 3, 1], [I.leer, 1, 2, 0.8]] },
+  oerbrachio: { name: 'Brachiosaurus', model: 'dier', animal: 'brachiosaurus', hp: 50, speed: 1.2, w: 2.2, h: 4.2, ai: 'passive', xp: 8, drops: [[I.rauw_vlees, 2, 4, 1], [I.leer, 2, 3, 1]] },
+  oerdinosaurus: { name: 'De Oerdinosaurus, bewaker van de Oerboom', model: 'dier', animal: 'trex', scale: 2.4, hp: 300, dmg: 6, speed: 3.4, w: 3.4, h: 5.6, ai: 'boss', boss: 'dino', proj: 'vuurbal', xp: 350,
+    drops: [[I.oerhart, 1, 1, 1], [I.fossiel, 6, 8, 1], [I.ei_oer, 2, 2, 1], [I.drakenschub, 3, 3, 1]] },
   drakenkoning: { name: 'De Drakenkoning', model: 'draak', dragon: 'koning', scale: 3.0, hp: 520, dmg: 7, speed: 8, w: 4.0, h: 3.6, ai: 'boss', boss: 'groen', proj: 'drakenvuur', fly: true, xp: 800,
     drops: [[I.drakenkroon, 1, 1, 1], [I.drakenschub, 8, 8, 1], [B.ei_goud, 1, 1, 1]] },
 

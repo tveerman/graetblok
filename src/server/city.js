@@ -5,6 +5,7 @@ import { CH } from '../shared/constants.js';
 import { hash2, hash3 } from '../shared/noise.js';
 import { B, bedFoot, bedHead } from '../shared/blocks.js';
 import { I } from '../shared/items.js';
+import { VEHICLES } from '../shared/vehicles.js';
 import { CITY_HALF, CITY_ROAD, CITY_LANE, lightState, AIR_HALF, RUNWAY_Z, FLIGHT_X, FLIGHT_PRICE, GATES, gateX } from '../shared/city.js';
 
 const R = CITY_ROAD;
@@ -21,6 +22,14 @@ for (const bx of [-1, 1]) for (const bz of [-1, 1]) {
   for (const a of [35, 59]) for (const b of [35, 59]) TOWERS.push([bx > 0 ? a : -a - 18, bz > 0 ? b : -b - 18]);
 }
 for (const a of [-21, 3]) { TOWERS.push([a, 59], [59, a], [-77, a]); }
+// welke wandkasten er in elke winkel hangen: [linkermuur, rechtermuur, achterwand]
+const SHELVES = {
+  bakker: [B.schap_brood, B.schap_brood, B.schap_groente], kok: [B.schap_flessen, B.schap_groente, B.schap_flessen],
+  winkelier: [B.schap_gereedschap, B.schap_flessen, B.schap_groente], juwelier: [B.schap_juwelen, B.schap_juwelen, B.schap_juwelen],
+  monteur: [B.schap_gereedschap, B.schap_gereedschap, B.schap_flessen], marktkoopman: [B.schap_groente, B.schap_groente, B.schap_brood],
+};
+// de winkeltjes in de terminal van het vliegveld: [x van het midden, beroep, wandkast, kleur van de lichtreclame]
+const AIR_SHOPS = [[-48, 'bakker', B.schap_brood, B.neon_geel], [-30, 'kraam_friet', B.schap_flessen, B.neon_roze], [30, 'kraam_snoep', B.schap_groente, B.neon_roze], [48, 'winkelier', B.schap_gereedschap, B.neon_blauw]];
 const WALLS = [B.beton, B.baksteen, B.beton_donker, B.marmer, B.beton, B.baksteen, B.zilverblok];
 
 // een rechthoekige toren met ramen; sommige ramen zijn verlicht
@@ -68,7 +77,8 @@ export const cityGen = {
     const cars = [['v_auto', 0xd8362c, 0, 0.05], ['v_auto', 0xf0d020, 0, 0.4, 'Taxi'], ['v_auto', 0x2a6ad0, 0, 0.72], ['v_bus', 0xf0c020, 1, 0.1, 'Stadsbus'], ['v_auto', 0x3ab04a, 1, 0.45], ['v_vrachtwagen', 0x2a6ad0, 1, 0.8]];
     for (const [k, col, loop, f, name] of cars) {
       const hh = R + (loop ? CITY_LANE : -CITY_LANE);
-      npcs.push({ k, x: x, y: y + 0.02, z: z, r: 0, yaw: 0, extra: { race: true, col, name: name || '', verkeer: { loop, s: f * 8 * hh, v: 0, len: k === 'v_auto' ? 3 : 6 } } });
+      // (veh: je kunt erin stappen en zelf rijden; leen = hij is van de stad en gaat daarna terug het verkeer in)
+      npcs.push({ k, x: x, y: y + 0.02, z: z, r: 0, yaw: 0, extra: { name: name || '', veh: { kind: k.slice(2), fuel: 100, dmg: 0, color: col, name: name || '', leen: true }, verkeer: { loop, s: f * 8 * hh, v: 0, len: k === 'v_auto' ? 3 : 6 } } });
     }
     return { npcs };
   },
@@ -128,11 +138,15 @@ export const cityGen = {
         else if (a % 6 !== 0) { set(a, 0, 2, B.glas); set(a, 0, 3, B.glas); }                                     // de etalage
         set(a, 0, 5, neon);
       }
+      // wandkasten vol producten: langs de twee zijmuren en tegen de achterwand, twee hoog
+      const [links, rechts, achter] = SHELVES[job] || SHELVES.winkelier;
+      for (let b = 3; b <= 16; b++) for (let k = 1; k <= 2; k++) { if (b % 5 !== 0) { set(1, b, k, links); set(17, b, k, rechts); } }
+      for (let a = 2; a <= 16; a++) for (let k = 1; k <= 2; k++) set(a, 17, k, achter);
       for (let a = 3; a <= 15; a++) if (a !== 9) set(a, 12, 1, B.tafel);                                         // de toonbank
       for (const a of [4, 14]) for (const b of [5, 11]) set(a, b, 5, B.lamp);
       if (job === 'bakker') { set(2, 16, 1, B.oven); set(3, 16, 1, B.oven); set(15, 16, 1, B.hooi); }
       else if (job === 'kok') { for (const a of [3, 7, 11, 15]) for (const b of [4, 8]) { set(a, b, 1, B.tafel); set(a + 1, b, 1, B.kruk); set(a - 1, b, 1, B.kruk); } set(4, 16, 1, B.kookpot); set(14, 16, 1, B.oven); }
-      else if (job === 'winkelier') { for (let a = 2; a <= 16; a++) { set(a, 17, 1, B.boekenkast); set(a, 17, 2, B.boekenkast); } }
+      else if (job === 'winkelier') { for (const a of [5, 13]) { set(a, 6, 1, B.tafel); set(a, 8, 1, B.tafel); } }
       else if (job === 'juwelier') { for (const a of [3, 6, 12, 15]) set(a, 16, 1, a % 2 ? B.goudblok : B.zilverblok); }
       else if (job === 'monteur') { set(3, 4, 1, B.garage); set(5, 4, 1, B.werkbank); set(15, 16, 1, B.ijzerblok); }
       else { for (const a of [2, 3, 15, 16]) set(a, 16, 1, B.hooi); }
@@ -199,6 +213,7 @@ export const cityGen = {
     npcs.push({ k: 'dorpeling', job: 'baliemedewerker', x: x - 9.5, y, z: z + 25.5, r: 0.4, yaw: Math.PI });
     npcs.push({ k: 'dorpeling', job: 'piloot', x: x + 10.5, y, z: z + 25.5, r: 0.4, yaw: Math.PI });
     npcs.push({ k: 'dorpeling', job: 'monteur', x: x - 70.5, y, z: z + 24.5, r: 0.4, yaw: Math.PI });
+    for (const [sx, job] of AIR_SHOPS) npcs.push({ k: 'dorpeling', job, x: x + sx + 0.5, y, z: z + 27.5, r: 0.4, yaw: Math.PI });
     for (const [wx, wz] of [[-30, 18], [28, 17], [0, 15], [44, 22]]) npcs.push({ k: 'dorpeling', job: 'dorpeling', x: x + wx + 0.5, y, z: z + wz + 0.5, r: 6, yaw: 0 });
     return { npcs };
   },
@@ -246,6 +261,16 @@ export const cityGen = {
       S.fill(X - 13, y + 1, Z + 24, X - 6, y + 1, Z + 24, B.tafel);                      // de balie
       S.fill(X + 7, y + 1, Z + 24, X + 14, y + 1, Z + 24, B.tafel);
       S.set(X - 14, y + 2, Z + 29, B.neon_geel); S.set(X + 15, y + 2, Z + 29, B.neon_roze);
+      // de winkeltjes langs de zuidmuur: wandkasten, een toonbank, een lichtreclame en een paar tafeltjes
+      for (const [sx, , kast, neon] of AIR_SHOPS) {
+        const cx = X + sx;
+        S.fill(cx - 4, y + 1, Z + 29, cx + 4, y + 3, Z + 29, kast);
+        S.fill(cx - 4, y + 4, Z + 29, cx + 4, y + 4, Z + 29, neon);
+        S.fill(cx - 4, y + 1, Z + 26, cx + 4, y + 1, Z + 26, B.tafel);
+        S.set(cx, y + 1, Z + 26, 0);                                                    // een doorgang voor de verkoper
+        for (const a of [-5, 5]) S.fill(cx + a, y + 1, Z + 26, cx + a, y + 3, Z + 29, B.beton_donker);
+        for (const a of [-2, 2]) { S.set(cx + a, y + 1, Z + 21, B.tafel); S.set(cx + a + 1, y + 1, Z + 21, B.kruk); S.set(cx + a - 1, y + 1, Z + 21, B.kruk); }
+      }
     }
     // de verkeerstoren
     if (S.hit(X + 72, Z + 8, X + 82, Z + 18)) {
@@ -294,6 +319,15 @@ export const cityMethods = {
         for (const id of rec.ids) { const e = w.ents.get(id); if (e && e.verkeer) cars.push(e); }
         for (const e of cars) {
           const c = e.verkeer, hh = R + (c.loop ? CITY_LANE : -CITY_LANE), L = 8 * hh;
+          // Rijdt een speler er zelf in, dan doet de auto niet mee met het verkeer. Stapt hij uit,
+          // dan blijft de auto nog even staan en rijdt daarna weer zijn rondje (volgetankt en heel).
+          if (e.rider) { c.los = true; c.terug = 0; c.v = 0; continue; }
+          if (c.los) {
+            if (!c.terug) c.terug = this.meta.time + 12;
+            if (this.meta.time < c.terug) continue;
+            c.los = false; c.terug = 0;
+            e.veh.fuel = VEHICLES[e.veh.kind].tank; e.veh.dmg = 0;
+          }
           const q = loopPos(c.loop, c.s, hh);
           let want = c.len > 3 ? 5.5 : 7;
           // voor rood en oranje stoppen bij de streep (die ligt een eindje vóór de hoek)
@@ -301,7 +335,7 @@ export const cityMethods = {
           if (q.rest > line - 0.6 && q.rest < line + 10 && lightState(this.meta.time, q.dx ? 'x' : 'z') !== 2) want = Math.min(want, Math.max(0, (q.rest - line) * 1.4));
           // niet op de auto vóór je botsen
           for (const o of cars) {
-            if (o === e || o.verkeer.loop !== c.loop) continue;
+            if (o === e || o.verkeer.loop !== c.loop || o.verkeer.los) continue;
             const gap = ((o.verkeer.s - c.s) % L + L) % L - (c.len + o.verkeer.len) / 2;
             if (gap < 6) want = Math.min(want, Math.max(0, (gap - 1.5) * 1.6));
           }

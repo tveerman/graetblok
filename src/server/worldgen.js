@@ -10,10 +10,10 @@ import { secretGen } from './secrets.js';
 
 const M = 4;                 // rand om de chunk heen (voor bomen die over de grens hangen)
 const W = CS + 2 * M;
-const WORLD_SALT = { groen: 0, ijs: 1000, vuur: 2000, schaduw: 3000, wolken: 4000 };
+const WORLD_SALT = { groen: 0, ijs: 1000, vuur: 2000, schaduw: 3000, wolken: 4000, dino: 5000 };
 
-const T_EIK = 1, T_BERK = 2, T_DEN = 3, T_SCHADUW = 4, T_VERKOOLD = 5, T_HEMEL = 6, T_IJSPIEK = 7, T_PILAAR = 8;
-const V_GROEN = 1, V_IJS = 2, V_VUUR = 3, V_SCHADUW = 4, V_HEMEL = 5;
+const T_EIK = 1, T_BERK = 2, T_DEN = 3, T_SCHADUW = 4, T_VERKOOLD = 5, T_HEMEL = 6, T_IJSPIEK = 7, T_PILAAR = 8, T_REUS = 9;
+const V_GROEN = 1, V_IJS = 2, V_VUUR = 3, V_SCHADUW = 4, V_HEMEL = 5, V_OER = 6;
 
 export const NEST_REGION = 144;
 export const RUIN_REGION = 96;
@@ -60,6 +60,7 @@ export class WorldGen {
       case 'ijs': this.colIjs(x, z, c); break;
       case 'vuur': this.colVuur(x, z, c); break;
       case 'schaduw': this.colSchaduw(x, z, c); break;
+      case 'dino': this.colDino(x, z, c); break;
       default: this.colWolken(x, z, c);
     }
     if (this.hasSites) this.applySite(x, z, c);          // vlakke grond rond dorpen, kastelen en kampen
@@ -227,6 +228,53 @@ export class WorldGen {
     if (!special && fh > 39 && this.n8.n2(x / 60, z / 60) > 0.6) { c.ent = 1; c.tp = 0; }
   }
 
+  // Oerwereld: een warm oerwoud met heuvels, meren met modderige oevers, hier en daar een
+  // vulkaan met lava in de krater, en reuzenbomen die boven alles uitsteken.
+  colDino(x, z, c) {
+    const T = this.tree;
+    const d = Math.hypot(x, z);
+    const hills = this.n1.fbm2(x / 130, z / 130, 4);
+    const r = 1 - Math.abs(this.n2.fbm2(x / 240, z / 240, 3));
+    const mm = smoothstep(0.2, 0.65, this.n3.n2(x / 380, z / 380));
+    let h = SEA + 4 + hills * 10 + mm * r * r * 26;
+    h = lerp(SEA + 5, h, smoothstep(18, 60, d));                 // vlak land waar je uit het portaal komt
+    let special = d < 14 ? 1 : 0, onCone = 0;
+    // (in de Oerwereld staat maar in ongeveer een derde van de streken een vulkaan)
+    const vrx = Math.floor(x / 192), vrz = Math.floor(z / 192);
+    const v = hash2(vrx, vrz, this.seed + 777) < 0.45 ? this.volcano(vrx, vrz) : null;
+    if (v) {
+      const dv = Math.hypot(x - v.x, z - v.z), base = SEA + 6;
+      if (dv < v.r) {
+        const top = base + v.r * 0.95;
+        let cone = base + (1 - dv / v.r) * (top - base);
+        const rim = 7;
+        if (dv < rim) { cone = base + (1 - rim / v.r) * (top - base) - (rim - dv) * 2.5; c.liq = B.lava; c.ly = Math.floor(base + (1 - rim / v.r) * (top - base)) - 4; }
+        if (cone > h || dv < rim) { h = cone; onCone = 1; }
+        if (dv < rim + 2) special = 1;
+      }
+    }
+    const dt = Math.hypot(x - T.x, z - T.z);
+    if (dt < 70) {
+      h = lerp(T.y, h, smoothstep(40, 70, dt));
+      if (dt < 46) { c.nc = 1; special = 1; }
+    }
+    c.h = h;
+    const fh = Math.floor(h);
+    if (!c.liq && fh < SEA) { c.liq = B.water; c.ly = SEA; }
+    if (onCone) { c.top = hash2(x, z, this.seed + 6) < 0.15 ? B.magmasteen : B.basalt; c.under = B.basalt; c.base = B.basalt; }
+    else if (fh <= SEA + 1) { c.top = B.modder; c.under = B.modder; }
+    else {
+      c.top = B.gras; c.under = B.aarde; c.vg = V_OER;
+      if (!special) {
+        const forest = smoothstep(-0.3, 0.35, this.n5.n2(x / 150, z / 150));
+        c.tp = 0.006 + forest * 0.03; c.tk = T_EIK;
+        if (hash2(x, z, this.seed + 31) < 0.002 + forest * 0.003) { c.tp = 1; c.tk = T_REUS; }
+      }
+    }
+    if (!special && !onCone && fh > SEA + 2 && this.n8.n2(x / 60, z / 60) > 0.6) { c.ent = 1; c.tp = 0; }
+    if (special) c.nc = 1;
+  }
+
   // Wolkenwereld: zwevende eilanden. h = bovenkant van eiland A (of 0), c.ly = onderkant.
   colWolken(x, z, c) {
     const d = Math.hypot(x, z);
@@ -332,8 +380,28 @@ export class WorldGen {
         else if (vg === V_IJS) id = r < 0.004 ? B.dode_struik : r < 0.008 ? B.bessenstruik : 0;
         else if (vg === V_VUUR) id = r < 0.01 ? B.dode_struik : 0;
         else if (vg === V_SCHADUW) id = r < 0.022 ? B.gloeipaddenstoel : r < 0.03 ? B.dode_struik : r < 0.034 ? B.bessenstruik : 0;
+        else if (vg === V_OER) id = r < 0.2 ? B.varen : r < 0.27 ? B.hoog_gras : r < 0.28 ? B.bloem_rood : r < 0.29 ? B.bloem_geel : r < 0.3 ? B.bessenstruik : 0;
         else if (vg === V_HEMEL) id = r < 0.09 ? B.hoog_gras : r < 0.1 ? B.bloem_geel : r < 0.11 ? B.bloem_blauw : r < 0.118 ? B.bessenstruik : 0;
         if (id) blocks[p + 1] = id;
+      }
+    }
+
+    // koraal: op de bodem van dieper water groeien hier en daar riffen in drie kleuren
+    if (this.world !== 'wolken') {
+      for (let lx = 0; lx < CS; lx++) {
+        for (let lz = 0; lz < CS; lz++) {
+          const i = (lx + M) * W + (lz + M);
+          if (LIQ[i] !== B.water || LY[i] - H[i] < 3) continue;
+          const wx = ox + lx, wz = oz + lz;
+          if (this.n8.n2(wx / 34 + 50, wz / 34 - 50) < 0.3) continue;
+          const r = hash2(wx, wz, this.seed + 1234);
+          if (r > 0.3) continue;
+          const id = [B.koraal_roze, B.koraal_oranje, B.koraal_blauw][Math.floor(hash2(wx >> 2, wz >> 2, this.seed + 1235) * 3) % 3];
+          const p = idx(lx, H[i], lz);
+          if (blocks[p + 1] !== B.water) continue;
+          blocks[p + 1] = id;
+          if (r < 0.07 && blocks[p + 2] === B.water && LY[i] - H[i] >= 4) blocks[p + 2] = id;
+        }
       }
     }
 
@@ -507,6 +575,7 @@ export class WorldGen {
     if (w === 'ijs') vein(B.ijskristal_erts, 7, 10, 70, 5);
     if (w === 'vuur') vein(B.vuurkristal_erts, 7, 10, 70, 5);
     if (w === 'schaduw') vein(B.schaduwkristal_erts, 7, 10, 70, 5);
+    if (w === 'dino') vein(B.fossiel_erts, 9, 10, 70, 4);
     // gloeikristallen in grotwanden
     let placed = 0;
     for (let n = 0; n < 50 && placed < 3; n++) {
@@ -520,6 +589,18 @@ export class WorldGen {
   }
 
   plantTree(kind, x, y, z, put, soft, rnd) {
+    if (kind === T_REUS) {
+      // een reuzenboom: een dikke voet, een hoge stam en twee platte kruinen boven elkaar
+      const th = 13 + Math.floor(rnd() * 7);
+      for (let i = 0; i < th; i++) put(x, y + i, z, B.stam_reus);
+      for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const hh = 2 + Math.floor(rnd() * 3); for (let i = 0; i < hh; i++) put(x + dx, y + i, z + dz, B.stam_reus); }
+      for (const [cy, R] of [[y + th, 4], [y + th - 5, 3.2]]) {
+        for (let dx = -4; dx <= 4; dx++) for (let dz = -4; dz <= 4; dz++) for (let dy = -1; dy <= 2; dy++) {
+          if (dx * dx + dz * dz + dy * dy * 3.2 <= R * R - rnd() * 2) soft(x + dx, cy + dy, z + dz, B.blad_reus);
+        }
+      }
+      return;
+    }
     if (kind === T_EIK || kind === T_BERK || kind === T_HEMEL) {
       const log = kind === T_EIK ? B.stam_eik : kind === T_BERK ? B.stam_berk : B.stam_hemel;
       const leaf = kind === T_EIK ? B.blad_eik : kind === T_BERK ? B.blad_berk : B.blad_goud;
@@ -758,7 +839,7 @@ export class WorldGen {
     const rnd = mulberry32((this.seed * 31 + 977) >>> 0);
     const TH = w === 'wolken' ? 27 : 34;
     // welke kleuren zwammen er bij deze boom groeien (0 blauw, 1 roze, 2 groen, 3 oranje, 4 paars)
-    const pal = { groen: [0, 1, 2, 4, 0, 3], ijs: [0, 4, 0, 1], vuur: [3, 1, 3, 4], schaduw: [4, 1, 0, 4, 2], wolken: [3, 1, 0, 2] }[w];
+    const pal = { groen: [0, 1, 2, 4, 0, 3], ijs: [0, 4, 0, 1], vuur: [3, 1, 3, 4], schaduw: [4, 1, 0, 4, 2], wolken: [3, 1, 0, 2], dino: [2, 3, 2, 0] }[w];
     const P = { TH, pal, roots: [], limbs: [], clusters: [], shrooms: [] };
     // wortels: grote vinnen rondom. Aan de kant van het hart (+z) blijft het vrij.
     // Wortel 3 (aan de achterkant) is precies 6 hoog: daar begint de trap van zwammen.

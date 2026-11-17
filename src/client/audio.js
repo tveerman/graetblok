@@ -3,16 +3,49 @@
 // De muziek: elke wereld heeft een eigen toonsoort, tempo en klank. Het liedje wordt
 // tijdens het spelen gemaakt: vier maten met akkoorden, een bas en een melodietje dat
 // zich herhaalt en af en toe verandert.
+// Akkoordenschema's (vier maten) in halve tonen boven de grondtoon.
+const MAJ_A = [[0, 4, 7], [7, 11, 14], [9, 12, 16], [5, 9, 12]], MAJ_B = [[0, 4, 7], [9, 12, 16], [5, 9, 12], [7, 11, 14]];
+const MAJ_C = [[0, 4, 7], [5, 9, 12], [0, 4, 7], [7, 11, 14]], MAJ_D = [[9, 12, 16], [5, 9, 12], [0, 4, 7], [7, 11, 14]];
+const MIN_A = [[0, 3, 7], [8, 12, 15], [3, 7, 10], [10, 14, 17]], MIN_B = [[0, 3, 7], [5, 8, 12], [7, 10, 14], [0, 3, 7]];
+const MIN_C = [[0, 3, 7], [10, 14, 17], [8, 12, 15], [10, 14, 17]];
+// Elke wereld heeft een paar liedjes die elkaar afwisselen. Een liedje heeft een toonsoort
+// (root, minor), een tempo, een klank voor de melodie, een akkoordenschema en een stijl voor
+// de begeleiding: 'rustig' (lange tonen) of 'arp' (de tonen van het akkoord één voor één).
 const SONGS = {
-  groen: { root: 261.63, minor: false, bpm: 96, lead: 'triangle' },
-  ijs: { root: 293.66, minor: false, bpm: 80, lead: 'sine' },
-  vuur: { root: 220.0, minor: true, bpm: 104, lead: 'triangle' },
-  schaduw: { root: 164.81, minor: true, bpm: 72, lead: 'sine' },
-  wolken: { root: 349.23, minor: false, bpm: 100, lead: 'triangle' },
+  groen: [
+    { root: 261.63, minor: false, bpm: 96, lead: 'triangle', chords: MAJ_A, stijl: 'rustig' },
+    { root: 293.66, minor: false, bpm: 108, lead: 'triangle', chords: MAJ_B, stijl: 'arp' },
+    { root: 196.0, minor: false, bpm: 84, lead: 'sine', chords: MAJ_C, stijl: 'rustig' },
+    { root: 220.0, minor: true, bpm: 92, lead: 'triangle', chords: MIN_A, stijl: 'arp' },
+    { root: 349.23, minor: false, bpm: 116, lead: 'square', chords: MAJ_D, stijl: 'arp' },
+  ],
+  ijs: [
+    { root: 293.66, minor: false, bpm: 80, lead: 'sine', chords: MAJ_A, stijl: 'rustig' },
+    { root: 329.63, minor: false, bpm: 72, lead: 'sine', chords: MAJ_C, stijl: 'arp' },
+    { root: 246.94, minor: true, bpm: 76, lead: 'triangle', chords: MIN_C, stijl: 'rustig' },
+  ],
+  vuur: [
+    { root: 220.0, minor: true, bpm: 104, lead: 'triangle', chords: MIN_A, stijl: 'rustig' },
+    { root: 196.0, minor: true, bpm: 116, lead: 'square', chords: MIN_B, stijl: 'arp' },
+    { root: 246.94, minor: true, bpm: 96, lead: 'triangle', chords: MIN_C, stijl: 'arp' },
+  ],
+  schaduw: [
+    { root: 164.81, minor: true, bpm: 72, lead: 'sine', chords: MIN_A, stijl: 'rustig' },
+    { root: 146.83, minor: true, bpm: 66, lead: 'sine', chords: MIN_C, stijl: 'rustig' },
+    { root: 185.0, minor: true, bpm: 80, lead: 'triangle', chords: MIN_B, stijl: 'arp' },
+  ],
+  wolken: [
+    { root: 349.23, minor: false, bpm: 100, lead: 'triangle', chords: MAJ_A, stijl: 'rustig' },
+    { root: 392.0, minor: false, bpm: 110, lead: 'sine', chords: MAJ_B, stijl: 'arp' },
+    { root: 329.63, minor: false, bpm: 88, lead: 'triangle', chords: MAJ_D, stijl: 'rustig' },
+  ],
+  dino: [
+    { root: 196.0, minor: true, bpm: 88, lead: 'triangle', chords: MIN_A, stijl: 'rustig' },
+    { root: 174.61, minor: true, bpm: 100, lead: 'square', chords: MIN_B, stijl: 'arp' },
+    { root: 220.0, minor: false, bpm: 92, lead: 'triangle', chords: MAJ_C, stijl: 'arp' },
+  ],
 };
-// akkoorden en toonladders in halve tonen boven de grondtoon
-const CHORDS_MAJ = [[0, 4, 7], [7, 11, 14], [9, 12, 16], [5, 9, 12]];
-const CHORDS_MIN = [[0, 3, 7], [8, 12, 15], [3, 7, 10], [10, 14, 17]];
+const SONG_REPEAT = 4;      // zoveel stukjes van hetzelfde liedje, dan komt het volgende
 const PENTA_MAJ = [0, 2, 4, 7, 9], PENTA_MIN = [0, 3, 5, 7, 10];
 const MUSIC_VOL = 0.8;      // de muziek blijft op de achtergrond, onder de geluidseffecten
 
@@ -312,6 +345,15 @@ export class Sound {
       // ---- dorpen, dieren, weer en treinen ----
       case 'coin': this.tone(1568, 0.07, 'square', 0.05 * v); this.tone(2093, 0.16, 'square', 0.05 * v, 0, 0.06); this.tone(2637, 0.2, 'sine', 0.07 * v, 0, 0.12); break;
       case 'chug': this.noise(0.16, 'lowpass', 700, 0.3 * v, 160); this.tone(90, 0.1, 'triangle', 0.14 * v, 60); break;
+      // vogels: een triller, een roep van twee tonen en een lange fluittoon die omhoog gaat
+      case 'vogel1': for (let i = 0; i < 5; i++) this.tone((2300 + i * 90) * r, 0.05, 'sine', 0.07 * v, 2900 * r, i * 0.07); break;
+      case 'vogel2': this.tone(1700 * r, 0.16, 'sine', 0.09 * v, 1300 * r); this.tone(1300 * r, 0.22, 'sine', 0.08 * v, 0, 0.2); break;
+      case 'vogel3': this.tone(1500 * r, 0.3, 'sine', 0.07 * v, 2600 * r); this.tone(2600 * r, 0.08, 'sine', 0.06 * v, 0, 0.32); this.tone(2600 * r, 0.08, 'sine', 0.06 * v, 0, 0.44); break;
+      case 'koekoek': this.tone(660, 0.2, 'sine', 0.08 * v); this.tone(523, 0.28, 'sine', 0.08 * v, 0, 0.26); break;
+      // een ratelslang: een hele rij korte tikjes
+      case 'ratel': for (let i = 0; i < 16; i++) this.noise(0.025, 'highpass', 5200, 0.1 * v * (i < 12 ? 1 : (16 - i) / 5), 0, i * 0.045); break;
+      // een autoclaxon: twee tonen tegelijk, één of twee keer
+      case 'claxon': { const n = Math.random() < 0.5 ? 1 : 2; for (let i = 0; i < n; i++) { this.tone(415, 0.22, 'square', 0.05 * v, 0, i * 0.3, 0.01); this.tone(523, 0.22, 'square', 0.045 * v, 0, i * 0.3, 0.01); } break; }
       case 'toet': this.tone(590, 0.7, 'square', 0.07 * v, 0, 0, 0.03); this.tone(740, 0.7, 'square', 0.06 * v, 0, 0, 0.03); this.noise(0.7, 'bandpass', 1600, 0.07 * v, 0, 0, 2); break;
       case 'zap': this.noise(0.14, 'highpass', 3000, 0.25 * v); this.tone(1900 * r, 0.1, 'sawtooth', 0.1 * v, 200); this.tone(120, 0.22, 'square', 0.12 * v, 50, 0.03); break;
       case 'ijs': this.tone(2600 * r, 0.12, 'sine', 0.1 * v, 3900); this.tone(3300 * r, 0.14, 'sine', 0.07 * v, 0, 0.05); this.noise(0.12, 'highpass', 5000, 0.14 * v); break;
@@ -378,10 +420,14 @@ export class Sound {
     }
     this.ambT -= dt;
     if (this.ambT <= 0 && this.sfxOn) {
-      this.ambT = 2 + Math.random() * 5;
+      // in het bos hoor je veel meer vogels dan op een open veld
+      const bos = env.bos || 0, vogelWereld = w === 'groen' || w === 'wolken' || w === 'dino';
+      this.ambT = (2 + Math.random() * 5) * (bos > 0.2 && vogelWereld && env.day > 0.5 && !env.under ? 0.4 : 1);
       this.dest = this.ambGain;              // vogeltjes, druppels en gerommel horen bij de omgeving
       if (env.under) { this.tone(1300 + Math.random() * 600, 0.08, 'sine', 0.05, 700); }
-      else if (w === 'groen' || w === 'wolken') { if (env.day > 0.5) this.play('chirp', 0.5); else { for (let i = 0; i < 4; i++) this.tone(4200, 0.03, 'sine', 0.025, 0, i * 0.07); } }
+      else if (env.stad && Math.random() < 0.4) this.play('claxon', 0.5 + Math.random() * 0.5);                 // in de stad toetert er af en toe een auto
+      else if (env.zand && Math.random() < 0.3) this.play('ratel', 0.7);                                          // in de woestijn ratelt af en toe een slang
+      else if (vogelWereld) { if (env.day > 0.5) { if (bos > 0.2) this.play(['vogel1', 'vogel2', 'vogel3', 'chirp', 'vogel1', 'koekoek'][Math.floor(Math.random() * 6)], 0.35 + bos * 0.4); else if (Math.random() < 0.45) this.play('chirp', 0.45); } else { for (let i = 0; i < 4; i++) this.tone(4200, 0.03, 'sine', 0.025, 0, i * 0.07); } }
       else if (w === 'vuur') { this.noise(0.5, 'lowpass', 200, 0.12, 80); }
       else if (w === 'schaduw') { this.tone(55 + Math.random() * 10, 2.5, 'sine', 0.07, 0, 0, 0.8); this.tone(82, 2.5, 'sine', 0.03, 78, 0, 0.8); }
       this.dest = null;
@@ -406,10 +452,14 @@ export class Sound {
   // De noten van één achtste tel. emit(melodie?, toon, wanneer, duur, klank, sterkte, aanzet).
   songStep(song, phrase, step, t, v, emit) {
     const stepDur = 60 / song.bpm / 2;
-    const chords = song.minor ? CHORDS_MIN : CHORDS_MAJ;
+    const chords = song.chords;
     const hz = (n) => song.root * Math.pow(2, n / 12);
     const st = step % 8, chord = chords[Math.floor(step / 8) % 4];
-    if (st === 0) {
+    if (song.stijl === 'arp') {
+      // de tonen van het akkoord één voor één, met een bas op de eerste tel
+      if (st === 0) { emit(false, hz(chord[0] - 12), t, stepDur * 7.6, 'triangle', 0.09 * v, 0.03); emit(false, hz(chord[0]), t, stepDur * 7.6, 'sine', 0.04 * v, 0.03); }
+      if (st % 2 === 0) emit(false, hz(chord[[0, 1, 2, 1][st / 2]] + 12), t, stepDur * 1.9, 'triangle', 0.045 * v, 0.02);
+    } else if (st === 0) {
       emit(false, hz(chord[0] - 12), t, stepDur * 7.6, 'triangle', 0.1 * v, 0.03);                  // bas
       emit(false, hz(chord[0]), t, stepDur * 7.6, 'sine', 0.05 * v, 0.03);                           // dezelfde toon hoger: kleine speakers geven lage tonen slecht weer
       for (const n of chord) emit(false, hz(n + 12), t, stepDur * 8.2, 'triangle', 0.035 * v, 0.4);  // akkoord
@@ -427,8 +477,18 @@ export class Sound {
   }
 
   // een nieuw melodietje van vier maten (32 achtste noten); -1 = rust
-  makePhrase(minor) {
-    const penta = minor ? PENTA_MIN : PENTA_MAJ, chords = minor ? CHORDS_MIN : CHORDS_MAJ;
+  // Welk liedje is aan de beurt in deze wereld? Na een paar stukjes komt het volgende.
+  nextSong(world) {
+    const list = SONGS[world] || SONGS.groen, all = this.lied || (this.lied = {});
+    const k = all[world] || (all[world] = { i: Math.floor(Math.random() * list.length), n: 0 });
+    if (k.n >= SONG_REPEAT) { k.i = (k.i + 1) % list.length; k.n = 0; }
+    k.n++;
+    this.songNr = k.i + 1; this.songCount = list.length;
+    return list[k.i];
+  }
+
+  makePhrase(song) {
+    const penta = song.minor ? PENTA_MIN : PENTA_MAJ, chords = song.chords;
     const scale = [];
     for (let o = 0; o < 2; o++) for (const p of penta) scale.push(p + 12 * o);
     scale.push(24);
@@ -608,7 +668,7 @@ export class Sound {
 
   // Reken vier maten muziek vooruit uit: links de begeleiding, rechts de melodie met echo.
   renderSong(world, wav) {
-    const m = this.mus, song = SONGS[world] || SONGS.groen;
+    const m = this.mus, song = this.nextSong(world);
     const OAC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
     const stepDur = 60 / song.bpm / 2;
     const job = m.job = { world };
@@ -630,7 +690,7 @@ export class Sound {
       const fb = oc.createGain(); fb.gain.value = 0.3;
       const wet = oc.createGain(); wet.gain.value = 0.35;
       echo.connect(fb); fb.connect(echo); echo.connect(wet); wet.connect(lead);
-      const phrase = this.makePhrase(song.minor);
+      const phrase = this.makePhrase(song);
       for (let step = 0; step < 32; step++) {
         this.songStep(song, phrase, step, step * stepDur, 1, (isMel, f, t, dur, type, vol, attack) => this.note(oc, isMel ? lead : back, isMel ? echo : null, f, t, dur, type, vol, attack));
       }
@@ -667,19 +727,19 @@ export class Sound {
         this.echo = echo;
       } catch (e) { /* dan maar zonder echo */ }
     }
-    const song = SONGS[env.world] || SONGS.groen;
-    if (m.world !== env.world) { m.world = env.world; m.step = 0; m.phrase = null; m.next = now + 0.5; }
+    if (m.world !== env.world) { m.world = env.world; m.step = 0; m.phrase = null; m.next = now + 0.5; m.liveSong = null; }
+    const song = m.liveSong || (m.liveSong = this.nextSong(env.world));
     if (m.next < now - 0.2) m.next = now + 0.12;          // na een pauze niet alles inhalen
     const stepDur = 60 / song.bpm / 2;
     const v = (env.under ? 0.6 : 1) * (0.75 + 0.25 * (env.day === undefined ? 1 : env.day));
     while (m.next < now + 0.4) {
-      if (!m.phrase) m.phrase = this.makePhrase(song.minor);
+      if (!m.phrase) m.phrase = this.makePhrase(song);
       this.songStep(song, m.phrase, m.step, m.next, v, (isMel, f, t, dur, type, vol, attack) => {
         if (isMel && env.under) return;
         this.note(c, this.musicGain, isMel ? this.echo || null : null, f, t, dur, type, vol, attack);
       });
       m.step++;
-      if (m.step % 64 === 0) m.phrase = null;              // na twee keer spelen: een nieuw melodietje
+      if (m.step % 64 === 0) { m.phrase = null; m.liveSong = null; }      // na twee keer spelen: een nieuw melodietje (en misschien het volgende liedje)
       m.next += stepDur;
     }
   }

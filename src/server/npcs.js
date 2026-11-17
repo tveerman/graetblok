@@ -91,8 +91,9 @@ const WEATHER = {
   ijs: [['sneeuw', 0.4], ['storm', 0.14]],
   wolken: [['regen', 0.18]],
   schaduw: [['regen', 0.2], ['onweer', 0.1]],
+  dino: [['regen', 0.34], ['onweer', 0.12]],
 };
-const WILD_DRAGONS = { groen: ['natuur', 'vuur', 'natuur', 'goud'], ijs: ['ijs'], vuur: ['vuur'], schaduw: ['schaduw'], wolken: ['bliksem', 'kristal'] };
+const WILD_DRAGONS = { groen: ['natuur', 'vuur', 'natuur', 'goud'], ijs: ['ijs'], vuur: ['vuur'], schaduw: ['schaduw'], dino: ['natuur', 'vuur'], wolken: ['bliksem', 'kristal'] };
 
 export const npcMethods = {
 
@@ -190,7 +191,7 @@ export const npcMethods = {
         const first = q.job === 'koning' ? KINGS[h % KINGS.length] : NAMES[h % NAMES.length];
         extra.name = JOBS[q.job].title ? JOBS[q.job].title + ' ' + first : first;
       }
-      if (q.extra) Object.assign(extra, q.extra, q.extra.verkeer ? { verkeer: { ...q.extra.verkeer } } : null);
+      if (q.extra) Object.assign(extra, q.extra, q.extra.verkeer ? { verkeer: { ...q.extra.verkeer } } : null, q.extra.veh ? { veh: { ...q.extra.veh } } : null);
       const e = this.spawnEnt(w, q.k, q.x, y, q.z, extra);
       if (q.yaw !== undefined) e.yaw = q.yaw;
       ids.push(e.id);
@@ -201,7 +202,12 @@ export const npcMethods = {
   depopulate(w, key) {
     const rec = w.pop.get(key);
     if (!rec) return;
-    for (const id of rec.ids) w.ents.delete(id);
+    for (const id of rec.ids) {
+      // een stadsauto waar iemand mee is weggereden hoort niet meer bij de stad: die blijft staan tot hij verlaten is
+      const e = w.ents.get(id);
+      if (e && e.rider && e.verkeer) { e.verkeer = null; e.site = undefined; continue; }
+      w.ents.delete(id);
+    }
     w.pop.delete(key);
   },
 
