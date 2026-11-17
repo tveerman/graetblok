@@ -543,6 +543,25 @@ const PX = {
     else if (Math.abs(u - v) < 0.04 || Math.abs(u + v - 1) < 0.04) c = mul(c, 0.7);
     return c;
   },
+  // de stad: beton in platen, een raam met een kozijn (donker of met licht aan) en stoeptegels
+  beton: (x, y, u, v) => { const n = fbm(u, v, 5, 5, 2, 180); const c = mul([188, 190, 194], 0.9 + n * 0.16 + hash2(x, y, 181) * 0.04); return (x % 32 === 0 || y % 32 === 0) ? mul(c, 0.82) : c; },
+  beton_donker: (x, y, u, v) => { const n = fbm(u, v, 5, 5, 2, 182); const c = mul([98, 104, 114], 0.9 + n * 0.16 + hash2(x, y, 183) * 0.04); return (x % 32 === 0 || y % 32 === 0) ? mul(c, 0.8) : c; },
+  raam: (x, y, u, v) => {
+    const b = Math.min(u, v, 1 - u, 1 - v);
+    if (b < 0.1) return mul([150, 156, 166], 0.9 + hash2(x, y, 184) * 0.14);
+    const glans = Math.max(0, 1 - Math.abs(u - v + 0.15) * 5);
+    return mix(mix([36, 58, 92], [70, 110, 160], 1 - v), [200, 225, 250], glans * 0.5);
+  },
+  raam_licht: (x, y, u, v) => {
+    const b = Math.min(u, v, 1 - u, 1 - v);
+    if (b < 0.1) return mul([150, 156, 166], 0.9 + hash2(x, y, 185) * 0.14);
+    if (Math.abs(u - 0.5) < 0.03) return [120, 96, 60];
+    return mix([255, 236, 150], [255, 196, 96], v);
+  },
+  stoep: (x, y, u, v) => { const c = mul([168, 166, 160], 0.9 + hash2(x >> 1, y >> 1, 186) * 0.12); return (x % 16 === 0 || y % 16 === 0) ? mul(c, 0.78) : c; },
+  neon_roze: (x, y, u, v) => mix([255, 90, 200], [255, 220, 245], Math.max(0, 1 - Math.hypot(u - 0.5, v - 0.5) * 2.2)),
+  neon_blauw: (x, y, u, v) => mix([60, 170, 255], [220, 245, 255], Math.max(0, 1 - Math.hypot(u - 0.5, v - 0.5) * 2.2)),
+  neon_geel: (x, y, u, v) => mix([255, 210, 50], [255, 250, 220], Math.max(0, 1 - Math.hypot(u - 0.5, v - 0.5) * 2.2)),
   // wegdek: donker asfalt met kleine steentjes
   asfalt: (x, y, u, v) => asfaltPx(x, y),
   // een kort wit streepje in het midden: achter elkaar gelegd wordt het een onderbroken streep,
@@ -997,6 +1016,13 @@ function zwamDraw(dark, light) {
     een(20, 64, 26, 11); een(42, 64, 40, 14); een(53, 64, 16, 7);
   };
 }
+// de borden met de nummers van de gates op het vliegveld
+for (let n = 1; n <= 10; n++) DRAW['bord_' + n] = (g) => {
+  g.fillStyle = '#1c2028'; g.fillRect(0, 0, 64, 64);
+  g.fillStyle = '#f5c93a'; g.fillRect(4, 4, 56, 56);
+  g.fillStyle = '#1c2028'; g.font = 'bold ' + (n > 9 ? 38 : 46) + 'px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.fillText(String(n), 32, 35);
+};
 for (const k in zwamKleur) DRAW['gloeizwam_' + k] = zwamDraw(zwamKleur[k][0], zwamKleur[k][1]);
 DRAW.lichtbloem = (g) => {
   g.strokeStyle = '#2f9a78'; g.lineWidth = 3; g.lineCap = 'round';
@@ -1447,6 +1473,8 @@ function hqMat(name) {
   else if (is(/^(fakkel|kampvuur)$/)) emis = (r, g, b) => (r > 215 && g > 70 ? 1 : 0);
   else if (name === 'gloeipaddenstoel') emis = (r, g, b) => (g > 150 && b > 140 ? 1 : 0.1);
   else if (name === 'oven_side') emis = (r, g, b) => (r > 205 && g > 50 && b < 110 ? 1 : 0);
+  else if (is(/^neon_/)) { emis = 1; bump = 0; }
+  else if (name === 'raam_licht') emis = (r, g, b) => (r > 240 && g > 180 ? 0.9 : 0);
   else if (is(/^broedmachine_/)) emis = (r, g, b) => (r > 205 && g > 90 && b < 170 && r - b > 60 ? 0.8 : 0);
   else if (name === 'scheepscomputer') emis = (r, g, b) => (g > 170 && r < 160 ? 1 : 0);
   else if (name === 'stam_verkoold') emis = (r, g, b) => (r > 220 && g > 90 && b < 90 ? 1 : 0);
@@ -1777,6 +1805,7 @@ const ICONS = {
     if (soort === 'motor') { box(18, 30, 26, 9, c); box(24, 24, 14, 6, '#2a2e36'); g.beginPath(); g.moveTo(44, 30); g.lineTo(50, 18); g.lineTo(42, 18); g.stroke(); wheel(14, 44, 9); wheel(50, 44, 9); }
     else if (soort === 'boot') { g.fillStyle = c; g.beginPath(); g.moveTo(4, 30); g.lineTo(60, 30); g.lineTo(50, 46); g.lineTo(12, 46); g.closePath(); g.fill(); g.stroke(); box(20, 20, 18, 10, '#9fd8f0'); g.strokeStyle = '#58b8e8'; g.lineWidth = 3; g.beginPath(); g.moveTo(2, 54); for (let x = 2; x < 62; x += 12) g.quadraticCurveTo(x + 6, 48, x + 12, 54); g.stroke(); }
     else if (soort === 'heli') { g.fillStyle = c; g.beginPath(); g.ellipse(36, 34, 18, 12, 0, 0, 6.3); g.fill(); g.stroke(); box(4, 30, 20, 5, c); box(2, 22, 5, 14, c); g.fillStyle = '#9fd8f0'; g.beginPath(); g.ellipse(44, 32, 8, 7, 0, 0, 6.3); g.fill(); g.stroke(); g.lineWidth = 3; g.beginPath(); g.moveTo(8, 16); g.lineTo(62, 16); g.moveTo(36, 16); g.lineTo(36, 22); g.moveTo(22, 52); g.lineTo(52, 52); g.moveTo(28, 46); g.lineTo(28, 52); g.moveTo(44, 46); g.lineTo(44, 52); g.stroke(); }
+    else if (soort === 'vlieg') { box(8, 28, 44, 10, c); box(4, 16, 6, 14, '#d8362c'); box(22, 34, 22, 5, '#d8362c'); box(38, 22, 10, 7, '#9fd8f0'); g.lineWidth = 3; g.beginPath(); g.moveTo(56, 20); g.lineTo(56, 46); g.stroke(); wheel(20, 46, 4); wheel(40, 46, 4); }
     else if (soort === 'truck') { box(4, 14, 36, 30, '#d8dce4'); box(40, 22, 18, 22, c); box(46, 26, 10, 8, '#9fd8f0'); wheel(14, 48, 7); wheel(28, 48, 7); wheel(50, 48, 7); }
     else if (soort === 'bus') { box(4, 16, 56, 28, c); for (let x = 8; x < 54; x += 12) box(x, 21, 9, 9, '#9fd8f0'); wheel(16, 48, 7); wheel(48, 48, 7); }
     else if (soort === 'quad') { box(16, 26, 32, 10, c); box(24, 20, 14, 6, '#2a2e36'); g.beginPath(); g.moveTo(44, 26); g.lineTo(46, 16); g.stroke(); wheel(14, 42, 10); wheel(50, 42, 10); }

@@ -21,6 +21,7 @@ import { npcMethods } from './npcs.js';
 import { zooMethods } from './zoo.js';
 import { vehicleMethods } from './vehicles.js';
 import { kermisMethods } from './kermis.js';
+import { cityMethods } from './city.js';
 import { WorldGen } from './worldgen.js';
 
 const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
@@ -39,7 +40,7 @@ export class GameServer {
 
   newMeta() {
     return { v: 1, seed: (Math.random() * 2147483647) | 0, time: DAY_LENGTH * 0.05, trees: {}, bossDead: {}, portals: [], eggs: {}, nextId: 1,
-      gen2: 1, gen3: 1, gen4: 1, noParks: {}, noSites: {}, oldChunks: {}, trains: [], weather: {}, cleared: {} };
+      gen2: 1, gen3: 1, gen4: 1, gen5: 1, noCity: {}, noParks: {}, noSites: {}, oldChunks: {}, trains: [], weather: {}, cleared: {} };
   }
 
   async init() {
@@ -54,7 +55,8 @@ export class GameServer {
     if (!meta.gen2) this.upgradeWorld(meta, per);
     if (!meta.gen3) this.upgradeCircuits(meta, per);
     if (!meta.gen4) this.upgradeParks(meta, per);
-    for (const w of WORLD_ORDER) this.worlds[w] = new ServerWorld(w, meta.seed, per[w], { noSites: meta.noSites[w], oldChunks: meta.oldChunks[w], noParks: (meta.noParks || {})[w] });
+    if (!meta.gen5) this.upgradeCity(meta, per);
+    for (const w of WORLD_ORDER) this.worlds[w] = new ServerWorld(w, meta.seed, per[w], { noSites: meta.noSites[w], oldChunks: meta.oldChunks[w], noParks: (meta.noParks || {})[w], noCity: (meta.noCity || {})[w] });
     for (const rec of meta.trains || []) this.spawnTrain(rec);
     for (const rec of meta.vehicles || []) this.spawnVehicle(rec);
     this.ready = true;
@@ -113,6 +115,21 @@ export class GameServer {
         for (const st of gen.sitesNear(x, z, 110)) if (st.kind === 'pretpark' && Math.hypot(x - st.x, z - st.z) < st.r1 + 14) blocked.add(st.key);
       }
       meta.noParks[wid] = Array.from(blocked);
+    }
+  }
+
+  // Een wereld van vóór de stad en het vliegveld: in een vak waar de speler al iets had gebouwd
+  // of gegraven komt geen stad of vliegveld.
+  upgradeCity(meta, per) {
+    meta.gen5 = 1; meta.noCity = {};
+    for (const wid of WORLD_ORDER) {
+      const blocked = new Set();
+      for (const key of per[wid] ? per[wid].keys() : []) {
+        const cx = Math.floor(key / 65536) - 32768, cz = (key % 65536) - 32768;
+        blocked.add(Math.floor(cx * 16 / 224) + ',' + Math.floor(cz * 16 / 224));
+        blocked.add(Math.floor((cx * 16 + 15) / 224) + ',' + Math.floor((cz * 16 + 15) / 224));
+      }
+      meta.noCity[wid] = Array.from(blocked);
     }
   }
 
@@ -846,6 +863,7 @@ export class GameServer {
       }
       this.updateLineTrains(dt);
       this.updateRace(dt);
+      this.updateTraffic(dt);
 
       this.updateFuses();
       this.acc.snap += dt;
@@ -957,5 +975,5 @@ export class GameServer {
   }
 }
 
-Object.assign(GameServer.prototype, entityMethods, npcMethods, zooMethods, vehicleMethods, kermisMethods);
+Object.assign(GameServer.prototype, entityMethods, npcMethods, zooMethods, vehicleMethods, kermisMethods, cityMethods);
 export { itemName, isNight };

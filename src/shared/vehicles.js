@@ -16,11 +16,12 @@ export const VEHICLES = {
   vrachtwagen: { name: 'Vrachtwagen', soort: 'weg', max: 11, acc: 5, turn: 1.5, tank: 200, zuinig: 7, size: [1.9, 2.3, 5.2], seat: 1.25, kleur: 0x2a6ad0, prijs: 90, klasse: 'D' },
   bus: { name: 'Bus', soort: 'weg', max: 11, acc: 5, turn: 1.5, tank: 200, zuinig: 8, size: [1.9, 2.3, 5.6], seat: 1.0, kleur: 0xf0c020, prijs: 90, klasse: 'D' },
   boot: { open: 1, name: 'Boot', soort: 'boot', max: 11, acc: 6, turn: 1.8, tank: 80, zuinig: 12, size: [1.6, 0.9, 3.4], seat: 0.35, kleur: 0xf4f4f0, prijs: 40, klasse: 'C' },
+  vliegtuig: { name: 'Vliegtuig', soort: 'lucht', max: 26, acc: 6, turn: 2.0, tank: 200, zuinig: 12, size: [1.9, 1.7, 4.6], seat: 0.8, kleur: 0xf4f4f0, prijs: 220, klasse: 'S' },
   helikopter: { name: 'Helikopter', soort: 'lucht', max: 16, acc: 6, turn: 2.0, tank: 150, zuinig: 9, size: [1.7, 1.9, 3.6], seat: 0.8, kleur: 0x1c2028, prijs: 160, klasse: 'A' },
 };
 // de botsauto's van de kermis: die blijven in hun baan, hebben geen brandstof nodig en gaan niet kapot
 VEHICLES.botsauto = { open: 1, kermis: 1, name: 'Botsauto', soort: 'weg', max: 8, acc: 11, turn: 3.4, tank: 100, zuinig: 1e9, size: [1.2, 0.8, 1.7], seat: 0.3, kleur: 0xd8362c, prijs: 0, klasse: 'D' };
-export const VEHICLE_ORDER = ['auto', 'terreinwagen', 'motor', 'quad', 'vrachtwagen', 'bus', 'boot', 'helikopter'];
+export const VEHICLE_ORDER = ['auto', 'terreinwagen', 'motor', 'quad', 'vrachtwagen', 'bus', 'boot', 'helikopter', 'vliegtuig'];
 
 export const FUEL_PER_CAN = 50;       // zoveel brandstof zit er in één jerrycan
 

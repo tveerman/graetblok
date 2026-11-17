@@ -12,6 +12,7 @@
 import * as THREE from '../../vendor/three.module.min.js';
 import { skinMat, glowMat } from './models.js';
 import { RIDES } from '../shared/rides.js';
+import { lijnvlucht } from './city.js';
 
 const BOX = new THREE.BoxGeometry(1, 1, 1);
 const TAU = Math.PI * 2;
@@ -19,7 +20,7 @@ const _v = new THREE.Vector3(), _n = new THREE.Vector3(), _m = new THREE.Matrix4
 const _x = new THREE.Vector3(), _y = new THREE.Vector3(), _z = new THREE.Vector3();
 
 // Veel doosjes samen in één vorm: dat is voor de tablet veel minder werk dan elk doosje los.
-class Merge {
+export class Merge {
   constructor() { this.pos = []; this.nrm = []; this.uv = []; this.idx = []; }
   // een doosje met de matrix m (plek, draaiing en grootte)
   put(m) {
@@ -69,7 +70,7 @@ function lowest(seats) {
 }
 function base(kind) {
   const root = new THREE.Group();
-  root.userData.a = { type: 'rit', ride: kind, seats: [], update() {}, pickSeat() { return 0; }, canBoard() { return true; }, endTime(t) { return t + RIDES[kind].dur; }, exit: [0, 0.2, 2.5], wacht: '' };
+  root.userData.a = { type: 'rit', ride: kind, seats: [], update() {}, pickSeat() { return 0; }, canBoard() { return true; }, endTime(t) { return t + (RIDES[kind] ? RIDES[kind].dur : 20); }, exit: [0, 0.2, 2.5], wacht: '' };
   return root;
 }
 
@@ -345,4 +346,4 @@ function achtbaan() {
 }
 
 const BUILD = { reuzenrad, draaimolen, zweefmolen, schommelschip, vrijeval, achtbaan };
-export function buildRide(kind) { return (BUILD[kind] || reuzenrad)(); }
+export function buildRide(kind) { return kind === 'lijnvlucht' ? lijnvlucht() : (BUILD[kind] || reuzenrad)(); }

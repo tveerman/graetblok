@@ -5,6 +5,7 @@ import { Simplex, hash2, hash3, mulberry32 } from '../shared/noise.js';
 import { B, LIFE_LEAVES, LIFE_VINES, LIFE_FRUIT, ZWAMMEN, ZWAMHOEDEN } from '../shared/blocks.js';
 import { WORLDS, CRASH, NEST_PEAK } from '../shared/worlds.js';
 import { siteMethods, SITE_ODDS } from './sites.js';
+import { cityGen } from './city.js';
 
 const M = 4;                 // rand om de chunk heen (voor bomen die over de grens hangen)
 const W = CS + 2 * M;
@@ -24,6 +25,7 @@ export class WorldGen {
     this.siteCache = new Map();
     this.noSites = new Set(opts.noSites || []);
     this.noParks = new Set(opts.noParks || []);          // vakken waar geen pretpark mag komen (daar had de speler al gebouwd)
+    this.noCity = new Set(opts.noCity || []);            // vakken waar geen stad of vliegveld mag komen (daar had de speler al gebouwd)
     this.noCircuits = !!(opts && opts.noCircuits);      // een wereld van vóór de racebanen: daar komen er geen bij
     this.oldChunks = new Set(opts.oldChunks || []);
     this.raw = false;
@@ -948,6 +950,6 @@ export class WorldGen {
   }
 }
 
-Object.assign(WorldGen.prototype, siteMethods);
+Object.assign(WorldGen.prototype, siteMethods, cityGen);
 
 export const VAULT_Y = 3;

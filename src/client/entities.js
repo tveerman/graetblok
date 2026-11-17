@@ -233,7 +233,7 @@ export class Entities {
       e.group.rotation.y = e.yaw;
       // wezens die ver weg zijn tekenen we niet (een dorp vol mensen kost anders te veel)
       const far = e.def.boss || e.def.big || e.scale > 1.4 ? 150 : 62;
-      const vis = Math.abs(e.x - player.pos.x) < far && Math.abs(e.z - player.pos.z) < far;
+      const vis = e.id === this.ridden || (Math.abs(e.x - player.pos.x) < far && Math.abs(e.z - player.pos.z) < far);
       if (e.group.visible !== vis) { e.group.visible = vis; if (e.wagons) for (const w of e.wagons) w.visible = vis; }
       if (!vis) continue;
       const hurt = e.flags & 8;

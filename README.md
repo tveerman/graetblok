@@ -273,6 +273,28 @@ From Jorian's design document (`spel.txt`), following development phases 1–4, 
   In a world from before this version a park takes the place of about a quarter of the troll
   camps, but never where the player had built or dug. Not in yet: themed areas, the log flume
   and building your own coaster.
+- **The city and the airport (De Stad Van Wow en vliegveld Fintia)** – the fourth part of
+  Jorian's plan (`src/shared/city.js`, `src/server/city.js`, `src/client/city.js`). Two new
+  square places in the green world, 🏙️ and ✈️ on the compass (always shown, however far): the
+  nearest suitable troll camp, race circuit or castle cell around the spaceship becomes the
+  city, the next one the airport; further away about four in ten troll camps become one.
+  *The city*: a ring of four asphalt roads with zebra crossings and pavements, towers of
+  concrete, brick, marble and silver with windows (a third of them lit), six shops you can
+  walk into on the ring road (baker, restaurant, shop, jeweller, mechanic with a garage block,
+  market trader) with neon signs, the Silver Tower with a hotel (beds) in its lobby, a central
+  square with a fountain and a city park with a pond. Six cars, a taxi, a bus and a lorry
+  drive two loops; they stop for red lights (eight traffic lights, phase taken from the game
+  clock so server and screen agree), for the car in front and for a player on the road.
+  *The airport*: a runway with lights, a taxiway and apron, a terminal with gates 1-10
+  (numbered signs), a control tower, a hangar with a mechanic, three parked airliners and one
+  airliner that takes off, disappears, lands and turns around every minute. Board it at the
+  start of the runway ("✈️ Meevliegen", 5 coins): you ride along during take-off and arrive
+  at the nearest other airport, or get a round trip when there is none within 2000 blocks.
+  The pilot in the terminal sells a propeller plane (220 coins) that flies faster than the
+  helicopter. New blocks: concrete, dark concrete, window, lit window, paving, three neon
+  colours and the signs 1-10. In a world from before this version nothing changes in map
+  cells where the player had built or dug. Debug: `{c:'site', kind:'stad'|'vliegveld'}`.
+  Not in yet: buses and taxis you can ride, a metro, a harbour and more city buildings.
 - **Story quests** – 18 steps from "chop a tree" to "defeat the Drakenkoning", shown top-left,
   with a compass marker for the early ones.
 

@@ -17,6 +17,7 @@ import { UI } from './ui.js';
 import { connect } from './net.js';
 import { setupOffline } from './offline.js';
 import { RIDES } from '../shared/rides.js';
+import { setCityTime } from './city.js';
 import { Weather } from './weather.js';
 
 const $ = (id) => document.getElementById(id);
@@ -269,7 +270,7 @@ class Game {
         this.net.send({ t: 'move', x: p.pos.x, y: p.pos.y, z: p.pos.z, yaw: p.yaw, pitch: 0 });
         break;
       }
-      case 'tp': p.teleport(m.x, m.y, m.z); break;
+      case 'tp': p.teleport(m.x, m.y, m.z); if (m.fade) { ui.fade(true, m.fade); setTimeout(() => ui.fade(false), 1800); } break;
       case 'chunk': if (m.w === this.worldId) this.world.addChunk(m.cx, m.cz, m.b); break;
       case 'unload': this.world.removeChunk(m.cx, m.cz); break;
       case 'block': this.world.setBlock(m.x, m.y, m.z, m.id); break;
@@ -627,6 +628,7 @@ class Game {
       this.input.takeLook();                     // niet rondkijken of lopen terwijl een venster open staat
     } else {
       p.update(dt);
+      setCityTime(this.gameTime);
       this.ents.update(dt, this.time, p);
       this.sky.update(dt, this.R.camera, this.particles);
       this.weather(dt);
@@ -645,7 +647,7 @@ class Game {
       const steed = p.mount || own || train ? null : this.nearRide();
       const car = p.mount ? null : this.nearVehicle();
       const fair = p.mount || car ? null : this.nearAttraction();
-      this.ui.setRide(fair ? RIDES[fair.def.ride].knop : car ? (car.def.veh === 'helikopter' ? '🚁 Instappen' : car.def.veh === 'boot' ? '🚤 Instappen' : '🚗 Instappen') : train ? '🚂 Instappen' : steed ? (steed.def.rideFly ? '🪽 Vliegen' : '🐎 Rijden') : !own ? '' : (dragonStage(own.growth) >= 2 ? '🐉 Vliegen' : '🐉 ' + (own.name || 'Draak')));
+      this.ui.setRide(fair ? (RIDES[fair.def.ride] ? RIDES[fair.def.ride].knop : '✈️ Meevliegen (5 munten)') : car ? (car.def.veh === 'helikopter' ? '🚁 Instappen' : car.def.veh === 'vliegtuig' ? '✈️ Instappen' : car.def.veh === 'boot' ? '🚤 Instappen' : '🚗 Instappen') : train ? '🚂 Instappen' : steed ? (steed.def.rideFly ? '🪽 Vliegen' : '🐎 Rijden') : !own ? '' : (dragonStage(own.growth) >= 2 ? '🐉 Vliegen' : '🐉 ' + (own.name || 'Draak')));
       this.animalSounds(hd);
       const surf = this.world.get(Math.floor(p.pos.x) >> 4, Math.floor(p.pos.z) >> 4);
       const under = surf ? p.pos.y < surf.hm[(Math.floor(p.pos.x) & 15) * 16 + (Math.floor(p.pos.z) & 15)] - 6 : false;

@@ -895,7 +895,8 @@ export const entityMethods = {
       let boss = null;
       for (const e of w.ents.values()) {
         const far = e.def.boss || e.def.big ? 140 : 84;
-        if (Math.abs(e.x - p.x) > far || Math.abs(e.z - p.z) > far) continue;
+        // (waar je in zit blijft altijd in beeld: het lijnvliegtuig vliegt ver van zijn startplek weg)
+        if (e.id !== p.mount && (Math.abs(e.x - p.x) > far || Math.abs(e.z - p.z) > far)) continue;
         seen.add(e.id);
         if (!p.known.has(e.id)) { p.known.add(e.id); this.send(p, this.entDesc(e)); }
         const flags = (e.atk > 0 ? 1 : 0) | ((e.fly && !e.landed) ? 2 : 0) | (e.mode === 'stay' ? 4 : 0) | (e.hurtT > 0 ? 8 : 0) | (e.slowT > 0 ? 16 : 0) | (e.poisonT > 0 ? 32 : 0);

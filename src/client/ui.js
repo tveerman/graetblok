@@ -180,6 +180,8 @@ export class UI {
       this.cmpBurcht = el('span', 'cship', '🏰'); strip.appendChild(this.cmpBurcht);
       this.cmpBaan = el('span', 'cship', '🏁'); strip.appendChild(this.cmpBaan);
       this.cmpPark = el('span', 'cship', '🎡'); strip.appendChild(this.cmpPark);
+      this.cmpStad = el('span', 'cship', '🏙️'); strip.appendChild(this.cmpStad);
+      this.cmpVeld = el('span', 'cship', '✈️'); strip.appendChild(this.cmpVeld);
     }
     for (let i = 0; i < 4; i++) place(this.cmp[i], i * Math.PI / 2);
     let extra = '';
@@ -196,7 +198,7 @@ export class UI {
       extra += '  🚀 ' + Math.round(Math.hypot(dx, dz)) + ' m';
     }
     // het dichtstbijzijnde dorp (huisje) en kasteel (torentje)
-    for (const [node, kinds, icon] of [[this.cmpDorp, [0], '🏠'], [this.cmpBurcht, [1, 2], '🏰'], [this.cmpBaan, [4], '🏁'], [this.cmpPark, [5], '🎡']]) {
+    for (const [node, kinds, icon] of [[this.cmpDorp, [0], '🏠'], [this.cmpBurcht, [1, 2], '🏰'], [this.cmpBaan, [4], '🏁'], [this.cmpPark, [5], '🎡'], [this.cmpStad, [6], '🏙️'], [this.cmpVeld, [7], '✈️']]) {
       let best = null, bd = 1e9;
       if (sites) for (const st of sites) { if (!kinds.includes(st[0])) continue; const d = Math.hypot(st[1] - pos.x, st[2] - pos.z); if (d < bd) { bd = d; best = st; } }
       node.style.display = best && bd > 30 ? '' : 'none';
@@ -204,7 +206,7 @@ export class UI {
         let rel = Math.atan2(best[1] - pos.x, -(best[2] - pos.z)) - heading;
         while (rel > Math.PI) rel -= 2 * Math.PI; while (rel < -Math.PI) rel += 2 * Math.PI;
         node.style.left = (W / 2 + (Math.max(-1.6, Math.min(1.6, rel)) / 1.75) * (W / 2)) + 'px';
-        if (bd < 400 && Math.abs(rel) < 0.5) extra += '  ' + icon + ' ' + Math.round(bd) + ' m';
+        if ((bd < 400 || kinds[0] > 5) && Math.abs(rel) < 0.5) extra += '  ' + icon + ' ' + Math.round(bd) + ' m';
       }
     }
     let mk = this.quest && this.quest.marker && this.quest.marker.w === worldId ? this.quest.marker : null;

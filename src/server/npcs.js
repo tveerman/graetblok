@@ -54,6 +54,12 @@ export const JOBS = {
   spel_blik: { title: 'Kermisbaas', hi: '', game: 'blik', trades: [] },
   spel_ring: { title: 'Kermisbaas', hi: '', game: 'ring', trades: [] },
   spel_grijp: { title: 'Kermisbaas', hi: '', game: 'grijp', trades: [] },
+  hotelier: { title: 'Hotelbaas', hi: 'Welkom in hotel De Zilveren Toren! Slaap gerust in een van de bedden achterin.',
+    trades: [[M, 2, I.brood, 1], [M, 3, I.pannenkoek, 1], [M, 5, I.appeltaart, 1]] },
+  baliemedewerker: { title: 'Baliemedewerker', hi: 'Welkom op het vliegveld! Het lijnvliegtuig staat aan het begin van de startbaan. Een vlucht kost 5 munten.',
+    trades: [[M, 2, I.brood, 1], [M, 3, I.jerrycan, 1]] },
+  piloot: { title: 'Piloot', hi: 'Zelf vliegen? Ik verkoop vliegtuigen en helikopters. Zet hem op het platform en stap in!',
+    trades: [[M, 220, I.v_vliegtuig, 1], [M, 160, I.v_helikopter, 1], [M, 3, I.jerrycan, 1], [M, 4, I.moersleutel, 1]] },
   racemeester: { title: 'Racemeester', hi: 'Welkom op de baan!', trades: [] },
   monteur: { title: 'Monteur', hi: 'Tik op de rode gereedschapskast om aan je voertuig te sleutelen. Brandstof en onderdelen heb ik hier.',
     trades: [[M, 3, I.jerrycan, 1], [M, 4, I.moersleutel, 1], [M, 60, I.v_auto, 1], [M, 45, I.v_motor, 1], [M, 35, I.v_quad, 1], [M, 2, B.asfalt, 8], [M, 3, B.startlijn, 4], [M, 3, B.checkpoint, 4], [M, 12, B.garage, 1]] },
@@ -120,7 +126,7 @@ export const npcMethods = {
     if (inside) {
       if (p.inSite !== inside.key) {
         p.inSite = inside.key;
-        this.toast(p, (inside.kind === 'dorp' ? 'Welkom in ' : inside.kind === 'kamp' ? 'Pas op: je bent bij ' : 'Je bent bij ') + inside.name + (inside.evil && inside.kind === 'kasteel' ? '. Het spookt hier...' : '!'), inside.evil ? 'boss' : 'good');
+        this.toast(p, (inside.kind === 'vliegveld' ? 'Welkom op ' : inside.kind === 'dorp' || inside.kind === 'stad' ? 'Welkom in ' : inside.kind === 'kamp' ? 'Pas op: je bent bij ' : 'Je bent bij ') + inside.name + (inside.evil && inside.kind === 'kasteel' ? '. Het spookt hier...' : inside.kind === 'vliegveld' ? '! Het lijnvliegtuig wacht aan het begin van de startbaan: stap in om mee te vliegen.' : '!'), inside.evil ? 'boss' : 'good');
       }
     } else p.inSite = null;
     // het kompas wijst naar dorpen en kastelen in de buurt
@@ -131,7 +137,11 @@ export const npcMethods = {
   sendSites(p) {
     const w = this.worlds[p.world];
     const l = [];
-    for (const s of w.gen.sitesNear(p.x, p.z, 560)) l.push([s.kind === 'dorp' ? 0 : s.kind === 'kasteel' ? (s.evil ? 2 : 1) : s.kind === 'circuit' ? 4 : s.kind === 'pretpark' ? 5 : 3, s.x, s.z, s.name]);
+    const code = (s) => s.kind === 'dorp' ? 0 : s.kind === 'kasteel' ? (s.evil ? 2 : 1) : s.kind === 'circuit' ? 4 : s.kind === 'pretpark' ? 5 : s.kind === 'stad' ? 6 : s.kind === 'vliegveld' ? 7 : 3;
+    const seen = new Set();
+    for (const s of w.gen.sitesNear(p.x, p.z, 560)) { seen.add(s); l.push([code(s), s.x, s.z, s.name]); }
+    // de stad en het vliegveld bij het ruimteschip staan altijd op het kompas
+    if (p.world === 'groen') { const near = w.gen.cityCells(); for (const k in near) if (!seen.has(near[k])) l.push([code(near[k]), near[k].x, near[k].z, near[k].name]); }
     this.send(p, { t: 'sites', l });
   },
 
@@ -159,6 +169,7 @@ export const npcMethods = {
         const first = q.job === 'koning' ? KINGS[h % KINGS.length] : NAMES[h % NAMES.length];
         extra.name = JOBS[q.job].title ? JOBS[q.job].title + ' ' + first : first;
       }
+      if (q.extra) Object.assign(extra, q.extra, q.extra.verkeer ? { verkeer: { ...q.extra.verkeer } } : null);
       const e = this.spawnEnt(w, q.k, q.x, y, q.z, extra);
       if (q.yaw !== undefined) e.yaw = q.yaw;
       ids.push(e.id);

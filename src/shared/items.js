@@ -144,6 +144,7 @@ item(363, 'ijsje', 'IJsje', { icon: ['snack', 'ijsje'], food: 3 });
 item(364, 'knuffel_klein', 'Kleine knuffel', { icon: ['snack', 'knuffel'], stack: 16 });
 item(365, 'knuffel_groot', 'Grote knuffelbeer', { icon: ['snack', 'beer'], stack: 16 });
 item(366, 'trofee', 'Gouden trofee', { icon: ['snack', 'trofee'], stack: 16 });
+item(367, 'v_vliegtuig', 'Vliegtuig', { icon: ['car', '#f4f4f0', 'vlieg'], veh: 'vliegtuig', stack: 1 });
 
 export const isBlock = (id) => id > 0 && id < 256;
 export function itemName(id) {

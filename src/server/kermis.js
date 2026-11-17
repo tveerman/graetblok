@@ -12,6 +12,7 @@ export const kermisMethods = {
   // tik op een attractie: instappen. Het ritje zelf speelt zich af op het scherm van de speler.
   useRide(p, w, e) {
     if (p.mount || p.dead) return;
+    if (e.def.ride === 'lijnvlucht' && !this.boardFlight(p, w, e)) return;
     p.mount = e.id;
     p.rideT = this.meta.time;
     this.send(p, { t: 'mount', id: e.id, s: 1, k: 'rit', ride: e.def.ride });
@@ -19,6 +20,7 @@ export const kermisMethods = {
 
   // uit de attractie: de eerste keer per dag krijg je een paar munten
   rideDone(p, e) {
+    if (e.def.ride === 'lijnvlucht') { this.flightDone(p, e); return; }
     const R = RIDES[e.def.ride];
     if (!R || this.meta.time - (p.rideT || 0) < 8) return;
     const day = Math.floor(this.meta.time / DAY_LENGTH);

@@ -6,6 +6,7 @@ import { DRAGONS, MOBS } from '../shared/mobs.js';
 import { ANIMALS, SHINY } from '../shared/animals.js';
 import { VEHICLES } from '../shared/vehicles.js';
 import { buildRide } from './rides.js';
+import { buildCity } from './city.js';
 
 const BOX = new THREE.BoxGeometry(1, 1, 1);
 const PLANE = new THREE.PlaneGeometry(1, 1);
@@ -795,6 +796,21 @@ function voertuig(kind, kleur) {
     part(g, glas, w * 0.7, 0.34, 0.05, 0, 0.78, l * 0.12);                                          // voorruit
     part(g, donker, 0.34, 0.5, 0.3, 0, 0.5, -l * 0.5);                                              // buitenboordmotor
     part(g, donker, w * 0.5, 0.1, 0.36, 0, 0.64, -l * 0.26);                                        // bankje
+  } else if (kind === 'vliegtuig') {
+    // een klein propellervliegtuig
+    part(g, lak, w * 0.5, 0.9, l * 0.8, 0, 1.0, 0);
+    part(g, lak, w * 0.36, 0.6, l * 0.24, 0, 1.05, -l * 0.5);                                      // de staart
+    part(g, glas, w * 0.46, 0.5, l * 0.24, 0, 1.55, l * 0.08);                                     // de cockpit
+    part(g, lak, w * 3.4, 0.12, 1.1, 0, 1.3, l * 0.08);                                            // de vleugels
+    part(g, mat(0xd8362c, 'glad'), w * 3.42, 0.13, 0.3, 0, 1.3, l * 0.2);                           // rode streep op de vleugel
+    part(g, lak, w * 1.3, 0.1, 0.6, 0, 1.2, -l * 0.58);                                            // het staartvlak
+    part(g, mat(0xd8362c, 'glad'), 0.1, 0.8, 0.6, 0, 1.6, -l * 0.58);                               // het kielvlak
+    for (const s of [-1, 1]) { part(g, staal, 0.06, 0.6, 0.06, s * w * 0.4, 0.5, l * 0.1); const wl = new THREE.Mesh(WIEL, band); wl.rotation.z = Math.PI / 2; wl.scale.set(0.44, 0.16, 0.44); wl.position.set(s * w * 0.4, 0.22, l * 0.1); g.add(wl); }
+    const wl = new THREE.Mesh(WIEL, band); wl.rotation.z = Math.PI / 2; wl.scale.set(0.3, 0.12, 0.3); wl.position.set(0, 0.15, -l * 0.5); g.add(wl);
+    part(g, donker, 0.3, 0.3, 0.2, 0, 1.0, l * 0.42);
+    const prop = new THREE.Group(); prop.position.set(0, 1.0, l * 0.46); g.add(prop); a.prop = prop;
+    part(prop, donker, 1.7, 0.12, 0.04, 0, 0, 0); part(prop, donker, 0.12, 1.7, 0.04, 0, 0, 0);
+    part(g, licht, 0.12, 0.1, 0.05, w * 1.68, 1.3, l * 0.2); part(g, rood, 0.12, 0.1, 0.05, -w * 1.68, 1.3, l * 0.2);
   } else {
     // helikopter
     part(g, lak, w * 0.8, 1.1, l * 0.5, 0, 0.95, l * 0.1);
@@ -842,6 +858,7 @@ export function buildModel(kind, opts) {
     case 'trein': m = trein(); break;
     case 'voertuig': m = voertuig(def.veh, opts.color); break;
     case 'attractie': m = buildRide(def.ride); break;
+    case 'stad': m = buildCity(def.stad); break;
     case 'dier': m = dier(ANIMALS[def.animal].spec, opts.shiny || ''); break;
     default: m = pluizel(0xff00ff);
   }
@@ -902,12 +919,14 @@ export function animate(root, time, speed, flags, dt) {
       a.inner.rotation.x = atk ? 0.4 : 0;
       break;
     }
-    case 'rit': a.update(time); break;                       // een attractie van de kermis (zie rides.js)
+    case 'rit': a.update(time); break;
+    case 'stad': a.update(); break;                           // een stoplicht of een geparkeerd vliegtuig (zie city.js)                       // een attractie van de kermis (zie rides.js)
     case 'heli': {
       // de wieken draaien als er iemand in zit
       const sp = flags & 2 ? 34 : 0;
       a.spin = (a.spin || 0) + ((sp - (a.spin || 0)) * Math.min(1, dt * 1.5));
-      a.rotor.rotation.y += a.spin * dt; a.tailRotor.rotation.x += a.spin * dt * 1.6;
+      if (a.prop) a.prop.rotation.z += a.spin * dt * 1.4;
+      else { a.rotor.rotation.y += a.spin * dt; a.tailRotor.rotation.x += a.spin * dt * 1.6; }
       break;
     }
     case 'trein':

@@ -500,7 +500,9 @@ export class Player {
   fly(dt) {
     const g = this.g, inp = g.input;
     const sinY = Math.sin(this.yaw), cosY = Math.cos(this.yaw), cp = Math.cos(this.pitch), sp = Math.sin(this.pitch);
-    const speed = inp.sprint && !inp.down ? 20 : 14;
+    // een dier of draak vliegt 14 (20 met sprinten); een vliegtuig of helikopter zo hard als zijn motor kan
+    const vmax = this.mountKind === 'heli' && this.veh ? vehStats(this.veh, this.vehUp).max * (1 - 0.5 * Math.min(1, this.vehDmg / 100)) : 14;
+    const speed = inp.sprint && !inp.down ? vmax * (vmax > 20 ? 1.25 : 1.42) : vmax;
     const tx = (-sinY * cp * inp.fwd + cosY * inp.strafe * 0.7) * speed;
     const tz = (-cosY * cp * inp.fwd - sinY * inp.strafe * 0.7) * speed;
     const ty = sp * inp.fwd * speed + ((inp.jump ? 1 : 0) - (inp.down ? 1 : 0)) * 8;

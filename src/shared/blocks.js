@@ -98,6 +98,16 @@ def(42, 'drakennest', 'Drakennest', { hard: 1, snd: 'grass' });
 def(43, 'scheepswand', 'Scheepswand', { hard: 8, tool: 'pick', tier: 2, snd: 'metal' });
 def(44, 'scheepscomputer', 'Scheepscomputer', { tiles: ['scheepswand', 'scheepscomputer', 'scheepswand'], hard: Infinity, snd: 'metal', interact: true, light: 8 });
 def(45, 'machinekrat', 'Machinekrat', { hard: Infinity, snd: 'metal', interact: true });
+// de stad en het vliegveld
+def(172, 'beton', 'Beton', { hard: 3, tool: 'pick' });
+def(173, 'beton_donker', 'Donker beton', { hard: 3, tool: 'pick' });
+def(174, 'raam', 'Raam', { hard: 0.8, snd: 'glass' });
+def(175, 'raam_licht', 'Verlicht raam', { hard: 0.8, snd: 'glass', glow: 13 });
+def(176, 'stoep', 'Stoeptegels', { hard: 2, tool: 'pick' });
+def(177, 'neon_roze', 'Roze neonlicht', { hard: 0.8, snd: 'glass', glow: 15, light: 9 });
+def(178, 'neon_blauw', 'Blauw neonlicht', { hard: 0.8, snd: 'glass', glow: 15, light: 9 });
+def(179, 'neon_geel', 'Geel neonlicht', { hard: 0.8, snd: 'glass', glow: 15, light: 9 });
+for (let n = 1; n <= 10; n++) def(179 + n, 'bord_' + n, 'Bord ' + n, { hard: 1, snd: 'metal' });      // de nummers van de gates
 // wegen en racebanen: op asfalt rijdt een voertuig harder
 def(166, 'asfalt', 'Asfalt', { hard: 1.6, tool: 'pick', road: 1 });
 def(167, 'asfalt_streep', 'Asfalt met streep', { tiles: ['asfalt_streep', 'asfalt', 'asfalt'], hard: 1.6, tool: 'pick', road: 1 });

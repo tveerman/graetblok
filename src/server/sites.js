@@ -24,7 +24,9 @@ const SITE_ODDS = {
   schaduw: { dorp: 0, kasteel: 0.1, kamp: 0.16 },
 };
 // r0 = tot hier is de grond helemaal vlak, r1 = vanaf hier is het weer gewoon landschap
-const SITE_R = { dorp: [44, 62], kasteel: [56, 76], kamp: [15, 27], circuit: [50, 66], pretpark: [52, 68] };
+const SITE_R = { dorp: [44, 62], kasteel: [56, 76], kamp: [15, 27], circuit: [50, 66], pretpark: [52, 68], stad: [84, 100], vliegveld: [86, 100] };
+const STAD_NAMES = ['Nieuw Wow', 'Klein Wow', 'Wow aan Zee', 'Hoog Wow', 'Wowdam'];
+const FINTIA_NAMES = ['Fintia-Noord', 'Fintia-Oost', 'Fintia-Zuid', 'Fintia-West', 'Nieuw Fintia'];
 const PARK_NAMES = ['Kermis Wervelwind', 'Pretpark de Drakenvlucht', 'Kermis Suikerspin', 'Pretpark Sterrenland', 'Kermis de Vrolijke Draak', 'Pretpark Regenboog'];
 
 // De racebaan: een ovaal met rechte stukken. CA en CB = halve lengte en breedte tot het midden
@@ -265,12 +267,58 @@ export const siteMethods = {
     }
     if (this.world === 'groen' && rx === 0 && rz === 0) kind = 'dorp';      // altijd een dorp niet ver van het ruimteschip
     if (!kind || this.noSites.has(rx + ',' + rz)) return null;
+    // De stad en het vliegveld komen op de plek van een trollenkamp: de eerste twee geschikte
+    // plekken bij het ruimteschip (zodat er altijd een stad en een vliegveld in de buurt zijn),
+    // en verderop af en toe nog een.
+    if (this.world === 'groen' && kind !== 'dorp' && kind !== 'pretpark' && !this.noCity.has(rx + ',' + rz)) {
+      const near = this.cityCells(), key = rx + ',' + rz;
+      if (near[key]) return near[key];
+      if (kind === 'kamp' && Math.max(Math.abs(rx), Math.abs(rz)) > 6) {
+        const h = hash2(rx, rz, sd + 77), want = h < 0.22 ? 'stad' : h < 0.44 ? 'vliegveld' : '';
+        if (want) for (let t = 0; t < 5; t++) { const s = this.trySite(rx, rz, want, sd + t * 31); if (s) return s; }
+      }
+    }
     // een paar plekken in het vak proberen, tot er een geschikt stuk land is
     for (let t = 0; t < 5; t++) {
       const s = this.trySite(rx, rz, kind, sd + t * 31);
       if (s) return s;
     }
     return null;
+  },
+
+  // wat voor bouwwerk hoort er in dit vak (nog zonder te kijken of het land geschikt is)?
+  cellKind(rx, rz) {
+    const P = SITE_ODDS[this.world], sd = this.seed + 4100, r = hash2(rx, rz, sd);
+    let kind = r < P.dorp ? 'dorp' : r < P.dorp + P.kasteel ? 'kasteel' : r < P.dorp + P.kasteel + P.kamp ? 'kamp' : r < P.dorp + P.kasteel + P.kamp + (P.circuit || 0) ? 'circuit' : null;
+    if (kind === 'circuit' && this.noCircuits) kind = null;
+    const wasCamp = kind === 'kamp';
+    if (P.pretpark && (kind === null || (wasCamp && hash2(rx, rz, sd + 55) < P.pretpark))) kind = this.noParks.has(rx + ',' + rz) ? (wasCamp ? 'kamp' : null) : 'pretpark';
+    if (rx === 0 && rz === 0) kind = 'dorp';
+    return this.noSites.has(rx + ',' + rz) ? null : kind;
+  },
+
+  // De stad en het vliegveld bij het ruimteschip: de dichtstbijzijnde twee trollenkampen waar
+  // genoeg vlak land is. Geeft { 'rx,rz': bouwwerk } terug.
+  cityCells() {
+    if (this.nearCity) return this.nearCity;
+    const out = this.nearCity = {}, sd = this.seed + 4100;
+    let stad = false, veld = false;
+    // per ring om het ruimteschip: eerst de trollenkampen, dan de racebanen, dan de kastelen
+    for (let ring = 1; ring <= 6 && !(stad && veld); ring++) {
+      for (const soort of ['kamp', 'circuit', 'kasteel']) {
+        for (let rx = -ring; rx <= ring; rx++) for (let rz = -ring; rz <= ring; rz++) {
+          if (Math.max(Math.abs(rx), Math.abs(rz)) !== ring || (stad && veld)) continue;
+          if (this.noCity.has(rx + ',' + rz) || this.cellKind(rx, rz) !== soort) continue;
+          for (const want of ['stad', 'vliegveld']) {
+            if (want === 'stad' ? stad : veld) continue;
+            let s = null;
+            for (let t = 0; t < 8 && !s; t++) s = this.trySite(rx, rz, want, sd + t * 31);
+            if (s) { s.main = true; s.name = want === 'stad' ? 'De Stad Van Wow' : 'vliegveld Fintia'; out[rx + ',' + rz] = s; if (want === 'stad') stad = true; else veld = true; break; }
+          }
+        }
+      }
+    }
+    return out;
   },
 
   trySite(rx, rz, kind, sd) {
@@ -301,7 +349,8 @@ export const siteMethods = {
         }
       }
     } finally { this.raw = false; }
-    if (!ok || n < 11 || max - min > (kind === 'kamp' ? 10 : 24)) return null;
+    const sq = kind === 'stad' || kind === 'vliegveld';
+    if (!ok || n < (sq ? 13 : 11) || max - min > (kind === 'kamp' ? 10 : sq ? 21 : 24)) return null;
     const seed = (hash2(rx, rz, sd + 7) * 4294967296) >>> 0;
     const s = { kind, x, y: Math.min(hi, Math.round(sum / n)), z, rx, rz, key: rx + ',' + rz, r0, r1, seed, evil: false, name: '' };
     const pick = (list, salt) => list[Math.floor(hash2(rx, rz, sd + salt) * list.length)];
@@ -311,6 +360,8 @@ export const siteMethods = {
       s.name = s.evil ? 'Spookkasteel ' + pick(SPOOK, 13) : 'Kasteel ' + pick(BURCHT, 13);
     } else if (kind === 'circuit') s.name = pick(CIRCUIT_NAMES, 14);
     else if (kind === 'pretpark') s.name = pick(PARK_NAMES, 15);
+    else if (kind === 'stad') { s.sq = true; s.name = pick(STAD_NAMES, 16); }
+    else if (kind === 'vliegveld') { s.sq = true; s.name = 'vliegveld ' + pick(FINTIA_NAMES, 17); }
     else { s.evil = true; s.name = 'het Trollenkamp'; }
     return s;
   },
@@ -320,7 +371,8 @@ export const siteMethods = {
     if (this.raw) return;
     const s = this.siteAt(Math.floor(x / SITE_CELL), Math.floor(z / SITE_CELL));
     if (!s) return;
-    const d = Math.hypot(x - s.x, z - s.z);
+    // (de stad en het vliegveld zijn vierkant, de rest is rond)
+    const d = s.sq ? Math.max(Math.abs(x - s.x), Math.abs(z - s.z)) : Math.hypot(x - s.x, z - s.z);
     if (d >= s.r1) return;
     const P = PAL[this.world];
     c.h = lerp(s.y, c.h, smoothstep(s.r0, s.r1, d));
@@ -343,7 +395,7 @@ export const siteMethods = {
   },
 
   sitePlan(s) {
-    if (!s.plan) s.plan = s.kind === 'dorp' ? this.villagePlan(s) : s.kind === 'kasteel' ? this.castlePlan(s) : s.kind === 'circuit' ? this.circuitPlan(s) : s.kind === 'pretpark' ? this.parkPlan(s) : this.campPlan(s);
+    if (!s.plan) s.plan = s.kind === 'dorp' ? this.villagePlan(s) : s.kind === 'kasteel' ? this.castlePlan(s) : s.kind === 'circuit' ? this.circuitPlan(s) : s.kind === 'pretpark' ? this.parkPlan(s) : s.kind === 'stad' ? this.stadPlan(s) : s.kind === 'vliegveld' ? this.luchthavenPlan(s) : this.campPlan(s);
     return s.plan;
   },
 
@@ -961,6 +1013,8 @@ export const siteMethods = {
         else if (s.kind === 'kasteel') this.drawCastle(S, s);
         else if (s.kind === 'circuit') this.drawCircuit(S, s);
         else if (s.kind === 'pretpark') this.drawPark(S, s);
+        else if (s.kind === 'stad') this.drawStad(S, s);
+        else if (s.kind === 'vliegveld') this.drawLuchthaven(S, s);
         else this.drawCamp(S, s);
       }
     }
