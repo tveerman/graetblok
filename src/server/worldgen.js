@@ -23,6 +23,7 @@ export class WorldGen {
     this.world = world;
     this.siteCache = new Map();
     this.noSites = new Set(opts.noSites || []);
+    this.noParks = new Set(opts.noParks || []);          // vakken waar geen pretpark mag komen (daar had de speler al gebouwd)
     this.noCircuits = !!(opts && opts.noCircuits);      // een wereld van vóór de racebanen: daar komen er geen bij
     this.oldChunks = new Set(opts.oldChunks || []);
     this.raw = false;

@@ -45,6 +45,15 @@ export const JOBS = {
   drakenhandelaar: { title: 'Drakenhandelaar', hi: 'Psst... zoek je iets bijzonders? Ik heb eieren van heel ver weg.',
     trades: [[M, 160, I.v_helikopter, 1], [M, 40, I.ei_magisch, 1], [M, 120, I.ei_sterren, 1], [M, 40, B.ei_vuur, 1], [M, 40, B.ei_ijs, 1], [M, 50, B.ei_bliksem, 1], [M, 50, B.ei_schaduw, 1], [M, 80, B.ei_kristal, 1],
       [M, 6, I.drakenschub, 1], [I.drakenschub, 1, M, 4]] },
+  kraam_oliebol: { title: 'Oliebollenbakker', hi: 'Verse oliebollen! Lekker warm.', trades: [[M, 1, I.oliebol, 2], [M, 1, I.poffertjes, 1], [M, 1, I.churros, 2]] },
+  kraam_snoep: { title: 'Snoepverkoper', hi: 'Suikerspin, popcorn of een ijsje?', trades: [[M, 1, I.suikerspin, 2], [M, 1, I.popcorn, 3], [M, 1, I.ijsje, 2]] },
+  kraam_friet: { title: 'Frietbakker', hi: 'Een puntzak friet, zo uit het vet!', trades: [[M, 1, I.friet, 1], [M, 2, I.gebraden_vlees, 1], [M, 4, I.drankje, 1]] },
+  spel_jut: { title: 'Kermisbaas', hi: '', game: 'jut', trades: [] },
+  spel_eend: { title: 'Kermisbaas', hi: '', game: 'eend', trades: [] },
+  spel_ballon: { title: 'Kermisbaas', hi: '', game: 'ballon', trades: [] },
+  spel_blik: { title: 'Kermisbaas', hi: '', game: 'blik', trades: [] },
+  spel_ring: { title: 'Kermisbaas', hi: '', game: 'ring', trades: [] },
+  spel_grijp: { title: 'Kermisbaas', hi: '', game: 'grijp', trades: [] },
   racemeester: { title: 'Racemeester', hi: 'Welkom op de baan!', trades: [] },
   monteur: { title: 'Monteur', hi: 'Tik op de rode gereedschapskast om aan je voertuig te sleutelen. Brandstof en onderdelen heb ik hier.',
     trades: [[M, 3, I.jerrycan, 1], [M, 4, I.moersleutel, 1], [M, 60, I.v_auto, 1], [M, 45, I.v_motor, 1], [M, 35, I.v_quad, 1], [M, 2, B.asfalt, 8], [M, 3, B.startlijn, 4], [M, 3, B.checkpoint, 4], [M, 12, B.garage, 1]] },
@@ -105,6 +114,7 @@ export const npcMethods = {
       const d = Math.hypot(s.x - p.x, s.z - p.z);
       if (d < s.r0 + 60 && !w.pop.has(s.key)) this.populate(w, s);
       if (d < s.r0 + 90 && s.kind === 'dorp') this.ensureLineTrain(w, s);
+      if (d < s.r0 + 60 && s.kind === 'pretpark') this.ensureBots(w, s);
       if (d < s.r0 - 6 && s.name) inside = s;
     }
     if (inside) {
@@ -121,7 +131,7 @@ export const npcMethods = {
   sendSites(p) {
     const w = this.worlds[p.world];
     const l = [];
-    for (const s of w.gen.sitesNear(p.x, p.z, 560)) l.push([s.kind === 'dorp' ? 0 : s.kind === 'kasteel' ? (s.evil ? 2 : 1) : s.kind === 'circuit' ? 4 : 3, s.x, s.z, s.name]);
+    for (const s of w.gen.sitesNear(p.x, p.z, 560)) l.push([s.kind === 'dorp' ? 0 : s.kind === 'kasteel' ? (s.evil ? 2 : 1) : s.kind === 'circuit' ? 4 : s.kind === 'pretpark' ? 5 : 3, s.x, s.z, s.name]);
     this.send(p, { t: 'sites', l });
   },
 
@@ -385,7 +395,9 @@ export const npcMethods = {
     const ai = e.def.ai;
     if (e.kind === 'trein') { this.useTrain(p, w, e, hid); return true; }
     if (e.veh) { this.useVehicle(p, w, e, hid); return true; }
-    if (e.race) return true;                                              // de auto van een andere coureur
+    if (e.race) return true;
+    if (e.def.ride) { this.useRide(p, w, e); return true; }
+    if (e.job && JOBS[e.job] && JOBS[e.job].game) { this.kermisMenu(p, JOBS[e.job].game); return true; }                                              // de auto van een andere coureur
     if (e.job === 'racemeester') { this.raceMenu(p, w, e); return true; }
     if (e.job) {
       const J = JOBS[e.job];

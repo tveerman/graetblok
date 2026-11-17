@@ -5,6 +5,7 @@ import { skin, faceTex, wingTex } from './textures.js';
 import { DRAGONS, MOBS } from '../shared/mobs.js';
 import { ANIMALS, SHINY } from '../shared/animals.js';
 import { VEHICLES } from '../shared/vehicles.js';
+import { buildRide } from './rides.js';
 
 const BOX = new THREE.BoxGeometry(1, 1, 1);
 const PLANE = new THREE.PlaneGeometry(1, 1);
@@ -776,6 +777,16 @@ function voertuig(kind, kleur) {
       part(g, staal, 0.1, 0.5, 0.1, w * 0.4, h * 0.95, l * 0.22);                                    // uitlaat
     }
     lampen(by + 0.25, l / 2 + 0.01, w * 0.36);
+  } else if (kind === 'botsauto') {
+    // een lage ronde botsauto met een rubberen rand en een stroomstok
+    for (const x of [-1, 1]) for (const z of [-1, 1]) wiel(x * (w / 2 - 0.12), z * l * 0.3, 0.16, 0.14);
+    part(g, donker, w + 0.16, 0.22, l + 0.16, 0, 0.3, 0);
+    part(g, lak, w, 0.42, l, 0, 0.52, 0);
+    part(g, lak, w * 0.8, 0.3, 0.2, 0, 0.84, -l * 0.36);                                          // rugleuning
+    part(g, donker, 0.4, 0.06, 0.06, 0, 0.9, l * 0.2);                                           // stuur
+    part(g, staal, 0.05, 2.0, 0.05, 0, 1.7, -l * 0.44);
+    part(g, licht, 0.14, 0.14, 0.14, 0, 2.72, -l * 0.44);
+    part(g, licht, 0.5, 0.1, 0.05, 0, 0.5, l / 2 + 0.01);
   } else if (kind === 'boot') {
     part(g, lak, w, 0.5, l * 0.78, 0, 0.3, -l * 0.06);
     part(g, lak, w * 0.7, 0.5, l * 0.16, 0, 0.3, l * 0.38); part(g, lak, w * 0.36, 0.46, l * 0.1, 0, 0.32, l * 0.47);      // de punt
@@ -830,6 +841,7 @@ export function buildModel(kind, opts) {
     case 'reuzenspin': m = reuzenspin(); break;
     case 'trein': m = trein(); break;
     case 'voertuig': m = voertuig(def.veh, opts.color); break;
+    case 'attractie': m = buildRide(def.ride); break;
     case 'dier': m = dier(ANIMALS[def.animal].spec, opts.shiny || ''); break;
     default: m = pluizel(0xff00ff);
   }
@@ -890,6 +902,7 @@ export function animate(root, time, speed, flags, dt) {
       a.inner.rotation.x = atk ? 0.4 : 0;
       break;
     }
+    case 'rit': a.update(time); break;                       // een attractie van de kermis (zie rides.js)
     case 'heli': {
       // de wieken draaien als er iemand in zit
       const sp = flags & 2 ? 34 : 0;
@@ -918,3 +931,6 @@ export function animate(root, time, speed, flags, dt) {
     }
   }
 }
+
+// de bouwstenen van de modellen, ook voor de attracties in rides.js
+export { mat as skinMat, glowMat, part as boxPart };

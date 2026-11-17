@@ -1754,6 +1754,21 @@ const ICONS = {
     g.restore();
   },
   stick: (g) => { g.strokeStyle = '#4a3018'; g.lineWidth = 9; g.lineCap = 'round'; g.beginPath(); g.moveTo(16, 50); g.lineTo(48, 14); g.stroke(); g.strokeStyle = '#9a6e3a'; g.lineWidth = 5; g.stroke(); },
+  // lekkers en prijzen van de kermis
+  snack: (g, soort) => {
+    g.strokeStyle = 'rgba(0,0,0,0.65)'; g.lineWidth = 2; g.lineJoin = 'round';
+    const bol = (x, y, r, c) => { g.fillStyle = c; g.beginPath(); g.arc(x, y, r, 0, 6.3); g.fill(); g.stroke(); };
+    const vak = (x, y, w, h, c) => { g.fillStyle = c; g.fillRect(x, y, w, h); g.strokeRect(x, y, w, h); };
+    if (soort === 'oliebol') { bol(32, 36, 19, '#b8742c'); g.fillStyle = '#fff'; for (const [x, y] of [[24, 26], [34, 22], [42, 30], [28, 34], [38, 38]]) { g.beginPath(); g.arc(x, y, 2.2, 0, 6.3); g.fill(); } }
+    else if (soort === 'suikerspin') { vak(30, 34, 4, 26, '#e8dcc0'); bol(32, 24, 19, '#ff9ad0'); g.fillStyle = 'rgba(255,255,255,.5)'; g.beginPath(); g.arc(26, 18, 7, 0, 6.3); g.fill(); }
+    else if (soort === 'popcorn') { g.fillStyle = '#d8362c'; g.beginPath(); g.moveTo(16, 26); g.lineTo(48, 26); g.lineTo(43, 58); g.lineTo(21, 58); g.closePath(); g.fill(); g.stroke(); g.fillStyle = '#fff'; g.fillRect(27, 27, 4, 30); g.fillRect(37, 27, 4, 30); for (const [x, y] of [[20, 20], [30, 15], [40, 16], [46, 22], [34, 22], [25, 24]]) bol(x, y, 6, '#fff4c0'); }
+    else if (soort === 'churros') { g.save(); g.translate(32, 32); g.rotate(-0.6); for (const x of [-12, 0, 12]) vak(x - 4, -24, 8, 48, '#d89a3c'); g.restore(); }
+    else if (soort === 'poffertjes') { g.fillStyle = '#f4f4f0'; g.beginPath(); g.ellipse(32, 44, 26, 10, 0, 0, 6.3); g.fill(); g.stroke(); for (const [x, y] of [[20, 40], [32, 36], [44, 40], [26, 46], [38, 46]]) bol(x, y, 6.5, '#e0a84a'); g.fillStyle = '#fff'; g.beginPath(); g.arc(32, 34, 3, 0, 6.3); g.fill(); }
+    else if (soort === 'friet') { for (const [x, h] of [[20, 26], [26, 34], [32, 30], [38, 36], [44, 26]]) vak(x - 3, 34 - h, 6, h + 6, '#f5d23a'); g.fillStyle = '#d8362c'; g.beginPath(); g.moveTo(14, 30); g.lineTo(50, 30); g.lineTo(42, 60); g.lineTo(22, 60); g.closePath(); g.fill(); g.stroke(); }
+    else if (soort === 'ijsje') { g.fillStyle = '#d8a04a'; g.beginPath(); g.moveTo(22, 30); g.lineTo(42, 30); g.lineTo(32, 60); g.closePath(); g.fill(); g.stroke(); bol(32, 22, 13, '#ffb0c8'); bol(32, 10, 5, '#d8362c'); }
+    else if (soort === 'trofee') { g.fillStyle = '#f5c93a'; g.beginPath(); g.moveTo(18, 10); g.lineTo(46, 10); g.lineTo(42, 32); g.quadraticCurveTo(32, 40, 22, 32); g.closePath(); g.fill(); g.stroke(); vak(29, 36, 6, 10, '#f5c93a'); vak(20, 46, 24, 8, '#c8901c'); g.beginPath(); g.arc(16, 20, 7, 1.2, 5.1); g.stroke(); g.beginPath(); g.arc(48, 20, 7, 4.3, 8.2); g.stroke(); }
+    else { const beer = soort === 'beer', c = beer ? '#a8743c' : '#f0a0c0'; bol(20, 14, 7, c); bol(44, 14, 7, c); bol(32, 44, beer ? 17 : 14, c); bol(32, 24, beer ? 15 : 13, c); bol(32, 28, 5, '#f4e0c0'); g.fillStyle = '#1c1c20'; for (const x of [26, 38]) { g.beginPath(); g.arc(x, 21, 2, 0, 6.3); g.fill(); } g.beginPath(); g.arc(32, 27, 1.8, 0, 6.3); g.fill(); }
+  },
   // een voertuig van opzij: c = de lak, soort = 'auto', 'jeep', 'motor', 'quad', 'truck', 'bus', 'boot' of 'heli'
   car: (g, c, soort) => {
     g.strokeStyle = 'rgba(0,0,0,0.7)'; g.lineWidth = 2; g.lineJoin = 'round';

@@ -133,6 +133,18 @@ item(354, 'v_helikopter', 'Helikopter', { icon: ['car', '#1c2028', 'heli'], veh:
 item(355, 'jerrycan', 'Jerrycan met brandstof', { icon: ['can'], stack: 16 });
 item(356, 'moersleutel', 'Moersleutel', { icon: ['wrench'], stack: 1 });
 
+// lekkers van de kermis, en de prijzen die je bij de spelletjes kunt winnen
+item(357, 'oliebol', 'Oliebol', { icon: ['snack', 'oliebol'], food: 5 });
+item(358, 'suikerspin', 'Suikerspin', { icon: ['snack', 'suikerspin'], food: 3 });
+item(359, 'popcorn', 'Popcorn', { icon: ['snack', 'popcorn'], food: 3 });
+item(360, 'churros', 'Churros', { icon: ['snack', 'churros'], food: 4 });
+item(361, 'poffertjes', 'Poffertjes', { icon: ['snack', 'poffertjes'], food: 5 });
+item(362, 'friet', 'Friet', { icon: ['snack', 'friet'], food: 6 });
+item(363, 'ijsje', 'IJsje', { icon: ['snack', 'ijsje'], food: 3 });
+item(364, 'knuffel_klein', 'Kleine knuffel', { icon: ['snack', 'knuffel'], stack: 16 });
+item(365, 'knuffel_groot', 'Grote knuffelbeer', { icon: ['snack', 'beer'], stack: 16 });
+item(366, 'trofee', 'Gouden trofee', { icon: ['snack', 'trofee'], stack: 16 });
+
 export const isBlock = (id) => id > 0 && id < 256;
 export function itemName(id) {
   if (id < 256) return BLOCKS[id] ? BLOCKS[id].name : '?';

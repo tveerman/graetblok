@@ -16,10 +16,12 @@
   "src/client/particles.js",
   "src/client/player.js",
   "src/client/render.js",
+  "src/client/rides.js",
   "src/client/textures.js",
   "src/client/ui.js",
   "src/client/weather.js",
   "src/server/entities.js",
+  "src/server/kermis.js",
   "src/server/npcs.js",
   "src/server/quests.js",
   "src/server/server.js",
@@ -37,6 +39,7 @@
   "src/shared/mobs.js",
   "src/shared/noise.js",
   "src/shared/rails.js",
+  "src/shared/rides.js",
   "src/shared/vehicles.js",
   "src/shared/worlds.js"
 ]

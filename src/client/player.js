@@ -14,6 +14,7 @@ const _v = new THREE.Vector3();
 const _L = [0, 0, 0, 0], _P = [0, 0, 0, 0];
 
 const AIR_MAX = 15;        // zoveel tellen kun je onder water blijven
+const _seat = new THREE.Vector3();
 export class Player {
   constructor(game) {
     this.g = game;
@@ -24,6 +25,7 @@ export class Player {
     this.mount = 0; this.mountScale = 1;
     this.mountKind = '';          // 'trein' = op een trein, 'dier' = rijden over de grond, 'vlieg' = op een vliegend dier, '' = op een draak
     this.veh = null; this.carYaw = 0; this.carV = 0; this.vehFuel = 0; this.vehDmg = 0; this.vehDist = 0; this.vehBump = 0; this.vehT = 0;      // het voertuig waar je in zit
+    this.wetY = 0; this.wetT = 0;                                  // voor het uit het water klimmen (zie walk)
     this.air = AIR_MAX; this.drownT = 0; this.airShown = -1;      // lucht onder water
     this.seatH = 0; this.rideSp = 0;      // hoe hoog je op je rijdier zit en hoe hard het loopt
     this.rail = null;             // waar de trein op het spoor is: { x, y, z, din, dout, t, v, end }
@@ -88,6 +90,17 @@ export class Player {
       this.mount = id; this.mountScale = scale || 1; this.mountKind = kind || '';
       this.seatH = seat || 0; this.rideSp = sp || 7;
       this.vel.set(0, 0, 0);
+      if (kind === 'rit') {
+        // in een attractie: je zit op een stoel van het model en beweegt daarmee mee
+        const e = this.g.ents.map.get(id), a = e && e.group.userData.a;
+        if (!a || !a.canBoard(this.g.time)) { this.mount = 0; this.mountKind = ''; this.g.net.send({ t: 'dismount' }); this.g.ui.toast((a && a.wacht) || 'Dat kan nu even niet.'); this.g.ents.ridden = 0; return; }
+        this.rideA = a; this.rideE = e;
+        this.rideSeat = a.pickSeat(this.g.time, this.pos.x, this.pos.z);
+        this.rideEnd = a.endTime(this.g.time);
+        this.rideOut = false;
+        this.g.ents.ridden = id;
+        return;
+      }
       if (kind === 'auto' || kind === 'heli') {
         // in een voertuig: je staat waar het voertuig staat en kijkt mee in zijn rijrichting
         const e = this.g.ents.map.get(id);
@@ -111,6 +124,7 @@ export class Player {
         this.rail = null; this.railV = 0;
       }
       this.raceHold = 0;
+      if (this.mountKind === 'rit' && this.rideE) { const x = this.rideA.exit; this.pos.set(this.rideE.x + x[0], this.rideE.y + x[1], this.rideE.z + x[2]); this.vel.set(0, 0, 0); this.rideA = null; this.rideE = null; }
       if (this.veh) { this.flushVeh(); this.pos.x += Math.cos(this.carYaw) * (this.veh.size[0] / 2 + 0.7); this.pos.z -= Math.sin(this.carYaw) * (this.veh.size[0] / 2 + 0.7); this.pos.y += 0.2; this.veh = null; this.g.sound.engine(0); this.g.ui.setVeh(''); }
       this.mount = 0; this.mountKind = ''; this.softLand = true; this.fallPeak = this.pos.y;
     }
@@ -175,6 +189,19 @@ export class Player {
     this.chugT = (this.chugT || 0) - dt * (0.5 + R.v * 0.42);
     if (this.chugT <= 0 && R.v > 0.3) { this.chugT = 1; g.sound.play('chug', 0.45 + Math.min(0.5, R.v / 22)); }
     if (get(R.x, R.y, R.z) !== B.rails) { this.rail = null; g.ui.toast('De trein is van de rails!', 'warn'); }
+  }
+
+  // In een attractie: je zit op je stoel en beweegt mee tot het ritje is afgelopen.
+  rideTick() {
+    const a = this.rideA, g = this.g;
+    if (!a || !this.rideE || !g.ents.map.has(this.mount)) { g.net.send({ t: 'dismount' }); return; }
+    a.seats[this.rideSeat].getWorldPosition(_seat);
+    const ox = this.pos.x, oy = this.pos.y, oz = this.pos.z;
+    this.pos.copy(_seat);
+    this.speedNow = 0; this.vel.set(0, 0, 0); this.onGround = false; this.fallPeak = this.pos.y; this.softLand = true; this.inWater = false;
+    // hoe harder het gaat, hoe meer de wind suist
+    this.rideV = Math.hypot(this.pos.x - ox, this.pos.y - oy, this.pos.z - oz);
+    if (g.time >= this.rideEnd && !this.rideOut) { this.rideOut = true; g.net.send({ t: 'dismount' }); }
   }
 
   // Een auto, motor, vrachtwagen of boot besturen. Stick naar voren = gas, naar achteren =
@@ -362,7 +389,7 @@ export class Player {
 
     const ready = !this.frozen && !this.dead && w.isLoaded(this.pos.x, this.pos.z);
     if (ready) {
-      if (!this.mount || this.mountKind === 'dier') this.walk(dt); else if (this.mountKind === 'trein') this.ride(dt); else if (this.mountKind === 'auto') this.drive(dt); else this.fly(dt);
+      if (this.mountKind === 'rit') this.rideTick(); else if (!this.mount || this.mountKind === 'dier') this.walk(dt); else if (this.mountKind === 'trein') this.ride(dt); else if (this.mountKind === 'auto') this.drive(dt); else this.fly(dt);
       if (this.veh) this.vehicleTick(dt);
       this.environment(dt);
     } else { this.vel.set(0, 0, 0); this.speedNow = 0; }
@@ -431,9 +458,20 @@ export class Player {
       this.fallPeak = this.pos.y;
     }
     // automatisch een blok omhoog springen
-    if (blocked && wl > 0.2 && (this.onGround || this.inWater)) {
+    // Uit het water of de lava klimmen. Zwem (of loop) tegen de kant aan en je klimt langs de
+    // wand omhoog, tot drie blokken boven het water. Zonder dit kwam je uit een kuil met water
+    // of lava niet meer weg: springen komt maar een klein stukje boven het water uit.
+    if (this.inWater) {
+      this.wetY = this.pos.y; this.wetT = 0.7;
+      // lig je er al een tijdje in? dan één keer vertellen hoe je eruit komt
+      this.wetLong = (this.wetLong || 0) + dt;
+      if (this.wetLong > 6 && !this.wetTold) { this.wetTold = true; g.ui.toast('Zwem tegen de kant aan: dan klim je eruit.'); }
+    } else { if (this.wetT > 0) this.wetT -= dt; else { this.wetLong = 0; this.wetTold = false; } }
+    const climbing = blocked && wl > 0.2 && !this.inWater && this.wetT > 0 && this.pos.y < this.wetY + 3.4;
+    if (climbing) { this.vel.y = Math.max(this.vel.y, 4.6); this.wetT = 0.7; this.fallPeak = this.pos.y; this.onGround = false; }
+    else if (blocked && wl > 0.2 && (this.onGround || this.inWater)) {
       const px = this.pos.x + wx * 0.45, pz = this.pos.z + wz * 0.45;
-      if (this.inWater) this.vel.y = Math.max(this.vel.y, 4.2);
+      if (this.inWater) this.vel.y = Math.max(this.vel.y, 5.2);
       else if (this.autoJump && !w.boxHits(px, this.pos.y + 1.05, pz, HW, HH) && !w.boxHits(this.pos.x, this.pos.y + 1.05, this.pos.z, HW, HH)) { this.vel.y = 8.6; this.onGround = false; }
     }
     const moved = Math.hypot(this.pos.x - ox, this.pos.z - oz);
@@ -608,7 +646,7 @@ export class Player {
     if (third) {
       m.position.copy(this.pos);
       if (this.mountKind === 'dier' || this.mountKind === 'auto') m.position.y += this.seatH - 0.62;      // je zit op zijn rug, of op de stoel
-      else if (this.mountKind === 'vlieg' || this.mountKind === 'heli') m.position.y -= 0.62;
+      else if (this.mountKind === 'vlieg' || this.mountKind === 'heli' || this.mountKind === 'rit') m.position.y -= 0.62;
       m.rotation.y = this.yaw + Math.PI;
       const a = m.userData.a;
       a.pose = this.mount ? 'ride' : '';

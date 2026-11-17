@@ -197,6 +197,9 @@ export class Entities {
           const px = e.x + Math.sin(e.yaw) * 0.84, pz = e.z + Math.cos(e.yaw) * 0.84;
           for (let i = 0; i < 3; i++) this.particles.add(px, e.y + 2.05, pz, (Math.random() - 0.5) * 0.5, 1.6 + Math.random(), (Math.random() - 0.5) * 0.5, 0.92, 0.92, 0.94, 0.5 + Math.random() * 0.3, 1.4, -0.6);
         }
+      } else if (e.def.ride) {
+        // een attractie blijft staan waar hij staat, ook als je erin zit
+        e.x = e.nx; e.y = e.ny; e.z = e.nz; e.yaw = 0;
       } else if (e.id === this.ridden && e.def.veh) {
         // het voertuig waar je in zit staat waar jij staat (een helikopter hangt onder je)
         const air = player.mountKind === 'heli';
@@ -229,7 +232,7 @@ export class Entities {
       e.group.position.set(e.x, e.y, e.z);
       e.group.rotation.y = e.yaw;
       // wezens die ver weg zijn tekenen we niet (een dorp vol mensen kost anders te veel)
-      const far = e.def.boss || e.scale > 1.4 ? 150 : 62;
+      const far = e.def.boss || e.def.big || e.scale > 1.4 ? 150 : 62;
       const vis = Math.abs(e.x - player.pos.x) < far && Math.abs(e.z - player.pos.z) < far;
       if (e.group.visible !== vis) { e.group.visible = vis; if (e.wagons) for (const w of e.wagons) w.visible = vis; }
       if (!vis) continue;

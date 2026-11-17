@@ -255,8 +255,24 @@ From Jorian's design document (`spel.txt`), following development phases 1–4, 
   comes back. You may get in and drive it yourself; when you get out it carries on.
 - **Air under water** – ten bubbles above the hearts; after fifteen seconds under water you
   lose a heart every second until you come up.
+- **Climbing out of water and lava** – swim (or walk) against the bank and you climb up the
+  wall, up to three blocks above the surface. Jumping alone only gets you a third of a block
+  above the water, which used to leave you stuck in a pit.
 - **Above the clouds** – dragons, flying animals and the helicopter can fly through the cloud
   layer (at height 152) up to height 198.
+- **Fairground (kermis en pretpark)** – the third part of Jorian's plan. A new kind of place in
+  the world (🎡 on the compass): a fenced park with a gate. The rides are large animated models
+  you can sit in (`src/shared/rides.js`, `src/client/rides.js`): a roller coaster with a lift
+  hill, a big drop, a looping and a camelback; a Ferris wheel; a free-fall tower; a carousel; a
+  swing ride and a swinging ship. Stand at a ride and use the button ("🎢 Instappen"); the ride
+  ends by itself and the first ride of the day in each attraction pays two coins. There are
+  three food stalls (oliebollen, churros, poffertjes, candy floss, popcorn, ice cream, chips),
+  six fair games that really work (kop van jut, tin-can throw, ring toss, duck fishing, balloon
+  popping, claw machine: two coins a go, prizes are cuddly toys, a trophy, coins and sometimes
+  an egg), a bumper-car arena with four cars, lanterns, and fireworks above the park at night.
+  In a world from before this version a park takes the place of about a quarter of the troll
+  camps, but never where the player had built or dug. Not in yet: themed areas, the log flume
+  and building your own coaster.
 - **Story quests** – 18 steps from "chop a tree" to "defeat the Drakenkoning", shown top-left,
   with a compass marker for the early ones.
 
@@ -391,7 +407,7 @@ game.net.send({ t: 'debug', c: 'world', w: 'wolken' })     // jump to the cloud 
 game.net.send({ t: 'debug', c: 'time', v: 0 })             // morning
 game.net.send({ t: 'debug', c: 'god', v: 1 })              // cannot be hurt
 game.net.send({ t: 'debug', c: 'grow' })                   // all your dragons become adults
-game.net.send({ t: 'debug', c: 'site', kind: 'dorp' })     // jump to the nearest village ('kasteel', 'kamp', 'circuit')
+game.net.send({ t: 'debug', c: 'site', kind: 'dorp' })     // jump to the nearest village ('kasteel', 'kamp', 'circuit', 'pretpark')
 game.net.send({ t: 'debug', c: 'weather', k: 'onweer' })   // 'zon', 'regen', 'onweer', 'sneeuw', 'storm'
 game.net.send({ t: 'debug', c: 'herd', kind: 'schaap' })   // a herd next to you ('koe', 'wolf', 'beer')
 game.net.send({ t: 'debug', c: 'hatch' })                  // every egg in an incubator hatches now

@@ -247,3 +247,12 @@ body.touch #crosshair { opacity: .6; }
 #loadBar { height: 18px; border-radius: 10px; border: 2px solid rgba(255,255,255,.35); background: rgba(0,0,0,.45); overflow: hidden; }
 #loadFill { height: 100%; width: 4%; background: linear-gradient(#ffe27a, #e0a020); border-radius: 8px; transition: width .2s; }
 #loadText { font-size: 15px; margin: 8px 0 0; text-shadow: 0 1px 3px #000; }
+
+/* kermisspelletjes */
+.kbar { position: relative; height: 34px; margin: 14px 0; border-radius: 10px; border: 2px solid rgba(255,255,255,.35); background: rgba(0,0,0,.45); overflow: hidden; }
+.kzone { position: absolute; top: 0; bottom: 0; background: #f5c93a; opacity: .85; }
+.kmark { position: absolute; top: -2px; bottom: -2px; width: 6px; margin-left: -3px; background: #fff; border-radius: 3px; box-shadow: 0 0 6px #000; }
+.kgrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 12px 0; }
+.kitem { font-size: 30px; height: 58px; border-radius: 12px; border: 2px solid rgba(255,255,255,.25); background: rgba(80,160,220,.35); cursor: pointer; color: #fff; font-weight: 800; }
+.kitem.open { background: rgba(255,255,255,.12); font-size: 24px; }
+.kprijs { font-size: 17px; } .kprijs img { width: 44px; height: 44px; vertical-align: middle; }

@@ -16,6 +16,7 @@ import { Player } from './player.js';
 import { UI } from './ui.js';
 import { connect } from './net.js';
 import { setupOffline } from './offline.js';
+import { RIDES } from '../shared/rides.js';
 import { Weather } from './weather.js';
 
 const $ = (id) => document.getElementById(id);
@@ -302,7 +303,8 @@ class Game {
       }
       case 'fx': this.fx(m); break;
       case 'mount':
-        p.setMount(m.id, m.s, m.k, m.seat, m.sp, m); ui.setMounted(!!m.id);
+        p.setMount(m.id, m.s, m.k, m.seat, m.sp, m); ui.setMounted(!!p.mount);
+        if (m.id && m.k === 'rit') { if (p.mount) { this.sound.play('toet', 0.5); ui.toast('Houd je vast! Het ritje stopt vanzelf.'); } } else
         if (m.id && (m.k === 'auto' || m.k === 'heli')) {
           ui.toast(m.k === 'heli' ? (this.touch ? 'Je vliegt! Stick naar voren, ⬆ omhoog, ⬇ omlaag.' : 'Je vliegt! W = vooruit · spatie omhoog · shift omlaag · R uitstappen')
             : (this.touch ? 'Stick naar voren: gas. Naar achteren: remmen. Opzij: sturen.' : 'W = gas · S = remmen en achteruit · A/D = sturen · shift = plankgas · R uitstappen'));
@@ -325,6 +327,9 @@ class Game {
       case 'veh': p.vehFuel = m.fuel; p.vehDmg = m.dmg; if (m.up) p.vehUp = m.up; break;      // brandstof, schade en upgrades van je voertuig
       case 'garage': ui.openGarage(m); break;
       case 'raceMenu': ui.openRaceMenu(m); break;
+      case 'kermis': ui.openKermis(m); break;
+      case 'kermisGo': ui.playKermis(m.game); break;
+      case 'kermisPrijs': ui.kermisPrijs(m); break;
       case 'raceGrid':
         // naar de startplek: stilstaan tot het licht op groen gaat
         ui.close();
@@ -364,6 +369,14 @@ class Game {
     switch (m.k) {
       case 'hit': P.burst(x, y, z, 7, [1, 0.25, 0.2], { speed: 3, size: 0.16, life: 0.4 }); s.play('hit', v); break;
       case 'poof': P.burst(x, y, z, Math.round(16 * (m.a || 1)), [0.75, 0.75, 0.8], { speed: 2.5, size: 0.4 * Math.max(1, (m.a || 1) * 0.7), life: 0.8, grav: -1, spread: m.a || 1 }); s.play('poof', v); break;
+      case 'vuurwerk': {
+        // een vuurpijl boven de kermis: een bol van gekleurde vonken
+        const col = [[1, 0.3, 0.3], [1, 0.8, 0.2], [0.4, 1, 0.5], [0.4, 0.7, 1], [0.9, 0.5, 1], [1, 1, 1]][m.a % 6];
+        P.burst(x, y, z, 46, col, { speed: 9, size: 0.7, life: 1.6, grav: 3, spread: 1 });
+        P.burst(x, y, z, 14, [1, 1, 0.8], { speed: 4, size: 0.5, life: 1.0, grav: 2 });
+        s.play('boom', Math.min(0.5, v + 0.15) * s.ambVol);
+        break;
+      }
       case 'toet': P.burst(x, y + 0.6, z, 10, [0.92, 0.92, 0.94], { speed: 1.4, size: 0.5, life: 1.4, grav: -1.5, up: 1 }); s.play('toet', v * 0.7); break;      // de lijntrein vertrekt
       case 'hearts': P.burst(x, y, z, 8, [1, 0.4, 0.6], { speed: 1.2, size: 0.26, life: 1, grav: -2, up: 1 }); s.play('hearts', v); break;
       case 'levelup': P.burst(x, y, z, 34, [1, 0.85, 0.3], { speed: 3, size: 0.22, life: 1.2, grav: -3, up: 2 }); s.play('levelup', v); break;
@@ -484,6 +497,15 @@ class Game {
     return null;
   }
 
+  // een attractie van de kermis waar je bij de ingang staat
+  nearAttraction() {
+    for (const e of this.ents.map.values()) {
+      if (!e.def.ride) continue;
+      if (Math.hypot(e.x - this.player.pos.x, e.z - this.player.pos.z) < e.def.w / 2 + 3 && Math.abs(e.y - this.player.pos.y) < 5) return e;
+    }
+    return null;
+  }
+
   // een voertuig waar je vlak naast staat
   nearVehicle() {
     let best = null, bd = 4.2;
@@ -509,6 +531,8 @@ class Game {
   rideNearest() {
     const v = this.player.mount ? null : this.nearVehicle();
     if (v) { this.net.send({ t: 'useEnt', id: v.id }); return; }
+    const at = this.player.mount ? null : this.nearAttraction();
+    if (at) { this.net.send({ t: 'useEnt', id: at.id }); return; }
     const r = this.player.mount || this.nearDragon(5) ? null : this.nearRide();
     if (r && !this.nearTrain()) { this.net.send({ t: 'rideEnt', id: r.id }); return; }
     const t = this.player.mount ? null : this.nearTrain();
@@ -620,11 +644,12 @@ class Game {
       const train = p.mount || own ? null : this.nearTrain();
       const steed = p.mount || own || train ? null : this.nearRide();
       const car = p.mount ? null : this.nearVehicle();
-      this.ui.setRide(car ? (car.def.veh === 'helikopter' ? '🚁 Instappen' : car.def.veh === 'boot' ? '🚤 Instappen' : '🚗 Instappen') : train ? '🚂 Instappen' : steed ? (steed.def.rideFly ? '🪽 Vliegen' : '🐎 Rijden') : !own ? '' : (dragonStage(own.growth) >= 2 ? '🐉 Vliegen' : '🐉 ' + (own.name || 'Draak')));
+      const fair = p.mount || car ? null : this.nearAttraction();
+      this.ui.setRide(fair ? RIDES[fair.def.ride].knop : car ? (car.def.veh === 'helikopter' ? '🚁 Instappen' : car.def.veh === 'boot' ? '🚤 Instappen' : '🚗 Instappen') : train ? '🚂 Instappen' : steed ? (steed.def.rideFly ? '🪽 Vliegen' : '🐎 Rijden') : !own ? '' : (dragonStage(own.growth) >= 2 ? '🐉 Vliegen' : '🐉 ' + (own.name || 'Draak')));
       this.animalSounds(hd);
       const surf = this.world.get(Math.floor(p.pos.x) >> 4, Math.floor(p.pos.z) >> 4);
       const under = surf ? p.pos.y < surf.hm[(Math.floor(p.pos.x) & 15) * 16 + (Math.floor(p.pos.z) & 15)] - 6 : false;
-      this.sound.ambience(hd, { world: this.worldId, under, day: this.R.dayF, flying: !!p.mount && p.mountKind !== 'trein' && p.mountKind !== 'dier' && p.mountKind !== 'auto' && p.speedNow > 4, rain: Math.max(this.sky.rain, this.sky.snow * 0.25), roof: this.sky.roof });
+      this.sound.ambience(hd, { world: this.worldId, under, day: this.R.dayF, flying: !!p.mount && p.mountKind !== 'trein' && p.mountKind !== 'dier' && p.mountKind !== 'auto' && (p.speedNow > 4 || (p.mountKind === 'rit' && p.rideV > 0.12)), rain: Math.max(this.sky.rain, this.sky.snow * 0.25), roof: this.sky.roof });
     }
     const t3 = performance.now();
     this.R.render();

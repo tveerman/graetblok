@@ -19,12 +19,13 @@ export const SITE_CELL = 224;
 
 // kans per vak op een dorp, een kasteel of een kamp (de rest blijft leeg)
 const SITE_ODDS = {
-  groen: { dorp: 0.5, kasteel: 0.18, kamp: 0.18, circuit: 0.11 },
+  groen: { dorp: 0.5, kasteel: 0.18, kamp: 0.18, circuit: 0.11, pretpark: 0.28 },
   ijs: { dorp: 0.3, kasteel: 0.1, kamp: 0.2, circuit: 0.06 },
   schaduw: { dorp: 0, kasteel: 0.1, kamp: 0.16 },
 };
 // r0 = tot hier is de grond helemaal vlak, r1 = vanaf hier is het weer gewoon landschap
-const SITE_R = { dorp: [44, 62], kasteel: [56, 76], kamp: [15, 27], circuit: [50, 66] };
+const SITE_R = { dorp: [44, 62], kasteel: [56, 76], kamp: [15, 27], circuit: [50, 66], pretpark: [52, 68] };
+const PARK_NAMES = ['Kermis Wervelwind', 'Pretpark de Drakenvlucht', 'Kermis Suikerspin', 'Pretpark Sterrenland', 'Kermis de Vrolijke Draak', 'Pretpark Regenboog'];
 
 // De racebaan: een ovaal met rechte stukken. CA en CB = halve lengte en breedte tot het midden
 // van de weg, CR = de straal van de bochten, CW = halve breedte van de weg.
@@ -47,6 +48,19 @@ function circuitWay() {
   line(-ex, CB, 0, CB);
   return pts;
 }
+// Het pretpark: waar de kraampjes en attracties staan (gemeten vanaf het midden).
+// Kraampjes met z < -8 staan aan de noordkant van het dwarspad, de andere aan de zuidkant.
+const PARK_STALLS = [
+  { job: 'kraam_oliebol', x: -32, z: -13 }, { job: 'kraam_snoep', x: -22, z: -13 }, { job: 'kraam_friet', x: -12, z: -13 },
+  { job: 'spel_jut', x: 12, z: -13 }, { job: 'spel_eend', x: 22, z: -13 }, { job: 'spel_ballon', x: 32, z: -13 },
+  { job: 'spel_blik', x: -27, z: -4 }, { job: 'spel_ring', x: 17, z: -4 }, { job: 'spel_grijp', x: 27, z: -4 },
+];
+// r = hoe groot de stenen plaat eronder is
+const PARK_RIDES = [
+  { k: 'achtbaan', x: -6, z: -38, r: 0 }, { k: 'reuzenrad', x: 32, z: 6, r: 7 }, { k: 'vrijeval', x: -34, z: 6, r: 4 },
+  { k: 'draaimolen', x: -15, z: 7, r: 6 }, { k: 'zweefmolen', x: 13, z: 7, r: 7 }, { k: 'schommelschip', x: -20, z: 32, r: 7 },
+];
+const PARK_BOTS = { x: 22, z: 33 };
 const CIRCUIT_NAMES = ['de Drakenring', 'het Bliksemcircuit', 'de Stormbaan', 'het Vonkenpark', 'de Kometenring', 'het Donderdal', 'de Raketbaan', 'het Turbocircuit'];
 const J_OFF = 30;            // het station (en het knooppunt van de rails) ligt zo ver ten zuidoosten van het dorpsplein
 
@@ -244,6 +258,11 @@ export const siteMethods = {
     const sd = this.seed + 4100, r = hash2(rx, rz, sd);
     let kind = r < P.dorp ? 'dorp' : r < P.dorp + P.kasteel ? 'kasteel' : r < P.dorp + P.kasteel + P.kamp ? 'kamp' : r < P.dorp + P.kasteel + P.kamp + (P.circuit || 0) ? 'circuit' : null;
     if (kind === 'circuit' && this.noCircuits) kind = null;
+    // een pretpark: op de laatste lege plekken, en op een kwart van de plekken van een trollenkamp
+    const wasCamp = kind === 'kamp';
+    if (P.pretpark && (kind === null || (wasCamp && hash2(rx, rz, sd + 55) < P.pretpark))) {
+      kind = this.noParks.has(rx + ',' + rz) ? (wasCamp ? 'kamp' : null) : 'pretpark';
+    }
     if (this.world === 'groen' && rx === 0 && rz === 0) kind = 'dorp';      // altijd een dorp niet ver van het ruimteschip
     if (!kind || this.noSites.has(rx + ',' + rz)) return null;
     // een paar plekken in het vak proberen, tot er een geschikt stuk land is
@@ -291,6 +310,7 @@ export const siteMethods = {
       s.evil = this.world !== 'groen' || hash2(rx, rz, sd + 8) < 0.42;
       s.name = s.evil ? 'Spookkasteel ' + pick(SPOOK, 13) : 'Kasteel ' + pick(BURCHT, 13);
     } else if (kind === 'circuit') s.name = pick(CIRCUIT_NAMES, 14);
+    else if (kind === 'pretpark') s.name = pick(PARK_NAMES, 15);
     else { s.evil = true; s.name = 'het Trollenkamp'; }
     return s;
   },
@@ -323,7 +343,7 @@ export const siteMethods = {
   },
 
   sitePlan(s) {
-    if (!s.plan) s.plan = s.kind === 'dorp' ? this.villagePlan(s) : s.kind === 'kasteel' ? this.castlePlan(s) : s.kind === 'circuit' ? this.circuitPlan(s) : this.campPlan(s);
+    if (!s.plan) s.plan = s.kind === 'dorp' ? this.villagePlan(s) : s.kind === 'kasteel' ? this.castlePlan(s) : s.kind === 'circuit' ? this.circuitPlan(s) : s.kind === 'pretpark' ? this.parkPlan(s) : this.campPlan(s);
     return s.plan;
   },
 
@@ -859,6 +879,73 @@ export const siteMethods = {
     for (const [lx, lz] of [[CA + 6, CB + 2], [-CA - 6, CB + 2], [CA + 6, -CB - 2], [-CA - 6, -CB - 2]]) { S.fill(x + lx, y + 1, z + lz, x + lx, y + 4, z + lz, P.log); S.set(x + lx, y + 5, z + lz, B.lantaarn); }
   },
 
+  // ---------- het pretpark ----------
+  // Een omheinde kermis: de achtbaan aan de noordkant, daaronder een rij kraampjes langs het
+  // dwarspad, en in de zuidelijke helft de andere attracties en de botsauto's. De attracties
+  // zelf zijn grote bewegende modellen (zie shared/rides.js); hier staan alleen de paden,
+  // kraampjes, hekken en de plekken waar ze op staan.
+
+  parkPlan(s) {
+    const y = s.y + 1, x = s.x, z = s.z;
+    const npcs = [];
+    for (const b of PARK_STALLS) npcs.push({ k: 'dorpeling', job: b.job, x: x + b.x + 0.5, y, z: z + b.z + (b.z < -8 ? 0.5 : 1.5), r: 0.4, yaw: b.z < -8 ? 0 : Math.PI });
+    for (const r of PARK_RIDES) npcs.push({ k: 'r_' + r.k, x: x + r.x + 0.5, y, z: z + r.z + 0.5, r: 0.1, yaw: 0 });
+    // de botsauto's: vier startplekken in de baan
+    const bots = [[-4, -2], [4, -2], [-4, 2], [4, 2]].map(([bx, bz]) => [x + PARK_BOTS.x + bx + 0.5, s.y + 1.02, z + PARK_BOTS.z + bz + 0.5]);
+    return { npcs, bots };
+  },
+
+  drawPark(S, s) {
+    const x = s.x, y = s.y, z = s.z, P = PAL[this.world];
+    if (!S.hit(x - 48, z - 48, x + 48, z + 50)) return;
+    // het hek rondom, met een poort aan de zuidkant
+    for (let d = -46; d <= 46; d++) {
+      for (const [fx, fz] of [[d, -46], [d, 46], [-46, d], [46, d]]) {
+        if (fz === 46 && Math.abs(fx) <= 3) continue;
+        S.fill(x + fx, y + 1, z + fz, x + fx, y + 6, z + fz, 0);
+        S.set(x + fx, y + 1, z + fz, P.wood);
+        if ((fx + fz) % 6 === 0) { S.set(x + fx, y + 2, z + fz, P.log); S.set(x + fx, y + 3, z + fz, ((fx + fz) / 6) & 1 ? B.wol_rood : B.wol_blauw); }
+      }
+    }
+    for (const gx of [-4, 4]) S.fill(x + gx, y + 1, z + 46, x + gx, y + 6, z + 46, P.log);
+    for (let gx = -4; gx <= 4; gx++) { S.set(x + gx, y + 7, z + 46, gx & 1 ? B.wol_rood : B.wol); S.set(x + gx, y + 8, z + 46, Math.abs(gx) < 3 ? (gx & 1 ? B.wol : B.wol_rood) : 0); }
+    S.set(x - 4, y + 7, z + 46, B.lantaarn); S.set(x + 4, y + 7, z + 46, B.lantaarn);
+    // paden: van de poort naar het noorden, en een dwarspad langs de kraampjes
+    for (let dz = -18; dz <= 50; dz++) for (let dx = -2; dx <= 2; dx++) { S.set(x + dx, y, z + dz, P.road); S.fill(x + dx, y + 1, z + dz, x + dx, y + 5, z + dz, 0); }
+    for (let dx = -42; dx <= 42; dx++) for (let dz = -10; dz <= -6; dz++) { S.set(x + dx, y, z + dz, P.road); S.fill(x + dx, y + 1, z + dz, x + dx, y + 5, z + dz, 0); }
+    for (let dx = -40; dx <= 40; dx++) for (let dz = 18; dz <= 20; dz++) { S.set(x + dx, y, z + dz, P.road); S.fill(x + dx, y + 1, z + dz, x + dx, y + 5, z + dz, 0); }
+    for (const lx of [-36, -18, 18, 36]) for (const lz of [-5, 21]) { S.fill(x + lx, y + 1, z + lz, x + lx, y + 3, z + lz, P.log); S.set(x + lx, y + 4, z + lz, B.lantaarn); }
+    // de kraampjes: een toonbank, een achterwand en een gestreept dak
+    PARK_STALLS.forEach((b, i) => {
+      const bx = x + b.x, north = b.z < -8, bz = z + b.z, back = north ? bz - 1 : bz + 2, front = north ? bz + 1 : bz;
+      const c1 = [B.wol_rood, B.wol_blauw, B.wol_rood][i % 3], c2 = B.wol;
+      S.fill(bx - 2, y, bz - 1, bx + 2, y, bz + 2, P.wood);
+      S.fill(bx - 2, y + 1, bz - 1, bx + 2, y + 4, bz + 2, 0);
+      S.fill(bx - 2, y + 1, back, bx + 2, y + 3, back, P.wood);
+      S.fill(bx - 2, y + 1, front, bx + 2, y + 1, front, P.wood);                      // de toonbank
+      for (const px of [-2, 2]) S.fill(bx + px, y + 2, front, bx + px, y + 3, front, P.log);
+      for (let dx = -3; dx <= 3; dx++) for (let dz = -2; dz <= 3; dz++) S.set(bx + dx, y + 4, bz + dz, (dx + 3) & 1 ? c1 : c2);
+      S.set(bx, y + 3, back + (north ? 1 : -1), B.lantaarn);
+    });
+    // een plaat van steen onder elke attractie
+    for (const r of PARK_RIDES) {
+      if (r.k === 'achtbaan') { S.fill(x + r.x - 6, y, z + r.z - 2, x + r.x + 10, y, z + r.z + 2, B.steenblok); S.fill(x + r.x - 6, y + 1, z + r.z - 2, x + r.x + 10, y + 4, z + r.z + 2, 0); continue; }
+      for (let dx = -r.r; dx <= r.r; dx++) for (let dz = -r.r; dz <= r.r; dz++) {
+        if (Math.hypot(dx, dz) > r.r + 0.3) continue;
+        S.set(x + r.x + dx, y, z + r.z + dz, (dx + dz) & 1 ? B.steenblok : P.road);
+        S.fill(x + r.x + dx, y + 1, z + r.z + dz, x + r.x + dx, y + 8, z + r.z + dz, 0);
+      }
+    }
+    // de botsautobaan: een gladde vloer met een muurtje van twee hoog en een smalle ingang
+    const bx = x + PARK_BOTS.x, bz = z + PARK_BOTS.z;
+    S.fill(bx - 9, y, bz - 6, bx + 9, y, bz + 6, B.asfalt);
+    S.fill(bx - 9, y + 1, bz - 6, bx + 9, y + 6, bz + 6, 0);
+    for (let dx = -9; dx <= 9; dx++) for (const dz of [-6, 6]) S.fill(bx + dx, y + 1, bz + dz, bx + dx, y + 2, bz + dz, (dx & 1) ? B.wol_rood : B.wol);
+    for (let dz = -6; dz <= 6; dz++) for (const dx of [-9, 9]) S.fill(bx + dx, y + 1, bz + dz, bx + dx, y + 2, bz + dz, (dz & 1) ? B.wol_rood : B.wol);
+    S.fill(bx, y + 1, bz - 6, bx, y + 2, bz - 6, 0);                                     // de ingang (te smal voor een botsauto)
+    for (const [cx, cz] of [[-9, -6], [9, -6], [-9, 6], [9, 6]]) { S.fill(bx + cx, y + 3, bz + cz, bx + cx, y + 5, bz + cz, P.log); S.set(bx + cx, y + 6, bz + cz, B.lantaarn); }
+  },
+
   // ---------- alles in één chunk tekenen ----------
 
   drawSites(blocks, cx, cz) {
@@ -873,6 +960,7 @@ export const siteMethods = {
         if (s.kind === 'dorp') this.drawVillage(S, s);
         else if (s.kind === 'kasteel') this.drawCastle(S, s);
         else if (s.kind === 'circuit') this.drawCircuit(S, s);
+        else if (s.kind === 'pretpark') this.drawPark(S, s);
         else this.drawCamp(S, s);
       }
     }

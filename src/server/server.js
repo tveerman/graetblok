@@ -20,6 +20,7 @@ import { entityMethods } from './entities.js';
 import { npcMethods } from './npcs.js';
 import { zooMethods } from './zoo.js';
 import { vehicleMethods } from './vehicles.js';
+import { kermisMethods } from './kermis.js';
 import { WorldGen } from './worldgen.js';
 
 const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
@@ -38,7 +39,7 @@ export class GameServer {
 
   newMeta() {
     return { v: 1, seed: (Math.random() * 2147483647) | 0, time: DAY_LENGTH * 0.05, trees: {}, bossDead: {}, portals: [], eggs: {}, nextId: 1,
-      gen2: 1, gen3: 1, noSites: {}, oldChunks: {}, trains: [], weather: {}, cleared: {} };
+      gen2: 1, gen3: 1, gen4: 1, noParks: {}, noSites: {}, oldChunks: {}, trains: [], weather: {}, cleared: {} };
   }
 
   async init() {
@@ -52,7 +53,8 @@ export class GameServer {
     }
     if (!meta.gen2) this.upgradeWorld(meta, per);
     if (!meta.gen3) this.upgradeCircuits(meta, per);
-    for (const w of WORLD_ORDER) this.worlds[w] = new ServerWorld(w, meta.seed, per[w], { noSites: meta.noSites[w], oldChunks: meta.oldChunks[w] });
+    if (!meta.gen4) this.upgradeParks(meta, per);
+    for (const w of WORLD_ORDER) this.worlds[w] = new ServerWorld(w, meta.seed, per[w], { noSites: meta.noSites[w], oldChunks: meta.oldChunks[w], noParks: (meta.noParks || {})[w] });
     for (const rec of meta.trains || []) this.spawnTrain(rec);
     for (const rec of meta.vehicles || []) this.spawnVehicle(rec);
     this.ready = true;
@@ -94,6 +96,23 @@ export class GameServer {
         for (const st of gen.sitesNear(x, z, 110)) if (st.kind === 'circuit' && Math.hypot(x - st.x, z - st.z) < st.r1 + 14) blocked.add(st.key);
       }
       meta.noSites[wid] = Array.from(blocked);
+    }
+  }
+
+  // Een wereld van vóór de pretparken: waar de speler al iets had gebouwd of gegraven komt
+  // geen pretpark (daar blijft wat er stond, bijvoorbeeld een trollenkamp).
+  upgradeParks(meta, per) {
+    meta.gen4 = 1; meta.noParks = {};
+    for (const wid of WORLD_ORDER) {
+      const keys = per[wid] ? Array.from(per[wid].keys()) : [];
+      if (!keys.length) continue;
+      const gen = new WorldGen(wid, meta.seed, { noSites: meta.noSites[wid] });
+      const blocked = new Set();
+      for (const key of keys) {
+        const x = (Math.floor(key / 65536) - 32768) * 16 + 8, z = ((key % 65536) - 32768) * 16 + 8;
+        for (const st of gen.sitesNear(x, z, 110)) if (st.kind === 'pretpark' && Math.hypot(x - st.x, z - st.z) < st.r1 + 14) blocked.add(st.key);
+      }
+      meta.noParks[wid] = Array.from(blocked);
     }
   }
 
@@ -749,6 +768,8 @@ export class GameServer {
         const r = e.train;
         e.x = r.x = p.x; e.y = r.y = p.y - 0.9; e.z = r.z = p.z;
         if (typeof m.ry === 'number') e.yaw = r.yaw = m.ry;
+      } else if (e && e.def.ride) {
+        // in een attractie: die blijft gewoon staan waar hij staat
       } else if (e && e.veh) {
         // in een voertuig: het staat waar de speler zegt (een helikopter hangt onder je)
         const r = e.veh, V = e.def;
@@ -856,6 +877,7 @@ export class GameServer {
       this.wildSpawn(p);
       this.checkGuardian(p);
       this.updateSites(p);
+      this.fireworks(p);
     }
     this.updateWeather(active);
     this.updateEggs();
@@ -935,5 +957,5 @@ export class GameServer {
   }
 }
 
-Object.assign(GameServer.prototype, entityMethods, npcMethods, zooMethods, vehicleMethods);
+Object.assign(GameServer.prototype, entityMethods, npcMethods, zooMethods, vehicleMethods, kermisMethods);
 export { itemName, isNight };

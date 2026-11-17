@@ -716,7 +716,8 @@ export const entityMethods = {
   on_dismount(p) {
     if (!p.mount) return;
     const e = this.worlds[p.world].ents.get(p.mount);
-    if (e) { e.rider = 0; e.vx = e.vy = e.vz = 0; }
+    if (e && e.def.ride) this.rideDone(p, e);                 // uit een attractie gestapt
+    else if (e) { e.rider = 0; e.vx = e.vy = e.vz = 0; }
     p.mount = 0;
     this.send(p, { t: 'mount', id: 0 });
   },
@@ -893,7 +894,7 @@ export const entityMethods = {
       const seen = new Set();
       let boss = null;
       for (const e of w.ents.values()) {
-        const far = e.def.boss ? 140 : 84;
+        const far = e.def.boss || e.def.big ? 140 : 84;
         if (Math.abs(e.x - p.x) > far || Math.abs(e.z - p.z) > far) continue;
         seen.add(e.id);
         if (!p.known.has(e.id)) { p.known.add(e.id); this.send(p, this.entDesc(e)); }

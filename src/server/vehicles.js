@@ -30,7 +30,8 @@ export const vehicleMethods = {
     const s = p.inv[p.sel], kind = s && ITEMS[s.id] ? ITEMS[s.id].veh : '';
     const V = VEHICLES[kind];
     if (!V || Math.hypot(x + 0.5 - p.x, y - p.y, z + 0.5 - p.z) > 10) return;
-    if (w.get(x, y + 1, z) > 0 && V.soort !== 'boot') { this.toast(p, 'Hier is geen plek. Zet hem op een vrij stuk grond.', 'warn'); return; }
+    // (op gras of een bloem mag het wel: daar rijd je zo overheen)
+    if (w.solid(x, y + 1, z) && V.soort !== 'boot') { this.toast(p, 'Hier is geen plek. Zet hem op een vrij stuk grond.', 'warn'); return; }
     for (const r of this.vehList()) if (r.w === w.id && Math.hypot(r.x - x - 0.5, r.z - z - 0.5) < 2.5 && Math.abs(r.y - y) < 3) { this.toast(p, 'Hier staat al een voertuig.', 'warn'); return; }
     // jouw auto blijft jouw auto: brandstof, schade, kleur, naam en upgrades van toen je hem oppakte
     const old = (p.flags.veh && p.flags.veh[kind]) || {};
@@ -49,7 +50,7 @@ export const vehicleMethods = {
   useVehicle(p, w, e, hid) {
     const rec = e.veh, V = VEHICLES[rec.kind];
     const s = p.inv[p.sel];
-    if (hid === I.jerrycan) {
+    if (hid === I.jerrycan && !V.kermis) {
       if (rec.fuel >= V.tank - 1) { this.toast(p, 'De tank zit al vol.'); return; }
       s.n--; if (s.n <= 0) p.inv[p.sel] = null;
       rec.fuel = Math.min(V.tank, rec.fuel + FUEL_PER_CAN);
@@ -59,7 +60,7 @@ export const vehicleMethods = {
       if (p.mount === e.id) this.vehStatus(p, rec);
       return;
     }
-    if (hid === I.moersleutel) {
+    if (hid === I.moersleutel && !V.kermis) {
       if (rec.dmg < 1) { this.toast(p, 'Er is niets kapot aan deze ' + V.name.toLowerCase() + '.'); return; }
       if (this.count(p, I.ijzerstaaf) < 1) { this.toast(p, 'Voor het repareren heb je een ijzerstaaf nodig.', 'warn'); return; }
       this.take(p, I.ijzerstaaf, 1);
@@ -84,7 +85,7 @@ export const vehicleMethods = {
     const d = Math.max(0, Math.min(60, +m.d || 0));
     rec.fuel = Math.max(0, rec.fuel - d / V.zuinig);
     const bump = Math.max(0, Math.min(40, +m.bump || 0));
-    if (bump && !p.god) rec.dmg = Math.min(100, rec.dmg + bump);
+    if (bump && !p.god && !V.kermis) rec.dmg = Math.min(100, rec.dmg + bump);
     this.vehStatus(p, rec);
   },
 
@@ -93,6 +94,7 @@ export const vehicleMethods = {
     if (e.rider) return;
     const s = p.inv[p.sel], it = s && ITEMS[s.id];
     const rec = e.veh, V = VEHICLES[rec.kind];
+    if (V.kermis) { this.toast(p, 'De botsauto\'s blijven op de kermis.'); return; }
     if (!it || it.tool !== 'pick') { this.toast(p, 'Sla met een houweel op de ' + V.name.toLowerCase() + ' om hem weer mee te nemen.'); return; }
     (p.flags.veh || (p.flags.veh = {}))[rec.kind] = { fuel: Math.round(rec.fuel), dmg: Math.round(rec.dmg), name: rec.name || '', color: rec.color, up: rec.up || {} };
     this.giveLoot(p, I['v_' + rec.kind], 1);

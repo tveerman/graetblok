@@ -5,6 +5,7 @@ import { ITEMS, I, RECIPES, GROUPS, GROUP_NAMES, matches, itemName } from '../sh
 import { WORLDS, WORLD_ORDER, CRASH } from '../shared/worlds.js';
 import { DRAGONS, dragonStage, STAGE_NAMES } from '../shared/mobs.js';
 import { iconURL, eggURL } from './textures.js';
+import { KERMIS_GAMES } from '../shared/rides.js';
 import { VEHICLES, VEH_COLORS, UPGRADES, UPGRADE_ORDER, vehStats } from '../shared/vehicles.js';
 import { ANIMALS, ANIMAL_LIST, EGG_KINDS, EGG_ORDER, RARITY, RARITIES, SHINIES, SHINY, ZOO_REWARDS, MAX_OUT } from '../shared/animals.js';
 
@@ -178,6 +179,7 @@ export class UI {
       this.cmpDorp = el('span', 'cship', '🏠'); strip.appendChild(this.cmpDorp);
       this.cmpBurcht = el('span', 'cship', '🏰'); strip.appendChild(this.cmpBurcht);
       this.cmpBaan = el('span', 'cship', '🏁'); strip.appendChild(this.cmpBaan);
+      this.cmpPark = el('span', 'cship', '🎡'); strip.appendChild(this.cmpPark);
     }
     for (let i = 0; i < 4; i++) place(this.cmp[i], i * Math.PI / 2);
     let extra = '';
@@ -194,7 +196,7 @@ export class UI {
       extra += '  🚀 ' + Math.round(Math.hypot(dx, dz)) + ' m';
     }
     // het dichtstbijzijnde dorp (huisje) en kasteel (torentje)
-    for (const [node, kinds, icon] of [[this.cmpDorp, [0], '🏠'], [this.cmpBurcht, [1, 2], '🏰'], [this.cmpBaan, [4], '🏁']]) {
+    for (const [node, kinds, icon] of [[this.cmpDorp, [0], '🏠'], [this.cmpBurcht, [1, 2], '🏰'], [this.cmpBaan, [4], '🏁'], [this.cmpPark, [5], '🎡']]) {
       let best = null, bd = 1e9;
       if (sites) for (const st of sites) { if (!kinds.includes(st[0])) continue; const d = Math.hypot(st[1] - pos.x, st[2] - pos.z); if (d < bd) { bd = d; best = st; } }
       node.style.display = best && bd > 30 ? '' : 'none';
@@ -498,6 +500,94 @@ export class UI {
       list.appendChild(card);
     });
     list.scrollTop = keep;
+  }
+
+  // ---------- kermisspelletjes ----------
+
+  // het kraampje: uitleg en de knop om te spelen
+  openKermis(m) {
+    const g = this.g, G = KERMIS_GAMES[m.game];
+    const b = el('div', 'kermis');
+    b.appendChild(el('p', '', G.uitleg));
+    const go = el('button', 'btn big', '🎟️ Speel (' + m.prijs + ' munten)');
+    tap(go, () => g.net.send({ t: 'kermis', c: 'start', game: m.game }));
+    b.appendChild(go);
+    b.appendChild(el('p', 'hint', 'Je hebt ' + m.munten + ' munten. Te winnen: knuffels, een trofee, munten en soms een ei!'));
+    this.open('kermis', G.name, b, false);
+  }
+
+  // het spelletje zelf. Aan het eind gaat je score (0..1) naar de server, die de prijs bepaalt.
+  playKermis(game) {
+    const g = this.g, G = KERMIS_GAMES[game];
+    const b = el('div', 'kermis');
+    const info = el('p', '', '');
+    b.appendChild(info);
+    let turn = 0, total = 0;
+    const finish = () => { clearInterval(this.kermisT); this.kermisT = 0; info.textContent = 'Even kijken wat je gewonnen hebt...'; g.net.send({ t: 'kermis', c: 'score', game, score: total / G.beurten }); };
+    if (G.soort === 'mik') {
+      // een streepje beweegt heen en weer; tik als het op het doel staat
+      const doel = game === 'jut' ? 1 : 0.5, snel = game === 'grijp' ? 2.6 : game === 'jut' ? 3.4 : 3.0;
+      const bar = el('div', 'kbar'), zone = el('div', 'kzone'), mark = el('div', 'kmark');
+      zone.style.left = Math.max(0, doel * 100 - 9) + '%'; zone.style.width = (game === 'jut' ? 9 : 18) + '%';
+      bar.appendChild(zone); bar.appendChild(mark); b.appendChild(bar);
+      let pos = 0, t0 = performance.now(), wait = false;
+      const say = () => { info.textContent = (G.beurten > 1 ? 'Beurt ' + (turn + 1) + ' van ' + G.beurten + '. ' : '') + 'Tik op "Nu!" als het streepje op het gele vak staat.'; };
+      say();
+      clearInterval(this.kermisT);
+      this.kermisT = setInterval(() => {
+        if (this.modal !== 'kermis') { clearInterval(this.kermisT); this.kermisT = 0; return; }
+        if (wait) return;
+        const t = (performance.now() - t0) / 1000;
+        pos = game === 'jut' ? Math.abs(Math.sin(t * snel * 0.5)) : 0.5 + 0.5 * Math.sin(t * snel + turn * 2);
+        mark.style.left = (pos * 100) + '%';
+      }, 25);
+      const nu = el('button', 'btn big', 'Nu!');
+      tap(nu, () => {
+        if (wait || !this.kermisT) return;
+        const sc = Math.max(0, 1 - Math.abs(pos - doel) / (game === 'jut' ? 0.45 : 0.4));
+        total += sc; turn++; wait = true;
+        g.sound.play(sc > 0.75 ? 'got' : 'click');
+        info.textContent = sc > 0.9 ? 'Raak! Precies goed!' : sc > 0.6 ? 'Mooi!' : sc > 0.3 ? 'Net ernaast.' : 'Mis!';
+        setTimeout(() => { if (this.modal !== 'kermis') return; if (turn >= G.beurten) finish(); else { wait = false; t0 = performance.now(); say(); } }, 800);
+      });
+      b.appendChild(nu);
+    } else {
+      // twaalf eendjes of ballonnen: kies er één (of drie)
+      const icon = game === 'eend' ? '🦆' : '🎈', grid = el('div', 'kgrid');
+      // de waarde onder elk ding: de meeste zijn laag, een paar zijn goed
+      const vals = [1, 0.9, 0.7, 0.6, 0.5, 0.4, 0.3, 0.25, 0.2, 0.15, 0.1, 0.05].sort(() => Math.random() - 0.5);
+      info.textContent = game === 'eend' ? 'Vis een eendje uit het water!' : 'Prik drie ballonnen!';
+      vals.forEach((val) => {
+        const c = el('button', 'kitem', icon);
+        tap(c, () => {
+          if (c.disabled || turn >= G.beurten) return;
+          c.disabled = true; turn++;
+          const sc = game === 'ballon' ? (val >= 0.7 ? 1 : val >= 0.4 ? 0.5 : 0) : val;
+          total += sc;
+          c.textContent = game === 'eend' ? String(Math.round(val * 10)) : sc >= 1 ? '⭐' : sc > 0 ? '🍬' : '💥';
+          c.classList.add('open');
+          g.sound.play(sc >= 0.7 ? 'got' : 'click');
+          if (turn >= G.beurten) setTimeout(() => { if (this.modal === 'kermis') finish(); }, 900);
+        });
+        grid.appendChild(c);
+      });
+      b.appendChild(grid);
+    }
+    this.open('kermis', G.name, b, false);
+  }
+
+  // wat heb je gewonnen?
+  kermisPrijs(m) {
+    if (this.modal !== 'kermis') return;
+    const g = this.g, G = KERMIS_GAMES[m.game];
+    const b = el('div', 'kermis');
+    b.appendChild(el('p', 'kprijs', (m.id ? '<img src="' + iconURL(m.id) + '"> ' : '') + m.tekst + (m.id ? ' Je krijgt ' + (m.n > 1 ? m.n + '× ' : '') + itemName(m.id).toLowerCase() + '.' : '')));
+    const go = el('button', 'btn big', '🎟️ Nog een keer (2 munten)');
+    tap(go, () => g.net.send({ t: 'kermis', c: 'start', game: m.game }));
+    b.appendChild(go);
+    b.appendChild(el('p', 'hint', 'Je hebt ' + m.munten + ' munten.'));
+    this.open('kermis', G.name, b, false);
+    if (m.id) g.sound.play('quest', 0.5);
   }
 
   // ---------- de racemeester ----------
