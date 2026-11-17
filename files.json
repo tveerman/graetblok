@@ -16,7 +16,7 @@
   "src/client/particles.js",
   "src/client/player.js",
   "src/client/render.js",
-  "src/client/rides.js", "src/client/city.js",
+  "src/client/rides.js", "src/client/city.js", "src/client/rig.js",
   "src/client/textures.js",
   "src/client/ui.js",
   "src/client/weather.js",

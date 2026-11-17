@@ -653,6 +653,7 @@ export class Player {
       m.rotation.y = this.yaw + Math.PI;
       const a = m.userData.a;
       a.pose = this.mount ? 'ride' : '';
+      a.airborne = !this.onGround && !this.mount && !this.inWater; a.vy = this.vel.y; a.swim = this.inWater && !this.mount;
       if (this.swing > 0 && !(a.swing > 0)) a.swing = this.swing;
       animate(m, g.time, this.mount ? 0 : this.speedNow, 0, dt);
     }

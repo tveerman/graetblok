@@ -313,6 +313,16 @@ From Jorian's design document (`spel.txt`), following development phases 1–4, 
   potatoes, popcorn from maize, sprinkler, market stall. A wheat block can no longer be put
   down as a ripe plant (that duplicated wheat); it is planted like the rest. Not in yet:
   employees, own shops with customers and prices, greenhouse, windmill, fruit trees.
+- **Player character with a skeleton** (`src/client/rig.js`) – the human, elf and robot you
+  can play are built on one rig with joints (hips, knees, ankles, spine, neck, shoulders,
+  elbows). The animation computes joint angles: knees bend while the leg swings forward, the
+  hips ride at the height where the lowest foot touches the ground, arms counter-swing, and
+  there are poses for standing still, running, jumping and falling, landing, swimming, riding
+  and swinging a tool. Each kind has its own proportions and gait: the human walks normally,
+  the elf is small with big ears and a pointed cap, walks on its toes with quick light steps
+  and a little hop, the robot is riveted tin with chest lights and an antenna and walks
+  stiff-legged with a stomp and a swaying body. Villagers and monsters still use the old
+  two-joint animation.
 - **Story quests** – 18 steps from "chop a tree" to "defeat the Drakenkoning", shown top-left,
   with a compass marker for the early ones.
 

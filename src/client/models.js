@@ -7,6 +7,7 @@ import { ANIMALS, SHINY } from '../shared/animals.js';
 import { VEHICLES } from '../shared/vehicles.js';
 import { buildRide } from './rides.js';
 import { buildCity } from './city.js';
+import { buildRig, animateRig } from './rig.js';
 
 const BOX = new THREE.BoxGeometry(1, 1, 1);
 const PLANE = new THREE.PlaneGeometry(1, 1);
@@ -294,29 +295,8 @@ export function setDragonGrowth(root, growth) {
   for (const w of a.wings) w.scale.setScalar(0.5 + 0.5 * t);
 }
 
-export function playerModel(look) {
-  const root = base('biped'), g = root.userData.a.inner, a = root.userData.a;
-  const type = (look && look.type) || 'mens';
-  const shirtC = (look && look.shirt) || 0x2f7fd0;
-  let skinC = 0xe8b890, kind = 'glad', hairC = (look && look.hair) || 0x5a3a1c, pantsC = 0x3a4a7a, eye = '#201810', glow = false;
-  if (type === 'elf') { skinC = 0xcfe8b0; hairC = 0xe8c860; pantsC = 0x4a6a3a; }
-  if (type === 'robot') { skinC = 0xa8b4c0; kind = 'metaal'; hairC = 0x56606c; pantsC = 0x56606c; eye = '#4ae0ff'; glow = true; }
-  const sk = mat(skinC, kind), shirt = mat(shirtC, type === 'robot' ? 'metaal' : 'glad'), pants = mat(pantsC, kind);
-  a.legs = [limb(g, pants, 0.24, 0.75, 0.24, -0.13, 0.75, 0), limb(g, pants, 0.24, 0.75, 0.24, 0.13, 0.75, 0)];
-  part(g, shirt, 0.52, 0.7, 0.28, 0, 1.1, 0);
-  // de mouw houdt op waar de hand begint, en de hand is net iets smaller dan de mouw:
-  // zo liggen er nergens twee vlakken precies op elkaar (dat gaf flikkerende handen)
-  a.arms = [limb(g, shirt, 0.2, 0.56, 0.2, -0.37, 1.43, 0), limb(g, shirt, 0.2, 0.56, 0.2, 0.37, 1.43, 0)];
-  part(a.arms[0], sk, 0.17, 0.17, 0.17, 0, -0.64, 0); part(a.arms[1], sk, 0.17, 0.17, 0.17, 0, -0.64, 0);
-  const head = new THREE.Group(); head.position.set(0, 1.68, 0); g.add(head); a.head = head;
-  part(head, faceMats(skinC, kind, eye, glow, true), 0.44, 0.44, 0.44, 0, 0, 0);
-  const hair = mat(hairC, 'vacht');
-  part(head, hair, 0.48, 0.14, 0.48, 0, 0.24, 0);
-  part(head, hair, 0.48, 0.3, 0.1, 0, 0.06, -0.2);
-  if (type === 'elf') for (const s of [-1, 1]) { const e = part(head, sk, 0.06, 0.2, 0.1, s * 0.25, 0.08, 0); e.rotation.z = -s * 0.5; }
-  if (type === 'robot') { part(head, mat(0x56606c, 'metaal'), 0.04, 0.24, 0.04, 0, 0.42, 0); part(head, glowMat(0xff3020), 0.08, 0.08, 0.08, 0, 0.56, 0); }
-  return root;
-}
+// het poppetje van de speler heeft een echt skelet met gewrichten: zie rig.js
+export function playerModel(look) { return buildRig(look); }
 
 // ---------- mensen: dorpelingen, de koning en ridders ----------
 
@@ -882,6 +862,7 @@ export function buildModel(kind, opts) {
 // Beweging van de modellen. speed = hoe snel het wezen beweegt, flags: 1 aanval, 2 vliegt, 4 blijft zitten
 export function animate(root, time, speed, flags, dt) {
   const a = root.userData.a;
+  if (a.type === 'speler') { animateRig(a, time, speed, dt); return; }
   const moving = speed > 0.3;
   a.phase += dt * Math.min(12, 3 + speed * 2.2) * (moving ? 1 : 0);
   const ph = a.phase, sw = moving ? Math.sin(ph) : 0;
@@ -966,4 +947,4 @@ export function animate(root, time, speed, flags, dt) {
 }
 
 // de bouwstenen van de modellen, ook voor de attracties in rides.js
-export { mat as skinMat, glowMat, part as boxPart };
+export { mat as skinMat, glowMat, part as boxPart, faceMats };
