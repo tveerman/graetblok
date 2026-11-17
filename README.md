@@ -423,8 +423,10 @@ From Jorian's design document (`spel.txt`), following development phases 1–4, 
 - **World map and marker** (`src/server/map.js`, `openMap` in `src/client/ui.js`) – the 🗺️
   button (or M) opens a map of the world you are in, also of places you have never been:
   the server computes 128 by 128 samples of the terrain (ground kind and height) and the
-  screen colours them with height shading. Four zoom levels from 512 to 10240 blocks across,
-  arrows to move the view, icons and names for villages, castles, the city, the airport and
+  screen colours them with height shading. Drag the map with a finger or the mouse to move
+  it, pinch or use the mouse wheel to zoom (ten levels from 512 to 10240 blocks across; the
+  wheel zooms around the pointer); the picture follows the gesture and the new part is
+  fetched when you let go. Icons and names for villages, castles, the city, the airport and
   the other places, your own position and direction, the tree of life and the spaceship. A
   tap on the map sets a marker; it is saved with the player, shown on the map, and always on
   the compass (📍 with the distance, and an arrow when it lies behind you). The map and

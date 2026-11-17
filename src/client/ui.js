@@ -760,13 +760,14 @@ export class UI {
   // De server stuurt een raster van kleurnummers en hoogtes; hier wordt er een plaatje van
   // gemaakt. Tik op de kaart om een markering te zetten: die staat daarna op je kompas.
   openMap(m) {
-    const g = this.g, N = m.n, STEPS = [4, 12, 32, 80];
+    const g = this.g, N = m.n, STEPS = [4, 6, 8, 12, 16, 24, 32, 48, 64, 80];
     const send = (o) => g.net.send(Object.assign({ t: 'kaart', x: m.x, z: m.z, stap: m.stap }, o));
     const b = el('div', 'kaart');
     const half = N / 2 * m.stap;
-    b.appendChild(el('p', 'hint', m.wereld + ' · je ziet ' + (2 * half) + ' bij ' + (2 * half) + ' blokken. Tik op de kaart om een markering te zetten; je kompas wijst er dan naartoe.'));
+    b.appendChild(el('p', 'hint', m.wereld + ' · je ziet ' + (2 * half) + ' bij ' + (2 * half) + ' blokken. Sleep om te schuiven, knijp met twee vingers of draai aan het muiswiel om te zoomen, en tik om een markering te zetten: je kompas wijst er dan naartoe.'));
     const cv = el('canvas'); cv.width = cv.height = N * 4;
-    b.appendChild(cv);
+    const vak = el('div', 'kaartvak'); vak.appendChild(cv);
+    b.appendChild(vak);
     const c = cv.getContext('2d');
     // het land: kleur per soort grond, lichter naarmate het hoger ligt, met een schaduwrandje op hellingen
     const img = c.createImageData(N, N), d = img.data;
@@ -799,19 +800,68 @@ export class UI {
       c.beginPath(); c.moveTo(0, -11); c.lineTo(8, 9); c.lineTo(0, 4); c.lineTo(-8, 9); c.closePath(); c.fill(); c.stroke();
       c.restore();
     }
-    tap(cv, (ev) => {
-      const r = cv.getBoundingClientRect(), t = ev && ev.changedTouches ? ev.changedTouches[0] : ev;
-      if (!t || t.clientX === undefined) return;
-      const mx = m.x - half + (t.clientX - r.left) / r.width * 2 * half, mz = m.z - half + (t.clientY - r.top) / r.height * 2 * half;
-      send({ c: 'mark', mx, mz });
+    // Slepen, knijpen, scrollen en tikken. Tijdens het gebaar schuift en groeit het plaatje dat
+    // er al staat mee; laat je los, dan vraagt de kaart het nieuwe stuk op bij de server.
+    let bezig = false;                                   // er is al een nieuw stuk gevraagd: even niets meer doen
+    const vingers = new Map();
+    let start = null, dx = 0, dy = 0, schaal = 1, bewogen = false;
+    const zet = () => { cv.style.transform = 'translate(' + dx + 'px,' + dy + 'px) scale(' + schaal + ')'; };
+    const midden = () => { let x = 0, y = 0; for (const p of vingers.values()) { x += p.x; y += p.y; } return { x: x / vingers.size, y: y / vingers.size }; };
+    const spreiding = () => { const p = [...vingers.values()]; return p.length < 2 ? 0 : Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y); };
+    const opnieuw = () => { const c0 = midden(); start = { x: c0.x - dx, y: c0.y - dy, d: spreiding() / schaal, t: performance.now() }; };
+    const dichtste = (stap) => STEPS.reduce((best, q) => Math.abs(Math.log(q / stap)) < Math.abs(Math.log(best / stap)) ? q : best, STEPS[0]);
+    cv.addEventListener('pointerdown', (e) => {
+      if (bezig) return;
+      e.preventDefault();
+      try { cv.setPointerCapture(e.pointerId); } catch (err) { /* geeft niet */ }
+      vingers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (vingers.size === 1) { dx = dy = 0; schaal = 1; bewogen = false; }
+      opnieuw();
     });
+    cv.addEventListener('pointermove', (e) => {
+      if (!vingers.has(e.pointerId) || bezig) return;
+      vingers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      const c0 = midden();
+      dx = c0.x - start.x; dy = c0.y - start.y;
+      if (vingers.size >= 2 && start.d > 0) schaal = Math.max(0.25, Math.min(4, spreiding() / start.d));
+      if (Math.hypot(dx, dy) > 8 || Math.abs(schaal - 1) > 0.04) bewogen = true;
+      if (bewogen) zet();
+    });
+    const los = (e) => {
+      if (!vingers.has(e.pointerId)) return;
+      const r = cv.getBoundingClientRect();
+      vingers.delete(e.pointerId);
+      if (vingers.size > 0) { opnieuw(); return; }                       // er ligt nog een vinger op de kaart
+      if (bezig) return;
+      const breed = r.width / schaal, perPunt = 2 * half / breed;        // blokken per schermpunt (voor het gebaar)
+      if (!bewogen) {
+        // een tik: daar komt de markering
+        if (e.type === 'pointercancel') return;
+        const mx = m.x - half + (e.clientX - r.left) / r.width * 2 * half, mz = m.z - half + (e.clientY - r.top) / r.height * 2 * half;
+        bezig = true; send({ c: 'mark', mx, mz });
+        return;
+      }
+      bezig = true;
+      send({ x: m.x - dx * perPunt, z: m.z - dy * perPunt, stap: dichtste(m.stap / schaal) });
+    };
+    cv.addEventListener('pointerup', los); cv.addEventListener('pointercancel', los);
+    // het muiswiel zoomt in en uit rond de plek waar de muis staat
+    cv.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      if (bezig) return;
+      const si0 = STEPS.indexOf(m.stap), ni = Math.max(0, Math.min(STEPS.length - 1, si0 + (e.deltaY > 0 ? 1 : -1)));
+      if (ni === si0) return;
+      const r = cv.getBoundingClientRect(), fx = (e.clientX - r.left) / r.width - 0.5, fz = (e.clientY - r.top) / r.height - 0.5;
+      const wx = m.x + fx * 2 * half, wz = m.z + fz * 2 * half, half2 = N / 2 * STEPS[ni];
+      bezig = true;
+      send({ x: wx - fx * 2 * half2, z: wz - fz * 2 * half2, stap: STEPS[ni] });
+    }, { passive: false });
     // knoppen: in- en uitzoomen, schuiven, terug naar jezelf, markering weghalen
     const rij = el('div', 'btnrow');
     const knop = (tekst, fn, aan = true) => { const k = el('button', 'btn small' + (aan ? ' active' : ''), tekst); tap(k, () => { if (aan) fn(); }); rij.appendChild(k); };
     const si = STEPS.indexOf(m.stap);
     knop('➕ Dichterbij', () => send({ stap: STEPS[si - 1] }), si > 0);
     knop('➖ Verder weg', () => send({ stap: STEPS[si + 1] }), si < STEPS.length - 1);
-    knop('⬆️', () => send({ z: m.z - half })); knop('⬇️', () => send({ z: m.z + half })); knop('⬅️', () => send({ x: m.x - half })); knop('➡️', () => send({ x: m.x + half }));
     knop('🧭 Naar mij', () => g.net.send({ t: 'kaart', stap: m.stap }));
     if (m.mark) { knop('📍 Naar markering', () => send({ x: m.mark.x, z: m.mark.z })); knop('❌ Markering weg', () => send({ c: 'wis' })); }
     b.appendChild(rij);

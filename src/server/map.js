@@ -5,7 +5,7 @@ import { B } from '../shared/blocks.js';
 import { WORLDS, CRASH } from '../shared/worlds.js';
 
 export const MAP_N = 128;                      // de kaart is 128 bij 128 vakjes
-export const MAP_STEPS = [4, 12, 32, 80];      // hoeveel blokken één vakje is, van dichtbij tot de hele wereld
+export const MAP_STEPS = [4, 6, 8, 12, 16, 24, 32, 48, 64, 80];      // hoeveel blokken één vakje is, van dichtbij tot de hele wereld
 
 // kleurnummer per soort grond (de kleuren zelf staan in het scherm: MAP_COLORS in ui.js)
 const TOP = {
