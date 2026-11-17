@@ -726,12 +726,12 @@ export function dier(S, shiny) {
 // ---------- voertuigen ----------
 // Elk voertuig is opgebouwd uit doosjes en wielen, met de neus naar +z. De wielen draaien mee
 // als je rijdt (net als bij de trein); de helikopter heeft draaiende wieken.
-function voertuig(kind) {
+function voertuig(kind, kleur) {
   const V = VEHICLES[kind], heli = V.soort === 'lucht';
   const root = base(heli ? 'heli' : 'trein'), a = root.userData.a, g = a.inner;
   a.wheels = [];
   const [w, h, l] = V.size;
-  const lak = mat(V.kleur, 'glad'), donker = mat(0x23262c, 'metaal'), band = mat(0x1a1a1e, 'glad'), glas = mat(0x9fd8f0, 'glad'), licht = glowMat(0xfff2b0), rood = glowMat(0xff3a2a), staal = mat(0xb0b8c4, 'metaal');
+  const lak = mat(kleur === undefined || kleur === null ? V.kleur : kleur, 'glad'), donker = mat(0x23262c, 'metaal'), band = mat(0x1a1a1e, 'glad'), glas = mat(0x9fd8f0, 'glad'), licht = glowMat(0xfff2b0), rood = glowMat(0xff3a2a), staal = mat(0xb0b8c4, 'metaal');
   const wiel = (x, z, r, dik) => { const m = new THREE.Mesh(WIEL, band); m.rotation.z = Math.PI / 2; m.scale.set(r * 2, dik, r * 2); m.position.set(x, r, z); g.add(m); a.wheels.push(m); };
   const lampen = (y, z, x) => { for (const s of [-1, 1]) { part(g, licht, 0.2, 0.12, 0.05, s * x, y, z); part(g, rood, 0.2, 0.1, 0.05, s * x, y, -z); } };
   if (kind === 'auto' || kind === 'terreinwagen') {
@@ -829,7 +829,7 @@ export function buildModel(kind, opts) {
     case 'grijzewolf': m = quad(opts.world === 'schaduw' ? 0x2a2434 : 0x7a7e88, 'vacht', '#ffd040', true, 0); break;
     case 'reuzenspin': m = reuzenspin(); break;
     case 'trein': m = trein(); break;
-    case 'voertuig': m = voertuig(def.veh); break;
+    case 'voertuig': m = voertuig(def.veh, opts.color); break;
     case 'dier': m = dier(ANIMALS[def.animal].spec, opts.shiny || ''); break;
     default: m = pluizel(0xff00ff);
   }

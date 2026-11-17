@@ -45,6 +45,9 @@ export const JOBS = {
   drakenhandelaar: { title: 'Drakenhandelaar', hi: 'Psst... zoek je iets bijzonders? Ik heb eieren van heel ver weg.',
     trades: [[M, 160, I.v_helikopter, 1], [M, 40, I.ei_magisch, 1], [M, 120, I.ei_sterren, 1], [M, 40, B.ei_vuur, 1], [M, 40, B.ei_ijs, 1], [M, 50, B.ei_bliksem, 1], [M, 50, B.ei_schaduw, 1], [M, 80, B.ei_kristal, 1],
       [M, 6, I.drakenschub, 1], [I.drakenschub, 1, M, 4]] },
+  racemeester: { title: 'Racemeester', hi: 'Welkom op de baan!', trades: [] },
+  monteur: { title: 'Monteur', hi: 'Tik op de rode gereedschapskast om aan je voertuig te sleutelen. Brandstof en onderdelen heb ik hier.',
+    trades: [[M, 3, I.jerrycan, 1], [M, 4, I.moersleutel, 1], [M, 60, I.v_auto, 1], [M, 45, I.v_motor, 1], [M, 35, I.v_quad, 1], [M, 2, B.asfalt, 8], [M, 3, B.startlijn, 4], [M, 3, B.checkpoint, 4], [M, 12, B.garage, 1]] },
   stationschef: { title: 'Stationschef', hi: 'Instappen! Zet een locomotief op de rails en tik erop om te rijden.',
     trades: [[M, 90, I.v_bus, 1], [M, 3, I.jerrycan, 1], [M, 25, I.locomotief, 1], [M, 10, I.wagon, 1], [M, 4, B.rails, 16], [I.steenkool, 6, M, 1]] },
   koning: { title: 'Koning', hi: 'Welkom in mijn kasteel, dappere held. Breng mij de kroon van de Skeletkoning en ik beloon je rijkelijk!',
@@ -118,7 +121,7 @@ export const npcMethods = {
   sendSites(p) {
     const w = this.worlds[p.world];
     const l = [];
-    for (const s of w.gen.sitesNear(p.x, p.z, 560)) l.push([s.kind === 'dorp' ? 0 : s.kind === 'kasteel' ? (s.evil ? 2 : 1) : 3, s.x, s.z, s.name]);
+    for (const s of w.gen.sitesNear(p.x, p.z, 560)) l.push([s.kind === 'dorp' ? 0 : s.kind === 'kasteel' ? (s.evil ? 2 : 1) : s.kind === 'circuit' ? 4 : 3, s.x, s.z, s.name]);
     this.send(p, { t: 'sites', l });
   },
 
@@ -382,6 +385,8 @@ export const npcMethods = {
     const ai = e.def.ai;
     if (e.kind === 'trein') { this.useTrain(p, w, e, hid); return true; }
     if (e.veh) { this.useVehicle(p, w, e, hid); return true; }
+    if (e.race) return true;                                              // de auto van een andere coureur
+    if (e.job === 'racemeester') { this.raceMenu(p, w, e); return true; }
     if (e.job) {
       const J = JOBS[e.job];
       e.talk = 25;

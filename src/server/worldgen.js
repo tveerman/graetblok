@@ -23,6 +23,7 @@ export class WorldGen {
     this.world = world;
     this.siteCache = new Map();
     this.noSites = new Set(opts.noSites || []);
+    this.noCircuits = !!(opts && opts.noCircuits);      // een wereld van vóór de racebanen: daar komen er geen bij
     this.oldChunks = new Set(opts.oldChunks || []);
     this.raw = false;
     this.hasSites = !!SITE_ODDS[world];

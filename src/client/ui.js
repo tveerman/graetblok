@@ -5,6 +5,7 @@ import { ITEMS, I, RECIPES, GROUPS, GROUP_NAMES, matches, itemName } from '../sh
 import { WORLDS, WORLD_ORDER, CRASH } from '../shared/worlds.js';
 import { DRAGONS, dragonStage, STAGE_NAMES } from '../shared/mobs.js';
 import { iconURL, eggURL } from './textures.js';
+import { VEHICLES, VEH_COLORS, UPGRADES, UPGRADE_ORDER, vehStats } from '../shared/vehicles.js';
 import { ANIMALS, ANIMAL_LIST, EGG_KINDS, EGG_ORDER, RARITY, RARITIES, SHINIES, SHINY, ZOO_REWARDS, MAX_OUT } from '../shared/animals.js';
 
 const EGG_PATS = ['vlek', 'blad', 'golf', 'ster', 'barst', 'streep'];
@@ -176,6 +177,7 @@ export class UI {
       this.cmpShip = el('span', 'cship', '🚀'); strip.appendChild(this.cmpShip);
       this.cmpDorp = el('span', 'cship', '🏠'); strip.appendChild(this.cmpDorp);
       this.cmpBurcht = el('span', 'cship', '🏰'); strip.appendChild(this.cmpBurcht);
+      this.cmpBaan = el('span', 'cship', '🏁'); strip.appendChild(this.cmpBaan);
     }
     for (let i = 0; i < 4; i++) place(this.cmp[i], i * Math.PI / 2);
     let extra = '';
@@ -192,7 +194,7 @@ export class UI {
       extra += '  🚀 ' + Math.round(Math.hypot(dx, dz)) + ' m';
     }
     // het dichtstbijzijnde dorp (huisje) en kasteel (torentje)
-    for (const [node, kinds, icon] of [[this.cmpDorp, [0], '🏠'], [this.cmpBurcht, [1, 2], '🏰']]) {
+    for (const [node, kinds, icon] of [[this.cmpDorp, [0], '🏠'], [this.cmpBurcht, [1, 2], '🏰'], [this.cmpBaan, [4], '🏁']]) {
       let best = null, bd = 1e9;
       if (sites) for (const st of sites) { if (!kinds.includes(st[0])) continue; const d = Math.hypot(st[1] - pos.x, st[2] - pos.z); if (d < bd) { bd = d; best = st; } }
       node.style.display = best && bd > 30 ? '' : 'none';
@@ -496,6 +498,74 @@ export class UI {
       list.appendChild(card);
     });
     list.scrollTop = keep;
+  }
+
+  // ---------- de racemeester ----------
+
+  openRaceMenu(m) {
+    const g = this.g;
+    const b = el('div', 'race');
+    b.appendChild(el('p', '', 'Welkom op <b>' + m.name + '</b>!'));
+    b.appendChild(el('p', '', 'Rijd over de geblokte startlijn en de klok begint te lopen. Haal de drie gele checkpoints en kom weer over de lijn: dat is een ronde. Je snelste ronde wordt onthouden.'));
+    b.appendChild(el('p', '', 'Of race tegen Flits, Bliksem en Turbo: drie rondes, wie het eerst over de finish is wint.' + (m.wins ? ' Jij hebt hier al ' + m.wins + ' keer gewonnen!' : '')));
+    const go = el('button', 'btn big', '🏁 Start de race');
+    tap(go, () => { g.net.send({ t: 'race', c: 'start' }); this.close(); });
+    b.appendChild(go);
+    b.appendChild(el('p', 'hint', 'Je moet in een voertuig met wielen zitten. In de loods in het midden staat de garage (de rode kast) en een monteur die brandstof verkoopt.'));
+    this.open('race', 'Racemeester', b, false);
+  }
+
+  // ---------- de garage ----------
+
+  // Het venster van je voertuig bij een garageblok: repareren, tanken, een kleur en een naam
+  // kiezen en upgrades inbouwen. m komt van de server: { v: het voertuig, munten }.
+  openGarage(m) {
+    const g = this.g, v = m.v, V = VEHICLES[v.kind];
+    const send = (o) => g.net.send(Object.assign({ t: 'garage' }, o));
+    const b = el('div', 'garage');
+    const S = vehStats(V, v.up);
+    b.appendChild(el('div', 'qsec', '<h4>' + (v.name ? v.name + ' – ' : '') + V.name + ' · klasse ' + v.klasse + '</h4>' +
+      '<p class="hint">Topsnelheid ' + Math.round(S.max * 3.6) + ' km/u (op asfalt ' + Math.round(S.max * 3.6 * 1.22) + ') · jij hebt ' + m.munten + ' munten</p>'));
+    // onderhoud
+    const row = el('div', 'btnrow');
+    const fixCost = Math.ceil(v.dmg / 12), fuelCost = Math.ceil((v.tank - v.fuel) / 30);
+    const fix = el('button', 'btn small' + (v.dmg >= 1 ? ' active' : ''), v.dmg >= 1 ? '🔧 Repareren (' + fixCost + ' munten)' : '🔧 Niets kapot');
+    tap(fix, () => { if (v.dmg >= 1) send({ c: 'fix' }); });
+    const fuel = el('button', 'btn small' + (v.fuel < v.tank - 1 ? ' active' : ''), v.fuel < v.tank - 1 ? '⛽ Voltanken (' + fuelCost + ' munten)' : '⛽ Tank is vol');
+    tap(fuel, () => { if (v.fuel < v.tank - 1) send({ c: 'fuel' }); });
+    const name = el('button', 'btn small', '✏️ Naam geven');
+    tap(name, () => { const n = window.prompt('Hoe heet je ' + V.name.toLowerCase() + '?', v.name || ''); if (n !== null) send({ c: 'name', name: n }); });
+    row.appendChild(fix); row.appendChild(fuel); row.appendChild(name);
+    b.appendChild(row);
+    b.appendChild(el('p', 'hint', 'Tank: ' + Math.round(v.fuel / v.tank * 100) + '% · Heel: ' + Math.round(100 - v.dmg) + '%'));
+    // kleur
+    const cs = el('div', 'qsec');
+    cs.appendChild(el('h4', '', 'Kleur'));
+    const pal = el('div', 'vcolors');
+    VEH_COLORS.forEach((c, i) => {
+      const sw = el('button', 'vcolor' + (c === v.color ? ' on' : ''));
+      sw.style.background = '#' + c.toString(16).padStart(6, '0');
+      tap(sw, () => send({ c: 'color', i }));
+      pal.appendChild(sw);
+    });
+    cs.appendChild(pal);
+    b.appendChild(cs);
+    // upgrades
+    const us = el('div', 'qsec');
+    us.appendChild(el('h4', '', 'Upgrades'));
+    for (const k of UPGRADE_ORDER) {
+      const U = UPGRADES[k], lv = v.up[k] || 0, max = U.prijs.length;
+      const r = el('div', 'drow');
+      r.appendChild(el('span', '', '<b>' + U.name + '</b> ' + '★'.repeat(lv) + '☆'.repeat(max - lv) + ' <small>' + U.hint + '</small>'));
+      const btns = el('span', 'drowbtns');
+      const buy = el('button', 'btn small' + (lv < max && m.munten >= U.prijs[lv] ? ' active' : ''), lv < max ? 'Niveau ' + (lv + 1) + ': ' + U.prijs[lv] + ' munten' : 'Helemaal af');
+      tap(buy, () => { if (lv < max) send({ c: 'up', k }); });
+      btns.appendChild(buy); r.appendChild(btns);
+      us.appendChild(r);
+    }
+    b.appendChild(us);
+    b.appendChild(el('p', 'hint', 'Nitro gebruik je met de sprintknop (stick helemaal naar voren, of shift). De springknop is de handrem: daarmee kun je driften.'));
+    this.open('garage', 'Garage', b, true);
   }
 
   // ---------- het Dierenboek ----------

@@ -19,12 +19,35 @@ export const SITE_CELL = 224;
 
 // kans per vak op een dorp, een kasteel of een kamp (de rest blijft leeg)
 const SITE_ODDS = {
-  groen: { dorp: 0.5, kasteel: 0.18, kamp: 0.18 },
-  ijs: { dorp: 0.3, kasteel: 0.1, kamp: 0.2 },
+  groen: { dorp: 0.5, kasteel: 0.18, kamp: 0.18, circuit: 0.11 },
+  ijs: { dorp: 0.3, kasteel: 0.1, kamp: 0.2, circuit: 0.06 },
   schaduw: { dorp: 0, kasteel: 0.1, kamp: 0.16 },
 };
 // r0 = tot hier is de grond helemaal vlak, r1 = vanaf hier is het weer gewoon landschap
-const SITE_R = { dorp: [44, 62], kasteel: [56, 76], kamp: [15, 27] };
+const SITE_R = { dorp: [44, 62], kasteel: [56, 76], kamp: [15, 27], circuit: [50, 66] };
+
+// De racebaan: een ovaal met rechte stukken. CA en CB = halve lengte en breedte tot het midden
+// van de weg, CR = de straal van de bochten, CW = halve breedte van de weg.
+const CA = 34, CB = 20, CR = 13, CW = 3.5;
+// afstand van een punt tot de middellijn van de baan (negatief = binnen het ovaal)
+function circuitDist(dx, dz) {
+  const qx = Math.abs(dx) - (CA - CR), qz = Math.abs(dz) - (CB - CR);
+  return Math.hypot(Math.max(qx, 0), Math.max(qz, 0)) + Math.min(Math.max(qx, qz), 0) - CR;
+}
+// De middellijn als een rij punten, om de twee blokken, tegen de klok in gezien vanaf boven:
+// over het zuidelijke rechte stuk naar het oosten, dan de bocht om naar het noorden, enzovoort.
+function circuitWay() {
+  const pts = [], ex = CA - CR, ez = CB - CR;
+  const line = (x0, z0, x1, z1) => { const n = Math.round(Math.hypot(x1 - x0, z1 - z0) / 2); for (let i = 0; i < n; i++) pts.push([x0 + (x1 - x0) * i / n, z0 + (z1 - z0) * i / n]); };
+  const arc = (cx, cz, a0) => { const n = Math.round(CR * Math.PI / 2 / 2); for (let i = 0; i < n; i++) { const a = a0 - (Math.PI / 2) * i / n; pts.push([cx + Math.cos(a) * CR, cz + Math.sin(a) * CR]); } };
+  line(0, CB, ex, CB); arc(ex, ez, Math.PI / 2);
+  line(CA, ez, CA, -ez); arc(ex, -ez, 0);
+  line(ex, -CB, -ex, -CB); arc(-ex, -ez, -Math.PI / 2);
+  line(-CA, -ez, -CA, ez); arc(-ex, ez, Math.PI);
+  line(-ex, CB, 0, CB);
+  return pts;
+}
+const CIRCUIT_NAMES = ['de Drakenring', 'het Bliksemcircuit', 'de Stormbaan', 'het Vonkenpark', 'de Kometenring', 'het Donderdal', 'de Raketbaan', 'het Turbocircuit'];
 const J_OFF = 30;            // het station (en het knooppunt van de rails) ligt zo ver ten zuidoosten van het dorpsplein
 
 const DX = [1, 0, -1, 0], DZ = [0, 1, 0, -1];
@@ -219,7 +242,8 @@ export const siteMethods = {
     const P = SITE_ODDS[this.world];
     if (!P) return null;
     const sd = this.seed + 4100, r = hash2(rx, rz, sd);
-    let kind = r < P.dorp ? 'dorp' : r < P.dorp + P.kasteel ? 'kasteel' : r < P.dorp + P.kasteel + P.kamp ? 'kamp' : null;
+    let kind = r < P.dorp ? 'dorp' : r < P.dorp + P.kasteel ? 'kasteel' : r < P.dorp + P.kasteel + P.kamp ? 'kamp' : r < P.dorp + P.kasteel + P.kamp + (P.circuit || 0) ? 'circuit' : null;
+    if (kind === 'circuit' && this.noCircuits) kind = null;
     if (this.world === 'groen' && rx === 0 && rz === 0) kind = 'dorp';      // altijd een dorp niet ver van het ruimteschip
     if (!kind || this.noSites.has(rx + ',' + rz)) return null;
     // een paar plekken in het vak proberen, tot er een geschikt stuk land is
@@ -266,7 +290,8 @@ export const siteMethods = {
     else if (kind === 'kasteel') {
       s.evil = this.world !== 'groen' || hash2(rx, rz, sd + 8) < 0.42;
       s.name = s.evil ? 'Spookkasteel ' + pick(SPOOK, 13) : 'Kasteel ' + pick(BURCHT, 13);
-    } else { s.evil = true; s.name = 'het Trollenkamp'; }
+    } else if (kind === 'circuit') s.name = pick(CIRCUIT_NAMES, 14);
+    else { s.evil = true; s.name = 'het Trollenkamp'; }
     return s;
   },
 
@@ -298,7 +323,7 @@ export const siteMethods = {
   },
 
   sitePlan(s) {
-    if (!s.plan) s.plan = s.kind === 'dorp' ? this.villagePlan(s) : s.kind === 'kasteel' ? this.castlePlan(s) : this.campPlan(s);
+    if (!s.plan) s.plan = s.kind === 'dorp' ? this.villagePlan(s) : s.kind === 'kasteel' ? this.castlePlan(s) : s.kind === 'circuit' ? this.circuitPlan(s) : this.campPlan(s);
     return s.plan;
   },
 
@@ -784,6 +809,56 @@ export const siteMethods = {
     for (const [dx, dz] of [[4, -3], [-5, 5], [5, 6], [-3, -2]]) S.set(x + dx, y + 1, z + dz, B.botten);
   },
 
+  // ---------- de racebaan ----------
+
+  // wie er staat, waar de coureurs rijden en waar je start
+  circuitPlan(s) {
+    const y = s.y + 1;
+    const npcs = [
+      { k: 'dorpeling', job: 'racemeester', x: s.x + 3.5, y, z: s.z + CB - 6.5, r: 1.5, yaw: 0 },
+      { k: 'dorpeling', job: 'monteur', x: s.x - 7.5, y, z: s.z + 8.5, r: 1.5, yaw: 0 },
+    ];
+    const way = circuitWay().map(([x, z]) => [s.x + x + 0.5, s.z + z + 0.5]);
+    // de startplekken: achter de startlijn (ten westen ervan), twee aan twee
+    const grid = [[-5, 1.6], [-5, -1.6], [-10, 1.6], [-10, -1.6]].map(([x, z]) => [s.x + x + 0.5, s.z + CB + z + 0.5]);
+    return { npcs, way, grid, y: s.y + 1.02 };
+  },
+
+  drawCircuit(S, s) {
+    const x = s.x, y = s.y, z = s.z, P = PAL[this.world];
+    if (!S.hit(x - 46, z - 34, x + 46, z + 34)) return;
+    for (let dx = -45; dx <= 45; dx++) for (let dz = -33; dz <= 33; dz++) {
+      const d = circuitDist(dx, dz), ad = Math.abs(d);
+      if (ad > CW + 1.5) continue;
+      S.fill(x + dx, y + 1, z + dz, x + dx, y + 7, z + dz, 0);
+      if (ad > CW) { S.set(x + dx, y, z + dz, ((dx + dz) & 1) ? B.wol_rood : B.wol); continue; }          // de rood-witte rand
+      let id = B.asfalt;
+      if (ad < 0.5 && ((dx + dz) & 1) === 0) id = B.asfalt_streep;
+      if (dz > 0 && (dx === 0 || dx === 1)) id = B.startlijn;                                          // start en finish op het zuidelijke rechte stuk
+      else if ((dz < 0 && dx === 0) || (dz === 0 && dx !== 0)) id = B.checkpoint;                     // drie checkpoints: noord, oost en west
+      S.set(x + dx, y, z + dz, id);
+    }
+    // de startboog met lampen boven de lijn
+    for (const sz of [CB - CW - 1, CB + CW + 1]) S.fill(x, y + 1, z + sz, x, y + 6, z + sz, P.log);
+    S.fill(x, y + 6, z + CB - CW - 1, x, y + 6, z + CB + CW + 1, P.wood);
+    for (const lz of [-2, 0, 2]) S.set(x, y + 5, z + CB + lz, B.lantaarn);
+    S.set(x, y + 7, z + CB - CW - 1, B.wol_rood); S.set(x, y + 7, z + CB + CW + 1, B.wol_rood);
+    // de pitsgarage in het midden: een open loods met een garageblok
+    S.fill(x - 12, y, z + 4, x - 3, y, z + 11, B.steenblok);
+    S.fill(x - 12, y + 1, z + 4, x - 3, y + 4, z + 11, 0);
+    S.fill(x - 12, y + 1, z + 4, x - 3, y + 4, z + 4, P.wall);                       // achterwand
+    S.fill(x - 12, y + 1, z + 4, x - 12, y + 4, z + 11, P.wall); S.fill(x - 3, y + 1, z + 4, x - 3, y + 4, z + 11, P.wall);
+    S.fill(x - 13, y + 5, z + 3, x - 2, y + 5, z + 12, P.roof);
+    S.set(x - 10, y + 1, z + 5, B.garage); S.set(x - 5, y + 1, z + 5, B.werkbank);
+    S.set(x - 7, y + 4, z + 8, B.lantaarn);
+    S.fill(x - 9, y + 2, z + 4, x - 6, y + 3, z + 4, B.glas);
+    // de tribune aan de zuidkant
+    for (let k = 0; k < 4; k++) S.fill(x - 14, y + 1, z + CB + CW + 4 + k, x + 14, y + 1 + k, z + CB + CW + 4 + k, P.wood);
+    for (const fx of [-15, 15]) { S.fill(x + fx, y + 1, z + CB + CW + 7, x + fx, y + 7, z + CB + CW + 7, P.log); S.set(x + fx, y + 8, z + CB + CW + 7, B.wol_blauw); }
+    // lantaarns in de bochten
+    for (const [lx, lz] of [[CA + 6, CB + 2], [-CA - 6, CB + 2], [CA + 6, -CB - 2], [-CA - 6, -CB - 2]]) { S.fill(x + lx, y + 1, z + lz, x + lx, y + 4, z + lz, P.log); S.set(x + lx, y + 5, z + lz, B.lantaarn); }
+  },
+
   // ---------- alles in één chunk tekenen ----------
 
   drawSites(blocks, cx, cz) {
@@ -797,6 +872,7 @@ export const siteMethods = {
         if (!s || !S.hit(s.x - s.r0, s.z - s.r0, s.x + s.r0, s.z + s.r0)) continue;
         if (s.kind === 'dorp') this.drawVillage(S, s);
         else if (s.kind === 'kasteel') this.drawCastle(S, s);
+        else if (s.kind === 'circuit') this.drawCircuit(S, s);
         else this.drawCamp(S, s);
       }
     }

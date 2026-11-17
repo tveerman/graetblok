@@ -186,6 +186,12 @@ recipe(I.lasergeweer, 1, [[I.machineonderdeel, 3], [I.ijzerstaaf, 2], [I.kristal
 recipe(I.drankje, 1, [[I.bessen, 3], [B.gloeikristal, 1]], 'werkbank');
 recipe(B.steenblok, 4, [[B.steen, 4]], 'werkbank');
 recipe(B.lamp, 1, [[B.gloeikristal, 1], [B.glas, 1]], 'werkbank');
+recipe(B.asfalt, 8, [[B.grind, 4], [I.steenkool, 1]], 'oven');
+recipe(B.asfalt_streep, 4, [[B.asfalt, 4], [B.wol, 1]], 'werkbank');
+recipe(B.zebrapad, 4, [[B.asfalt, 4], [B.wol, 2]], 'werkbank');
+recipe(B.startlijn, 4, [[B.asfalt, 4], [B.wol, 1], [I.steenkool, 1]], 'werkbank');
+recipe(B.checkpoint, 4, [[B.asfalt, 4], [I.goudstaaf, 1]], 'werkbank');
+recipe(B.garage, 1, [[I.ijzerstaaf, 4], [I.moersleutel, 1], [B.planken, 4]], 'werkbank');
 recipe(I.jerrycan, 2, [[I.steenkool, 3], [I.ijzerstaaf, 1]], 'oven');
 recipe(I.moersleutel, 1, [[I.ijzerstaaf, 2]], 'werkbank');
 recipe(I.v_quad, 1, [[I.ijzerstaaf, 6], [I.machineonderdeel, 1], [I.leer, 2]], 'werkbank');

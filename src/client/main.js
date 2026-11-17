@@ -320,7 +320,25 @@ class Game {
       case 'debugSite': this.debugSite = m.s; break;
       case 'dragons': this.dragons = m.l; ui.refreshDragon(); break;
       case 'zoo': this.zoo = m; ui.refreshZoo(); break;
-      case 'veh': p.vehFuel = m.fuel; p.vehDmg = m.dmg; break;      // brandstof en schade van je voertuig
+      case 'veh': p.vehFuel = m.fuel; p.vehDmg = m.dmg; if (m.up) p.vehUp = m.up; break;      // brandstof, schade en upgrades van je voertuig
+      case 'garage': ui.openGarage(m); break;
+      case 'raceMenu': ui.openRaceMenu(m); break;
+      case 'raceGrid':
+        // naar de startplek: stilstaan tot het licht op groen gaat
+        ui.close();
+        p.pos.set(m.x, m.y, m.z); p.vel.set(0, 0, 0); p.carV = 0; p.carYaw = m.yaw; p.slipYaw = m.yaw; p.yaw = m.yaw; p.pitch = -0.12;
+        p.raceHold = 1; p.falseStart = false; p.track = null; p.lapT = -1; p.wasStart = false;
+        break;
+      case 'raceCount':
+        if (m.n > 0) { ui.toast('🚦 ' + m.n + '...', 'rank'); this.sound.play('click', 1); }
+        else {
+          if (p.falseStart) { p.raceHold = 2; setTimeout(() => { p.raceHold = 0; }, 1500); ui.toast('Valse start! Je moet even wachten.', 'warn'); }
+          else p.raceHold = 0;
+          ui.toast('🟢 GO!', 'rank'); this.sound.play('quest', 0.8);
+        }
+        break;
+      case 'raceEnd': p.raceHold = 0; break;
+      case 'track': if (p.track && p.track.key === m.key) p.track.best = m.best; break;      // je record op deze baan
       case 'dragonMenu': ui.openDragon(m.uid); break;
       case 'bossDown': this.sound.play('restore', 0.7); break;
     }
@@ -468,7 +486,7 @@ class Game {
   nearVehicle() {
     let best = null, bd = 4.2;
     for (const e of this.ents.map.values()) {
-      if (!e.def.veh) continue;
+      if (!e.def.veh || e.rc) continue;                  // (rc = de auto van een andere coureur)
       const d = Math.hypot(e.x - this.player.pos.x, e.y - this.player.pos.y, e.z - this.player.pos.z) - e.w / 2;
       if (d < bd) { bd = d; best = e; }
     }

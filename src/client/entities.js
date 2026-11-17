@@ -35,13 +35,13 @@ export class Entities {
   spawn(m) {
     if (this.map.has(m.id)) this.despawn(m.id);
     const def = MOBS[m.k];
-    const group = buildModel(m.k, { world: this.world, dtype: m.d, growth: m.g, job: m.j, variant: m.v, shiny: m.sh });
+    const group = buildModel(m.k, { world: this.world, dtype: m.d, growth: m.g, job: m.j, variant: m.v, shiny: m.sh, color: m.col });
     group.scale.setScalar(m.s);
     group.position.set(m.x, m.y, m.z);
     group.rotation.y = m.yaw;
     this.scene.add(group);
     const e = {
-      id: m.id, kind: m.k, def, group, scale: m.s, owner: m.o || null, dtype: m.d || null, name: m.n || null, growth: m.g || 0,
+      id: m.id, kind: m.k, def, group, scale: m.s, rc: m.rc || 0, owner: m.o || null, dtype: m.d || null, name: m.n || null, growth: m.g || 0,
       px: m.x, py: m.y, pz: m.z, pyaw: m.yaw, pt: this.clock,
       nx: m.x, ny: m.y, nz: m.z, nyaw: m.yaw, nt: this.clock,
       x: m.x, y: m.y, z: m.z, yaw: m.yaw, flags: 0, hp: 1, speed: 0, bar: null, tag: null, lastX: m.x, lastZ: m.z,
@@ -77,6 +77,14 @@ export class Entities {
     if (m.n !== undefined) this.setName(e, m.n);
     if (m.wg !== undefined) this.setWagons(e, m.wg);
     if (m.o !== undefined) e.owner = m.o;
+    if (m.col !== undefined) {
+      // een andere kleur (een voertuig uit de garage): het model opnieuw maken op dezelfde plek
+      const g = buildModel(e.kind, { world: this.world, color: m.col });
+      g.scale.copy(e.group.scale); g.position.copy(e.group.position); g.rotation.copy(e.group.rotation);
+      if (e.tag) { e.group.remove(e.tag); g.add(e.tag); }
+      if (e.bar) { e.group.remove(e.bar); g.add(e.bar); }
+      this.scene.remove(e.group); this.scene.add(g); e.group = g;
+    }
   }
 
   // ---------- treinen: de wagons rijden achter de locomotief aan ----------

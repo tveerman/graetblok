@@ -219,8 +219,26 @@ From Jorian's design document (`spel.txt`), following development phases 1–4, 
   forward = throttle, back = brake and reverse, sideways = steer; the camera follows. A vehicle
   takes one-block steps by itself, uses fuel (refill by tapping it with a jerrycan), gets damaged
   when you hit a wall at speed (repair with a spanner and an iron bar) and stays where you leave
-  it. Hit it with a pickaxe to take it with you again. Not in yet: roads, racing, the garage,
-  upgrades and petrol stations.
+  it. Hit it with a pickaxe to take it with you again; its fuel, damage, colour, name and
+  upgrades are remembered per kind of vehicle.
+- **Roads** – asphalt, asphalt with a centre dash, zebra crossing, start/finish line and
+  checkpoint blocks (oven and workbench, or from the mechanic). On asphalt every vehicle is
+  22% faster.
+- **Garage** – a red tool cabinet block. Park within a few blocks and tap it: repair and
+  refuel for coins, pick one of ten colours, give the vehicle a name and buy upgrades in three
+  levels (engine, tyres, brakes, nitro). The class (D to S) follows from the top speed.
+- **Nitro and drifting** – with a nitro upgrade the sprint button gives a boost until the bar
+  is empty. The jump button is the handbrake: the rear slides out, and sliding at speed earns
+  drift points (a few extra coins per lap). In the rain the car slides more.
+- **Laps** – drive over a start/finish line and the clock starts; touch every checkpoint of the
+  track and cross the line again for a lap time. The best time per track is kept, with coins
+  for a first lap and for a record. This also works on a track you build yourself: the game
+  takes the checkpoint blocks within about 70 blocks of the start line.
+- **Race circuits** – a new kind of place in the world (🏁 on the compass, about one in nine
+  map cells): an oval with kerbs, a start gantry, three checkpoints, a pit building with a
+  garage and a mechanic, and a grandstand. The race master starts a three-lap race against
+  Flits, Bliksem and Turbo with a 3-2-1 countdown (move early and you get a penalty). In a
+  world from before this version no circuit is placed where the player had built or dug.
 - **Line trains** – every village with a railway to another village has its own train with two
   wagons. It waits at the platform, toots, drives to the next village's platform, waits and
   comes back. You may get in and drive it yourself; when you get out it carries on.
@@ -362,7 +380,7 @@ game.net.send({ t: 'debug', c: 'world', w: 'wolken' })     // jump to the cloud 
 game.net.send({ t: 'debug', c: 'time', v: 0 })             // morning
 game.net.send({ t: 'debug', c: 'god', v: 1 })              // cannot be hurt
 game.net.send({ t: 'debug', c: 'grow' })                   // all your dragons become adults
-game.net.send({ t: 'debug', c: 'site', kind: 'dorp' })     // jump to the nearest village ('kasteel', 'kamp')
+game.net.send({ t: 'debug', c: 'site', kind: 'dorp' })     // jump to the nearest village ('kasteel', 'kamp', 'circuit')
 game.net.send({ t: 'debug', c: 'weather', k: 'onweer' })   // 'zon', 'regen', 'onweer', 'sneeuw', 'storm'
 game.net.send({ t: 'debug', c: 'herd', kind: 'schaap' })   // a herd next to you ('koe', 'wolf', 'beer')
 game.net.send({ t: 'debug', c: 'hatch' })                  // every egg in an incubator hatches now

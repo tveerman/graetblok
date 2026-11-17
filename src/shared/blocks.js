@@ -26,6 +26,7 @@ function def(id, key, name, p = {}) {
     id, key, name,
     shape, pass,
     tTop: tile(t[0]), tSide: tile(t[1]), tBottom: tile(t[2]),
+    road: !!p.road,
     solid: p.solid !== undefined ? p.solid : shape === SHAPE_CUBE,
     opaque: p.opaque !== undefined ? p.opaque : (shape === SHAPE_CUBE && pass === 0),
     light: p.light || 0,
@@ -97,6 +98,13 @@ def(42, 'drakennest', 'Drakennest', { hard: 1, snd: 'grass' });
 def(43, 'scheepswand', 'Scheepswand', { hard: 8, tool: 'pick', tier: 2, snd: 'metal' });
 def(44, 'scheepscomputer', 'Scheepscomputer', { tiles: ['scheepswand', 'scheepscomputer', 'scheepswand'], hard: Infinity, snd: 'metal', interact: true, light: 8 });
 def(45, 'machinekrat', 'Machinekrat', { hard: Infinity, snd: 'metal', interact: true });
+// wegen en racebanen: op asfalt rijdt een voertuig harder
+def(166, 'asfalt', 'Asfalt', { hard: 1.6, tool: 'pick', road: 1 });
+def(167, 'asfalt_streep', 'Asfalt met streep', { tiles: ['asfalt_streep', 'asfalt', 'asfalt'], hard: 1.6, tool: 'pick', road: 1 });
+def(168, 'zebrapad', 'Zebrapad', { tiles: ['zebrapad', 'asfalt', 'asfalt'], hard: 1.6, tool: 'pick', road: 1 });
+def(169, 'startlijn', 'Start en finish', { tiles: ['startlijn', 'asfalt', 'asfalt'], hard: 1.6, tool: 'pick', road: 1 });
+def(170, 'checkpoint', 'Checkpoint', { tiles: ['checkpoint', 'asfalt', 'asfalt'], hard: 1.6, tool: 'pick', road: 1 });
+def(171, 'garage', 'Garage', { tiles: ['garage_top', 'garage_side', 'garage_top'], hard: 2, tool: 'pick', snd: 'metal', interact: true });
 def(165, 'broedmachine', 'Broedmachine', { tiles: ['broedmachine_top', 'broedmachine_side', 'broedmachine_top'], hard: 2, tool: 'pick', snd: 'metal', interact: true, light: 6 });
 def(46, 'portaalsteen', 'Portaalsteen', { hard: 6, tool: 'pick', tier: 2 });
 def(47, 'portaal_groen', 'Portaal naar de Groene wereld', { pass: 2, solid: false, opaque: false, hard: Infinity, light: 12 });
@@ -242,6 +250,7 @@ MODEL_TILES.forEach(tile);
 
 export const NUM_BLOCKS = 256;
 // Snelle opzoektabellen
+export const B_ROAD = new Uint8Array(NUM_BLOCKS);      // 1 = wegdek: voertuigen rijden hier harder
 export const B_SHAPE = new Uint8Array(NUM_BLOCKS);
 export const B_PASS = new Uint8Array(NUM_BLOCKS);
 export const B_OPAQUE = new Uint8Array(NUM_BLOCKS);
@@ -255,7 +264,7 @@ export const B_GLOW = new Uint8Array(NUM_BLOCKS);     // 0..15: licht het blok z
 export const B_BED = new Uint8Array(NUM_BLOCKS);      // 0 = geen bed-helft, 1..4 = voeteneind, 5..8 = hoofdeind (richting erbij)
 for (const b of BLOCKS) {
   if (!b) continue;
-  B_SHAPE[b.id] = b.shape; B_PASS[b.id] = b.pass;
+  B_SHAPE[b.id] = b.shape; B_PASS[b.id] = b.pass; B_ROAD[b.id] = b.road ? 1 : 0;
   B_OPAQUE[b.id] = b.opaque ? 1 : 0; B_SOLID[b.id] = b.solid ? 1 : 0;
   B_LIGHT[b.id] = b.light;
   B_TOP[b.id] = b.tTop; B_SIDE[b.id] = b.tSide; B_BOTTOM[b.id] = b.tBottom;

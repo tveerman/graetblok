@@ -57,7 +57,9 @@ export const entityMethods = {
       if (e.pet && e.pet.a) { if (e.pet.sh) m.sh = e.pet.sh; if (e.pet.name) m.n = e.pet.name; }
       if (e.job) { m.j = e.job; m.v = e.look || 0; }
       if (e.train) m.wg = e.train.wg;
-      if (e.veh) m.dm = Math.round(e.veh.dmg);
+      if (e.veh) { m.dm = Math.round(e.veh.dmg); if (e.veh.color !== undefined) m.col = e.veh.color; if (e.veh.name) m.n = e.veh.name; }
+      if (e.col !== undefined) m.col = e.col;
+      if (e.race) m.rc = 1;
     }
     return m;
   },

@@ -22,6 +22,31 @@ export const VEHICLE_ORDER = ['auto', 'terreinwagen', 'motor', 'quad', 'vrachtwa
 
 export const FUEL_PER_CAN = 50;       // zoveel brandstof zit er in één jerrycan
 
+// de kleuren waarin je een voertuig kunt spuiten in de garage
+export const VEH_COLORS = [0xd8362c, 0xf0a020, 0xf0d020, 0x3ab04a, 0x2a6ad0, 0x8a4ad0, 0xf06ab0, 0xf4f4f0, 0x8a929c, 0x1c2028];
+
+// Upgrades uit de garage. Elke upgrade heeft drie niveaus; prijs = wat elk niveau kost in munten.
+export const UPGRADES = {
+  motor: { name: 'Motor', prijs: [25, 50, 90], hint: 'Hogere topsnelheid en sneller optrekken.' },
+  banden: { name: 'Banden', prijs: [15, 30, 60], hint: 'Scherper sturen en meer grip, ook in de regen.' },
+  remmen: { name: 'Remmen', prijs: [15, 30, 60], hint: 'Je staat sneller stil.' },
+  nitro: { name: 'Nitro', prijs: [40, 70, 120], hint: 'Een extra zet met de sprintknop. Hoe hoger, hoe langer het duurt.' },
+};
+export const UPGRADE_ORDER = ['motor', 'banden', 'remmen', 'nitro'];
+
+// Hoe rijdt dit voertuig met deze upgrades? up = { motor, banden, remmen, nitro } (0..3)
+export function vehStats(V, up) {
+  const u = up || {};
+  const m = u.motor || 0, b = u.banden || 0, r = u.remmen || 0, n = u.nitro || 0;
+  return { max: V.max * (1 + 0.09 * m), acc: V.acc * (1 + 0.14 * m), turn: V.turn * (1 + 0.08 * b), grip: 1 + 0.3 * b, brake: 1.8 + 0.7 * r, nitro: n ? 1 + n * 1.2 : 0 };
+}
+// de klasse van een voertuig, van D (rustig) tot S (het allersnelst)
+export function vehKlasse(V, up) {
+  const s = vehStats(V, up).max;
+  return s < 12.5 ? 'D' : s < 15.5 ? 'C' : s < 18.5 ? 'B' : s < 21.5 ? 'A' : 'S';
+}
+export const ROAD_BONUS = 1.22;       // op asfalt gaat alles ruim een vijfde harder
+
 // voor de server en het scherm is een voertuig een wezen dat stilstaat tot iemand instapt
 for (const k of VEHICLE_ORDER) {
   const V = VEHICLES[k];

@@ -38,7 +38,7 @@ export class GameServer {
 
   newMeta() {
     return { v: 1, seed: (Math.random() * 2147483647) | 0, time: DAY_LENGTH * 0.05, trees: {}, bossDead: {}, portals: [], eggs: {}, nextId: 1,
-      gen2: 1, noSites: {}, oldChunks: {}, trains: [], weather: {}, cleared: {} };
+      gen2: 1, gen3: 1, noSites: {}, oldChunks: {}, trains: [], weather: {}, cleared: {} };
   }
 
   async init() {
@@ -51,6 +51,7 @@ export class GameServer {
       (per[parts[1]] = per[parts[1]] || new Map()).set(Number(parts[2]), new Map(v));
     }
     if (!meta.gen2) this.upgradeWorld(meta, per);
+    if (!meta.gen3) this.upgradeCircuits(meta, per);
     for (const w of WORLD_ORDER) this.worlds[w] = new ServerWorld(w, meta.seed, per[w], { noSites: meta.noSites[w], oldChunks: meta.oldChunks[w] });
     for (const rec of meta.trains || []) this.spawnTrain(rec);
     for (const rec of meta.vehicles || []) this.spawnVehicle(rec);
@@ -73,6 +74,24 @@ export class GameServer {
       for (const key of keys) {
         const x = (Math.floor(key / 65536) - 32768) * 16 + 8, z = ((key % 65536) - 32768) * 16 + 8;
         for (const st of gen.sitesNear(x, z, 110)) if (Math.hypot(x - st.x, z - st.z) < st.r1 + 14) blocked.add(st.key);
+      }
+      meta.noSites[wid] = Array.from(blocked);
+    }
+  }
+
+  // Een wereld van vóór de racebanen: waar de speler al iets had gebouwd of gegraven komt
+  // geen racebaan. Op andere plekken komen ze er gewoon bij.
+  upgradeCircuits(meta, per) {
+    meta.gen3 = 1;
+    if (!meta.noSites) meta.noSites = {};
+    for (const wid of WORLD_ORDER) {
+      const keys = per[wid] ? Array.from(per[wid].keys()) : [];
+      if (!keys.length) continue;
+      const gen = new WorldGen(wid, meta.seed, { noSites: meta.noSites[wid] });
+      const blocked = new Set(meta.noSites[wid] || []);
+      for (const key of keys) {
+        const x = (Math.floor(key / 65536) - 32768) * 16 + 8, z = ((key % 65536) - 32768) * 16 + 8;
+        for (const st of gen.sitesNear(x, z, 110)) if (st.kind === 'circuit' && Math.hypot(x - st.x, z - st.z) < st.r1 + 14) blocked.add(st.key);
       }
       meta.noSites[wid] = Array.from(blocked);
     }
@@ -485,6 +504,8 @@ export class GameServer {
       this.useHeart(p, w);
     } else if (id === B.broedmachine) {
       this.useIncubator(p, w, x, y, z);
+    } else if (id === B.garage) {
+      this.useGarage(p, w, x, y, z);
     } else if (EGG_TYPE[id]) {
       const e = this.meta.eggs[p.world + ':' + x + ',' + y + ',' + z];
       if (!e) this.toast(p, 'Een drakenei! Hak het los om het mee te nemen.');
@@ -732,7 +753,7 @@ export class GameServer {
         // in een voertuig: het staat waar de speler zegt (een helikopter hangt onder je)
         const r = e.veh, V = e.def;
         e.x = r.x = p.x; e.y = r.y = p.y - (m.air ? (+m.seat || 0) : 0); e.z = r.z = p.z;
-        if (typeof m.ry === 'number') e.yaw = r.yaw = m.ry;
+        if (typeof m.ry === 'number') e.yaw = r.yaw = m.ry + Math.PI;      // een model kijkt de andere kant op dan de speler telt
         e.vx = e.vy = e.vz = 0; void V;
       } else if (e && e.def.animal) {
         // op een dier: op de grond staat het dier waar jij staat, in de lucht hangt het onder je
@@ -803,6 +824,7 @@ export class GameServer {
         this.updateProjectiles(w, dt);
       }
       this.updateLineTrains(dt);
+      this.updateRace(dt);
 
       this.updateFuses();
       this.acc.snap += dt;

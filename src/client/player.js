@@ -1,8 +1,8 @@
 // De speler: lopen, springen, zwemmen, vliegen op een draak, hakken, bouwen en vechten.
 import * as THREE from '../../vendor/three.module.min.js';
-import { EYE, REACH, CH, clamp } from '../shared/constants.js';
-import { VEHICLES } from '../shared/vehicles.js';
-import { B, BLOCKS, B_SHAPE, SHAPE_LIQUID, PORTAL_TO, TILE_CRACK } from '../shared/blocks.js';
+import { EYE, REACH, CH, clamp, idx } from '../shared/constants.js';
+import { VEHICLES, vehStats, ROAD_BONUS } from '../shared/vehicles.js';
+import { B, BLOCKS, B_SHAPE, B_ROAD, SHAPE_LIQUID, PORTAL_TO, TILE_CRACK } from '../shared/blocks.js';
 import { ITEMS, I } from '../shared/items.js';
 import { BREATH } from '../shared/mobs.js';
 import { RAIL_DX, RAIL_DZ, railLinks, railExit, railRamp, railPos, railAt, railDirOf } from '../shared/rails.js';
@@ -92,8 +92,10 @@ export class Player {
         // in een voertuig: je staat waar het voertuig staat en kijkt mee in zijn rijrichting
         const e = this.g.ents.map.get(id);
         this.veh = VEHICLES[m.veh]; this.carV = 0; this.vehDist = 0; this.vehBump = 0; this.vehT = 0;
-        this.vehFuel = m.fuel; this.vehDmg = m.dmg;
-        this.carYaw = e ? e.yaw : this.yaw; this.yaw = this.carYaw;
+        this.vehFuel = m.fuel; this.vehDmg = m.dmg; this.vehUp = m.up || {};
+        this.slipYaw = typeof m.yaw === 'number' ? m.yaw : this.yaw; this.nitroLeft = vehStats(this.veh, this.vehUp).nitro; this.driftPts = 0; this.driftNow = 0; this.driftLap = 0;
+        this.track = null; this.wasStart = false; this.lapT = -1;
+        this.carYaw = typeof m.yaw === 'number' ? m.yaw : this.yaw; this.yaw = this.carYaw;
         if (e) { this.pos.x = e.x; this.pos.z = e.z; this.pos.y = e.y + (kind === 'heli' ? this.seatH : 0) + 0.05; }
         this.g.ents.ridden = id;
         return;
@@ -108,6 +110,7 @@ export class Player {
         this.pos.x += Math.cos(this.trainYaw) * 1.3; this.pos.z -= Math.sin(this.trainYaw) * 1.3; this.pos.y += 0.25;
         this.rail = null; this.railV = 0;
       }
+      this.raceHold = 0;
       if (this.veh) { this.flushVeh(); this.pos.x += Math.cos(this.carYaw) * (this.veh.size[0] / 2 + 0.7); this.pos.z -= Math.sin(this.carYaw) * (this.veh.size[0] / 2 + 0.7); this.pos.y += 0.2; this.veh = null; this.g.sound.engine(0); this.g.ui.setVeh(''); }
       this.mount = 0; this.mountKind = ''; this.softLand = true; this.fallPeak = this.pos.y;
     }
@@ -189,19 +192,39 @@ export class Player {
     this.inWater = wet;
     const boat = V.soort === 'boot';
     // hoe hard mag hij nu? leeg of kapot = stil; een auto in het water en een boot op het land kruipen
-    let top = V.max * (1 - 0.5 * Math.min(1, this.vehDmg / 100));
+    const S = vehStats(V, this.vehUp), road = under > 0 && B_ROAD[under] === 1;
+    let top = S.max * (1 - 0.5 * Math.min(1, this.vehDmg / 100)) * (road ? ROAD_BONUS : 1);
+    // nitro: de sprintknop geeft een flinke zet, tot hij op is; daarna laadt hij weer op
+    let acc = S.acc;
+    const boost = S.nitro > 0 && inp.sprint && inp.fwd > 0.15 && this.nitroLeft > 0.05 && !boat;
+    if (boost) {
+      this.nitroLeft -= dt; top *= 1.4; acc *= 1.8;
+      if (Math.random() < dt * 40) g.particles.add(this.pos.x + Math.sin(this.carYaw) * 1.5, this.pos.y + 0.4, this.pos.z + Math.cos(this.carYaw) * 1.5, (Math.random() - 0.5), 0.6 + Math.random(), (Math.random() - 0.5), 1, 0.55 + Math.random() * 0.3, 0.15, 0.5, 0.35, 0);
+    } else if (S.nitro > 0) this.nitroLeft = Math.min(S.nitro, this.nitroLeft + dt * S.nitro / 12);
     if (this.vehFuel <= 0 || this.vehDmg >= 100) top = 0;
     else if (boat ? !onWater : wet) top *= 0.18;
-    const want = inp.fwd > 0.15 ? top * (inp.sprint ? 1 : 0.8) : inp.fwd < -0.15 ? -top * 0.35 : 0;
-    const braking = want === 0 || (want > 0) !== (this.carV > 0);
-    const rate = (braking ? V.acc * 1.8 : V.acc) * dt;
+    // bij de start van een race sta je stil tot het groene licht; wie te vroeg gas geeft krijgt straf
+    if (this.raceHold) { if (this.raceHold === 1 && inp.fwd > 0.3) this.falseStart = true; this.carV = 0; top = 0; }
+    // de handrem (springknop): hij remt en de achterkant breekt uit, zo kun je driften
+    const hand = inp.jump && !boat && Math.abs(this.carV) > 2;
+    const want = hand ? 0 : inp.fwd > 0.15 ? top : inp.fwd < -0.15 ? -top * 0.35 : 0;
+    const braking = !hand && (want === 0 || (want > 0) !== (this.carV > 0));
+    const rate = (hand ? 3.5 : braking ? V.acc * S.brake * (want === 0 ? 0.45 : 1) : acc) * dt;
     this.carV += Math.max(-rate, Math.min(rate, want - this.carV));
     // sturen gaat alleen als je rijdt; achteruit stuurt hij de andere kant op
     const grip = Math.min(1, Math.abs(this.carV) / 3.5) * (this.carV < 0 ? -1 : 1) * (g.sky && g.sky.rain > 0.3 && !boat ? 0.8 : 1);
-    this.carYaw -= inp.strafe * V.turn * grip * dt;
+    this.carYaw -= inp.strafe * S.turn * (hand ? 1.5 : 1) * grip * dt;
     let dy = this.carYaw - this.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy));
     this.yaw += dy * Math.min(1, 7 * dt);                                  // de camera draait mee
-    this.vel.x = -Math.sin(this.carYaw) * this.carV; this.vel.z = -Math.cos(this.carYaw) * this.carV;
+    // De auto glijdt een beetje: de richting waarin hij rijdt loopt achter op waar de neus heen
+    // wijst. Met de handrem (of in de regen) is dat veel meer. Dat is driften.
+    const wetRoad = g.sky && g.sky.rain > 0.3 && !boat;
+    let slip = this.carYaw - this.slipYaw; slip = Math.atan2(Math.sin(slip), Math.cos(slip));
+    this.slipYaw += slip * Math.min(1, (hand ? 1.3 : 7 * S.grip * (wetRoad ? 0.55 : 1)) * dt);
+    this.vel.x = -Math.sin(this.slipYaw) * this.carV; this.vel.z = -Math.cos(this.slipYaw) * this.carV;
+    // driftpunten: zolang je hard genoeg dwars gaat
+    if (Math.abs(slip) > 0.28 && Math.abs(this.carV) > 5 && this.onGround) { this.driftNow += Math.abs(this.carV) * Math.abs(slip) * dt * 14; this.driftHold = 0.6; }
+    else if (this.driftNow > 0) { this.driftHold -= dt; if (this.driftHold <= 0) { this.driftPts += this.driftNow; this.driftLap += this.driftNow; if (this.driftNow > 120) g.ui.toast('💨 Drift: ' + Math.round(this.driftNow) + ' punten!'); this.driftNow = 0; } }
     if (boat && wet) { this.vel.y = Math.min(this.vel.y + 22 * dt, 2.2); }      // een boot drijft
     else { this.vel.y -= 27 * dt; if (this.vel.y < -48) this.vel.y = -48; }
     const vmax = Math.max(Math.abs(this.vel.x), Math.abs(this.vel.y), Math.abs(this.vel.z));
@@ -218,7 +241,7 @@ export class Player {
       // tegen een blok: één blok omhoog kan hij nemen, hoger is een botsing
       const s = this.carV > 0 ? 1 : -1, px = this.pos.x - Math.sin(this.carYaw) * 0.6 * s, pz = this.pos.z - Math.cos(this.carYaw) * 0.6 * s;
       const free = !w.boxHits(px, this.pos.y + 1.05, pz, hw, hh) && !w.boxHits(this.pos.x, this.pos.y + 1.05, this.pos.z, hw, hh);
-      if (free && (this.onGround || wet)) { this.vel.y = 8.2; this.onGround = false; this.carV *= V.offroad ? 0.92 : 0.7; }
+      if (hand) { /* met de handrem erop klimt hij niet */ } else if (free && (this.onGround || wet)) { this.vel.y = 8.2; this.onGround = false; this.carV *= V.offroad ? 0.92 : 0.7; }
       else if (!free) {
         if (Math.abs(this.carV) > 7) { this.vehBump += Math.round((Math.abs(this.carV) - 5) * 1.5); g.sound.play('hit', 0.9); this.shake = Math.max(this.shake || 0, 0.25); }
         this.carV *= -0.15;
@@ -242,10 +265,74 @@ export class Player {
     this.vehT += dt;
     if (this.vehT >= 1) this.flushVeh();
     g.sound.engine(this.vehFuel > 0 && this.vehDmg < 100 ? 1 : 0, this.speedNow / V.max, V.soort);
+    this.clock = (this.clock || 0) + dt;                 // de klok van de rondetijd (staat stil als het spel op pauze staat)
+    if (this.mountKind === 'auto' && V.soort === 'weg') this.raceTick();
+    const S = vehStats(V, this.vehUp);
+    const mmss = (s) => Math.floor(s / 60) + ':' + (s % 60 < 10 ? '0' : '') + (s % 60).toFixed(1);
+    const T = this.track;
     const t = '⛽ ' + Math.round(this.vehFuel / V.tank * 100) + '%  ·  🔧 ' + Math.round(100 - this.vehDmg) + '%  ·  ' + Math.round(this.speedNow * 3.6) + ' km/u' +
+      (S.nitro ? '  ·  🔥 ' + '▮'.repeat(Math.round(this.nitroLeft / S.nitro * 5)) + '▯'.repeat(5 - Math.round(this.nitroLeft / S.nitro * 5)) : '') +
+      (this.driftNow > 5 ? '  ·  💨 ' + Math.round(this.driftNow) : '') +
+      (T && this.lapT >= 0 ? '  ·  ⏱ ' + mmss(this.clock - this.lapT) + (T.cps.length ? ' ✔ ' + T.done.filter(Boolean).length + '/' + T.cps.length : '') + (T.best ? ' (record ' + mmss(T.best) + ')' : '') : '') +
       (this.vehFuel <= 0 ? '  ·  De tank is leeg! Tik met een jerrycan op het voertuig.' : this.vehDmg >= 100 ? '  ·  Kapot! Repareer met een moersleutel.' : '');
     if (t !== this.vehText) { this.vehText = t; g.ui.setVeh(t); }
     if (this.vehDmg > 55 && Math.random() < dt * 6) g.particles.add(this.pos.x - Math.sin(this.carYaw) * 1.1, this.pos.y + 1.0, this.pos.z - Math.cos(this.carYaw) * 1.1, (Math.random() - 0.5) * 0.4, 1.2 + Math.random(), (Math.random() - 0.5) * 0.4, 0.25, 0.25, 0.27, 0.6, 1.3, -0.5);
+  }
+
+  // ---------- rondes rijden ----------
+  // Rijd je over een startlijn, dan begint de klok. Haal alle checkpoints van de baan en rijd
+  // weer over de startlijn: dat is een ronde. Het spel zoekt de baan zelf op: de startlijn
+  // waar je overheen rijdt en alle checkpoint-blokken in de buurt (tot zo'n 70 blokken).
+  raceTick() {
+    const g = this.g, w = g.world;
+    const bx = Math.floor(this.pos.x), bz = Math.floor(this.pos.z), by = Math.floor(this.pos.y - 0.25);
+    const id = w.getBlock(bx, by, bz);
+    const onStart = id === B.startlijn;
+    if (this.track && Math.hypot(this.pos.x - this.track.x, this.pos.z - this.track.z) > 260) { this.track = null; this.lapT = -1; }      // ver weg gereden: de ronde vervalt
+    const T = this.track;
+    if (id === B.checkpoint && T && this.lapT >= 0) {
+      for (let i = 0; i < T.cps.length; i++) if (!T.done[i] && Math.hypot(T.cps[i][0] - this.pos.x, T.cps[i][1] - this.pos.z) < 9) { T.done[i] = true; g.sound.play('got'); }
+    }
+    if (onStart && !this.wasStart) {
+      if (!T || Math.hypot(this.pos.x - T.x, this.pos.z - T.z) > 14) {
+        // een nieuwe baan: de startlijn en de checkpoints opzoeken
+        const N = this.findTrack(bx, by, bz);
+        this.track = N; this.lapT = this.clock; this.driftLap = 0;
+        g.net.send({ t: 'trackAt', key: N.key });
+        g.ui.toast(N.cps.length ? '🏁 De klok loopt! Haal de ' + N.cps.length + ' checkpoints en rijd weer over de startlijn.' : '🏁 De klok loopt! Rijd een rondje en kom weer over de startlijn.');
+        g.sound.play('quest', 0.5);
+      } else if (this.lapT >= 0 && T.done.every(Boolean) && this.clock - this.lapT > (T.cps.length ? 3 : 8)) {
+        g.net.send({ t: 'lapDone', key: T.key, time: +(this.clock - this.lapT).toFixed(2), drift: Math.round(this.driftLap) });
+        this.lapT = this.clock; T.done.fill(false); this.driftLap = 0;
+      } else {
+        if (this.lapT >= 0 && T.done.some(Boolean)) g.ui.toast('Je hebt een checkpoint gemist. De ronde begint opnieuw.', 'warn');
+        this.lapT = this.clock; T.done.fill(false); this.driftLap = 0;
+      }
+    }
+    this.wasStart = onStart;
+  }
+
+  // de baan bij een startlijn: het midden van de lijn (dat is ook de naam van de baan) en de
+  // checkpoints, als groepjes blokken die bij elkaar liggen
+  findTrack(bx, by, bz) {
+    const w = this.g.world;
+    let sx = 0, sz = 0, n = 0;
+    for (let dx = -12; dx <= 12; dx++) for (let dz = -12; dz <= 12; dz++) for (let dy = -2; dy <= 2; dy++) if (w.getBlock(bx + dx, by + dy, bz + dz) === B.startlijn) { sx += bx + dx; sz += bz + dz; n++; }
+    const x = sx / n + 0.5, z = sz / n + 0.5;
+    const cps = [], R = 72;
+    for (const c of w.chunks.values()) {
+      const ox = c.cx * 16, oz = c.cz * 16;
+      if (ox + 16 < x - R || ox > x + R || oz + 16 < z - R || oz > z + R) continue;
+      for (let lx = 0; lx < 16; lx++) for (let lz = 0; lz < 16; lz++) for (let y = Math.max(1, by - 14); y <= by + 14; y++) {
+        if (c.b[idx(lx, y, lz)] !== B.checkpoint) continue;
+        const px = ox + lx + 0.5, pz = oz + lz + 0.5;
+        let hit = null;
+        for (const q of cps) if (Math.hypot(q[0] / q[2] - px, q[1] / q[2] - pz) < 9) { hit = q; break; }
+        if (hit) { hit[0] += px; hit[1] += pz; hit[2]++; } else cps.push([px, pz, 1]);
+      }
+    }
+    const list = cps.map((q) => [q[0] / q[2], q[1] / q[2]]);
+    return { key: 'baan' + Math.round(x / 4) + '_' + Math.round(z / 4), x, z, cps: list, done: list.map(() => false), best: 0 };
   }
 
   // de server vertellen hoe ver je gereden hebt en of je gebotst bent

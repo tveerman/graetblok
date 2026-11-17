@@ -543,6 +543,33 @@ const PX = {
     else if (Math.abs(u - v) < 0.04 || Math.abs(u + v - 1) < 0.04) c = mul(c, 0.7);
     return c;
   },
+  // wegdek: donker asfalt met kleine steentjes
+  asfalt: (x, y, u, v) => asfaltPx(x, y),
+  // een kort wit streepje in het midden: achter elkaar gelegd wordt het een onderbroken streep,
+  // welke kant de weg ook op loopt
+  asfalt_streep: (x, y, u, v) => (Math.abs(u - 0.5) < 0.22 && Math.abs(v - 0.5) < 0.22 ? mul([236, 236, 228], 0.9 + hash2(x, y, 171) * 0.12) : asfaltPx(x, y)),
+  zebrapad: (x, y, u, v) => (Math.floor(u * 4) % 2 === 0 && v > 0.06 && v < 0.94 ? mul([236, 236, 228], 0.9 + hash2(x, y, 172) * 0.12) : asfaltPx(x, y)),
+  startlijn: (x, y, u, v) => mul((Math.floor(u * 4) + Math.floor(v * 4)) % 2 ? [240, 240, 236] : [26, 26, 30], 0.92 + hash2(x, y, 173) * 0.1),
+  checkpoint: (x, y, u, v) => {
+    const b = Math.min(u, v, 1 - u, 1 - v);
+    if (b < 0.1) return mul([245, 196, 40], 0.92 + hash2(x, y, 174) * 0.1);
+    const d = Math.abs(u - 0.5) + Math.abs(v - 0.5);
+    return d > 0.2 && d < 0.32 ? mul([245, 196, 40], 0.92 + hash2(x, y, 175) * 0.1) : asfaltPx(x, y);
+  },
+  // de garage: een gereedschapskast met een moersleutel erop
+  garage_top: (x, y, u, v) => {
+    const b = Math.min(u, v, 1 - u, 1 - v);
+    if (b < 0.14) return (Math.floor((u + v) * 8) % 2) ? [240, 196, 40] : [30, 30, 34];
+    return metal([170, 60, 50], 176)(x, y, u, v);
+  },
+  garage_side: (x, y, u, v) => {
+    let c = metal([186, 62, 52], 177)(x, y, u, v);
+    const b = Math.min(u, v, 1 - u, 1 - v);
+    if (b < 0.07) return mul([96, 34, 30], 0.9 + hash2(x, y, 178) * 0.2);
+    if (Math.abs(v - 0.36) < 0.015 || Math.abs(v - 0.66) < 0.015) return [70, 26, 24];             // laden
+    if (Math.abs(u - 0.5) < 0.1 && (Math.abs(v - 0.2) < 0.03 || Math.abs(v - 0.51) < 0.03 || Math.abs(v - 0.8) < 0.03)) return [214, 220, 228];      // handgrepen
+    return c;
+  },
   // de broedmachine: een metalen kast met een rond raampje waar een warm ei achter ligt
   broedmachine_top: (x, y, u, v) => {
     let c = metal([150, 158, 170], 161)(x, y, u, v);
@@ -1552,6 +1579,12 @@ function shadeHex(h, f) {
   const c = hex(parseInt(h.slice(1), 16));
   const q = (v) => Math.max(0, Math.min(255, Math.round(v * f)));
   return 'rgb(' + q(c[0]) + ',' + q(c[1]) + ',' + q(c[2]) + ')';
+}
+
+// één puntje asfalt
+function asfaltPx(x, y) {
+  const n = hash2(x, y, 170);
+  return n > 0.93 ? [112, 114, 120] : mul([56, 58, 64], 0.82 + n * 0.3);
 }
 
 // Een ei tekenen (64 x 64): voor de eieren in je rugzak en voor het Dierenboek.
