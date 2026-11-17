@@ -7,7 +7,7 @@ import { ANIMALS, SHINY } from '../shared/animals.js';
 import { VEHICLES } from '../shared/vehicles.js';
 import { buildRide } from './rides.js';
 import { buildCity } from './city.js';
-import { buildRig, animateRig } from './rig.js';
+import { buildRig, animateRig, rigify, kneeify } from './rig.js';
 
 const BOX = new THREE.BoxGeometry(1, 1, 1);
 const PLANE = new THREE.PlaneGeometry(1, 1);
@@ -856,13 +856,17 @@ export function buildModel(kind, opts) {
     case 'dier': m = dier(ANIMALS[def.animal].spec, opts.shiny || ''); break;
     default: m = pluizel(0xff00ff);
   }
+  // iedereen op twee benen krijgt het skelet van de speler (zie rig.js); viervoeters krijgen knieën
+  const t = m.userData.a.type;
+  if (t === 'biped') rigify(m, model === 'mens' ? 'dorp' : model === 'ridder' ? 'ridder' : model === 'skelet' ? 'skelet' : 'zwaar');
+  else if (t === 'quad' || t === 'vogel') kneeify(m);
   return m;
 }
 
 // Beweging van de modellen. speed = hoe snel het wezen beweegt, flags: 1 aanval, 2 vliegt, 4 blijft zitten
 export function animate(root, time, speed, flags, dt) {
   const a = root.userData.a;
-  if (a.type === 'speler') { animateRig(a, time, speed, dt); return; }
+  if (a.type === 'speler') { a.atk = flags & 1; animateRig(a, time, speed, dt); return; }
   const moving = speed > 0.3;
   a.phase += dt * Math.min(12, 3 + speed * 2.2) * (moving ? 1 : 0);
   const ph = a.phase, sw = moving ? Math.sin(ph) : 0;
@@ -876,6 +880,8 @@ export function animate(root, time, speed, flags, dt) {
     case 'quad':
       a.legs[0].rotation.x = sw * 0.7; a.legs[3].rotation.x = sw * 0.7;
       a.legs[1].rotation.x = -sw * 0.7; a.legs[2].rotation.x = -sw * 0.7;
+      // de knie buigt als de poot naar voren zwaait
+      for (let i = 0; i < a.legs.length; i++) { const low = a.legs[i].userData.low; if (low) low.rotation.x = moving ? 0.9 * Math.max(0, (i === 0 || i === 3 ? -1 : 1) * Math.cos(ph)) : 0; }
       if (a.head) a.head.rotation.x = atk ? -0.5 : Math.sin(time * 1.3 + root.id) * 0.06;
       if (a.tail[0]) a.tail[0].rotation.z = Math.sin(time * 4 + root.id) * 0.3;
       a.inner.position.z = atk ? 0.25 : 0;
@@ -886,6 +892,7 @@ export function animate(root, time, speed, flags, dt) {
     case 'vogel': {
       // twee poten: vogels en dino's die rechtop lopen
       a.legs[0].rotation.x = sw * 0.8; a.legs[1].rotation.x = -sw * 0.8;
+      for (let i = 0; i < 2; i++) { const low = a.legs[i].userData.low; if (low) low.rotation.x = moving ? 0.9 * Math.max(0, (i ? 1 : -1) * Math.cos(ph)) : 0; }
       if (a.head) a.head.rotation.x = Math.sin(time * 1.5 + root.id) * 0.07 + (moving ? Math.sin(ph * 2) * 0.06 : 0);
       for (const w of a.wings) w.rotation.z = w.userData.s * (moving ? Math.sin(time * 11 + root.id) * 0.7 : -1.2 + Math.sin(time * 1.8 + root.id) * 0.04);      // stil: vleugels langs het lijf
       if (a.tail[0]) a.tail[0].rotation.z = Math.sin(time * 2 + root.id) * 0.12;

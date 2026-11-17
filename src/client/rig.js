@@ -19,19 +19,19 @@ const STYLE = {
   mens: {
     scale: 1, hip: 0.8, thigh: 0.4, shin: 0.34, foot: 0.06, hipX: 0.13, legW: 0.22,
     chestW: 0.5, chestH: 0.56, chestD: 0.27, shoulderX: 0.35, upper: 0.3, fore: 0.26, armW: 0.18, head: 0.44,
-    cad: 1.45, A0: 0.5, A1: 0.85, K0: 0.85, K1: 1.5, Kst: 0.06, arm0: 0.45, arm1: 0.95, E0: 0.18, E1: 1.1, armOut: 0.06,
+    A0: 0.7, A1: 1.0, K0: 0.85, K1: 1.5, Kst: 0.06, arm0: 0.45, arm1: 0.95, E0: 0.18, E1: 1.1, armOut: 0.06,
     lean0: 0.04, lean1: 0.22, twist: 0.1, sway: 0.025, hop: 0, stomp: 0, toe: 0, stiff: 0,
   },
   elf: {
     scale: 0.8, hip: 0.74, thigh: 0.36, shin: 0.32, foot: 0.06, hipX: 0.11, legW: 0.17,
     chestW: 0.42, chestH: 0.5, chestD: 0.24, shoulderX: 0.29, upper: 0.28, fore: 0.24, armW: 0.14, head: 0.46,
-    cad: 2.1, A0: 0.42, A1: 0.75, K0: 1.0, K1: 1.6, Kst: 0.12, arm0: 0.3, arm1: 0.7, E0: 0.7, E1: 0.7, armOut: 0.28,
-    lean0: 0.02, lean1: 0.14, twist: 0.14, sway: 0.03, hop: 0.07, stomp: 0, toe: 0.55, stiff: 0,
+    A0: 0.75, A1: 0.95, K0: 1.0, K1: 1.6, Kst: 0.12, arm0: 0.3, arm1: 0.7, E0: 0.7, E1: 0.7, armOut: 0.28,
+    lean0: 0.02, lean1: 0.14, twist: 0.14, sway: 0.03, hop: 0.05, stomp: 0, toe: 0.55, stiff: 0,
   },
   robot: {
     scale: 1, hip: 0.8, thigh: 0.38, shin: 0.32, foot: 0.1, hipX: 0.15, legW: 0.2,
     chestW: 0.58, chestH: 0.54, chestD: 0.36, shoulderX: 0.41, upper: 0.28, fore: 0.26, armW: 0.17, head: 0.46,
-    cad: 1.05, A0: 0.42, A1: 0.6, K0: 0.3, K1: 0.45, Kst: 0, arm0: 0.3, arm1: 0.45, E0: 1.45, E1: 0, armOut: 0.1,
+    A0: 0.85, A1: 0.95, K0: 0.15, K1: 0.25, Kst: 0, arm0: 0.3, arm1: 0.45, E0: 1.45, E1: 0, armOut: 0.1,
     lean0: 0, lean1: 0.05, twist: 0.03, sway: 0.09, hop: 0, stomp: 0.06, toe: 0, stiff: 1,
   },
 };
@@ -146,26 +146,34 @@ export function buildRig(look) {
 // swim (je zwemt) en swing (je zwaait met je arm).
 export function animateRig(a, time, speed, dt) {
   const S = a.S, riding = a.pose === 'ride';
+  time += a.seed || 0;                                                  // (zodat niet iedereen precies gelijk ademt en rondkijkt)
   const go = speed > 0.3 && !riding;
   const k = Math.min(1, dt * 10);
   a.move += ((go ? 1 : 0) - a.move) * k;
   a.run += (clamp01((speed - 4.6) / 1.6) - a.run) * Math.min(1, dt * 6);
   a.air += ((a.airborne && !riding && !a.swim ? 1 : 0) - a.air) * Math.min(1, dt * 12);
   a.swimF += ((a.swim && !riding ? 1 : 0) - a.swimF) * Math.min(1, dt * 6);
-  if (go) a.phase += dt * Math.max(2.2, speed) * S.cad;
   // net geland: even door de knieën
   if (a.wasAir && !a.airborne) a.land = 1;
   a.wasAir = a.airborne;
   a.land = Math.max(0, a.land - dt * 5);
   const mv = a.move * (1 - a.air) * (1 - a.swimF), run = a.run, air = a.air, sw = a.swimF, idle = 1 - a.move;
-  const A = lerp(S.A0, S.A1, run), K = lerp(S.K0, S.K1, run);
+  // Hoe ver zwaait het been? Langzaam lopen = kleine pasjes, rennen = grote.
+  const A = lerp(lerp(0.3, S.A0, clamp01(speed / 4.5)), S.A1, run), K = lerp(S.K0, S.K1, run);
+  // De benen gaan precies zo snel dat de voet die op de grond staat niet schuift: in een halve
+  // slag (één stap) leg je twee keer beenlengte x sin(A) af.
+  const pas = 2 * (S.thigh + S.shin) * Math.sin(A) * (S.scale || 1) * a.inner.parent.scale.x;
+  if (go) a.phase += dt * PI * speed / Math.max(0.15, pas);
+  const sinA = Math.sin(A);
   let reach = 0;
   for (let i = 0; i < 2; i++) {
     const L = a.legs[i], ph = a.phase + i * PI;
-    let s = Math.sin(ph);
-    if (S.stiff) s = Math.max(-1, Math.min(1, s * 1.7));                 // een robot houdt zijn been even stil aan het eind van de stap
+    const s = Math.sin(ph), p = ((ph % (2 * PI)) + 2 * PI) % (2 * PI);
     const swingF = Math.max(0, Math.cos(ph));                            // 1 als het been onder je door naar voren zwaait
-    let th = -A * s * mv;
+    // Staat de voet op de grond (de tweede helft van de slag), dan gaat hij met een vaste
+    // snelheid naar achteren, net zo hard als jij vooruit gaat. In de lucht zwaait hij soepel terug.
+    const stand = p > PI / 2 && p < 1.5 * PI;
+    let th = (stand ? -Math.asin(sinA * (1 - 2 * (p - PI / 2) / PI)) : -A * s) * mv;
     let kn = (K * Math.pow(swingF, 1.2) + S.Kst + 0.14 * Math.pow(Math.max(0, s), 4)) * mv;
     let toe = S.toe * (1 - air);
     // stilstaan: een heel klein beetje door de knieën, en na een sprong iets dieper
@@ -184,7 +192,7 @@ export function animateRig(a, time, speed, dt) {
     if (riding) { th = -1.35; kn = 1.2; splay = L.s * 0.32; toe = 0; }
     L.hp.rotation.set(th, 0, splay);
     L.kn.rotation.x = kn;
-    L.an.rotation.x = riding ? -0.2 : toe - (th + kn);                  // de voet blijft plat (of op de tenen)
+    if (L.an) L.an.rotation.x = riding ? -0.2 : toe - (th + kn);        // de voet blijft plat (of op de tenen)
     const r = S.thigh * Math.cos(th) + S.shin * Math.cos(th + kn) + S.foot * (1 + Math.sin(toe) * 1.6);
     if (r > reach) reach = r;
   }
@@ -218,6 +226,7 @@ export function animateRig(a, time, speed, dt) {
     }
     if (sw > 0) { const t = time * 3.4 + i * PI; sx = lerp(sx, -1.7 + Math.sin(t) * 0.9, sw); out = lerp(out, 0.3 + Math.max(0, Math.cos(t)) * 0.7, sw); el = lerp(el, -0.3, sw); }
     if (riding) { sx = -0.95; el = -0.4; out = 0.12; }
+    if (a.atk) { sx = -2.2 + Math.sin(time * 20 + i * 2) * 0.5; el = -0.3; }                                // een monster dat uithaalt
     if (i === 1 && a.swing > 0) { sx = -2.3 + Math.sin(a.swing * 14) * 1.1; el = -0.35; out = 0.05; }      // hakken, slaan, bouwen
     R.sh.rotation.set(sx, 0, R.s * out);
     R.el.rotation.x = el;
@@ -235,4 +244,51 @@ export function animateRig(a, time, speed, dt) {
     const n = Math.floor(time * (go ? 6 : 1.5)) % 3;
     a.lampjes.forEach((l, i) => { l.visible = go ? i === n : i <= n; });
   }
+}
+
+// ---------- dorpelingen en monsters ----------
+// De andere modellen zijn gebouwd met armen en benen uit één stuk. Hier krijgen ze achteraf
+// hetzelfde skelet: elk been en elke arm wordt in tweeën gedeeld (knie, elleboog), en de romp
+// komt op een heup te staan die kan bewegen. Daarna gebruiken ze dezelfde animatie als de speler.
+
+// loopstijlen voor wie geen speler is
+STYLE.dorp = Object.assign({}, STYLE.mens, { arm0: 0.35, armOut: 0.04 });
+STYLE.ridder = Object.assign({}, STYLE.mens, { K0: 0.7, arm0: 0.3, arm1: 0.6, sway: 0.04, lean0: 0.02 });
+STYLE.skelet = Object.assign({}, STYLE.mens, { K0: 1.1, twist: 0.18, sway: 0.05, arm0: 0.6, armOut: 0.12, lean0: 0.1 });
+STYLE.zwaar = Object.assign({}, STYLE.mens, { A0: 0.6, A1: 0.75, K0: 0.55, K1: 0.8, arm0: 0.5, arm1: 0.7, E0: 0.3, E1: 0.3, armOut: 0.12, lean0: 0.12, lean1: 0.2, twist: 0.06, sway: 0.08, stomp: 0.05 });
+
+// een ledemaat uit één stuk (gemaakt met limb() in models.js) in tweeën delen; wat aan de
+// onderste helft vastzat (een hand, een zwaard, een schild) gaat mee met het onderste stuk
+export function splitLimb(g) {
+  const m = g.children[0], h = m.scale.y;
+  const low = new THREE.Group(); low.position.y = -h / 2;
+  const m2 = new THREE.Mesh(m.geometry, m.material); m2.scale.set(m.scale.x, h / 2, m.scale.z); m2.position.y = -h / 4;
+  low.add(m2);
+  m.scale.y = h / 2; m.position.y = -h / 4;
+  for (const c of g.children.slice(1)) if (c.position.y < -h / 2 + 1e-6) { low.add(c); c.position.y += h / 2; }
+  g.add(low);
+  g.userData.low = low;
+  return h;
+}
+
+export function rigify(root, style) {
+  const a = root.userData.a, inner = a.inner;
+  if (!a.legs || a.legs.length !== 2 || !a.arms || a.arms.length !== 2 || !a.head) return;
+  const hip = a.legs[0].position.y;
+  const hips = new THREE.Group(); hips.position.y = hip;
+  const spine = new THREE.Group(), off = new THREE.Group(); off.position.y = -hip;
+  const kids = inner.children.slice();
+  inner.add(hips); hips.add(spine); spine.add(off);
+  for (const c of kids) { if (a.legs.includes(c)) { hips.add(c); c.position.y -= hip; } else off.add(c); }
+  let legH = 0, armH = 0;
+  a.legs = a.legs.map((g) => { legH = splitLimb(g); return { hp: g, kn: g.userData.low, an: null, s: g.position.x < 0 ? -1 : 1 }; });
+  a.arms = a.arms.map((g) => { armH = splitLimb(g); return { sh: g, el: g.userData.low, s: g.position.x < 0 ? -1 : 1 }; });
+  a.S = Object.assign({}, STYLE[style] || STYLE.dorp, { hip, thigh: legH / 2, shin: legH / 2, foot: 0, upper: armH / 2, fore: armH / 2, toe: 0 });
+  Object.assign(a, { type: 'speler', hips, spine, neck: a.head, move: 0, run: 0, air: 0, swimF: 0, land: 0, swing: 0, pose: '', airborne: false, swim: false, vy: 0, seed: (root.id * 1.37) % 60 });
+}
+
+// viervoeters en vogels: elke poot die lang genoeg is krijgt een knie
+export function kneeify(root) {
+  const a = root.userData.a;
+  for (const g of a.legs) if (g.children.length && g.children[0].isMesh && g.children[0].scale.y >= 0.4 && !g.userData.low) splitLimb(g);
 }

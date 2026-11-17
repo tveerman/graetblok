@@ -321,8 +321,12 @@ From Jorian's design document (`spel.txt`), following development phases 1–4, 
   and swinging a tool. Each kind has its own proportions and gait: the human walks normally,
   the elf is small with big ears and a pointed cap, walks on its toes with quick light steps
   and a little hop, the robot is riveted tin with chest lights and an antenna and walks
-  stiff-legged with a stomp and a swaying body. Villagers and monsters still use the old
-  two-joint animation.
+  stiff-legged with a stomp and a swaying body. Villagers, knights, skeletons, trolls, golems
+  and tree guardians are converted to the same rig when their model is built (`rigify`: each
+  one-piece arm and leg is split at the elbow or knee and the body is put on a moving hip),
+  each with its own gait (villager, knight, rattling skeleton, heavy lumbering giant); what
+  they hold moves with the forearm. Four-legged animals and walking birds get a knee in every
+  leg that is long enough (`kneeify`). Cost: four extra boxes per creature.
 - **Story quests** – 18 steps from "chop a tree" to "defeat the Drakenkoning", shown top-left,
   with a compass marker for the early ones.
 
