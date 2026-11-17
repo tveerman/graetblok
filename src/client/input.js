@@ -25,9 +25,11 @@ export class Input {
     const cv = this.canvas;
     window.addEventListener('keydown', (e) => {
       if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
-      if (e.repeat) { if (e.code === 'Space' || e.code.startsWith('Arrow')) e.preventDefault(); return; }
+      // F5 wisselt in het spel van camera (net als in Minecraft); op het beginscherm laadt hij gewoon de pagina opnieuw
+      const f5 = e.code === 'F5' && this.h.inGame && this.h.inGame();
+      if (e.repeat) { if (e.code === 'Space' || e.code.startsWith('Arrow') || f5) e.preventDefault(); return; }
       this.keys[e.code] = true;
-      if (e.code === 'Space' || e.code.startsWith('Arrow') || e.code === 'Tab') e.preventDefault();
+      if (e.code === 'Space' || e.code.startsWith('Arrow') || e.code === 'Tab' || f5) e.preventDefault();
       this.h.onKey(e.code);
     });
     window.addEventListener('keyup', (e) => { this.keys[e.code] = false; });

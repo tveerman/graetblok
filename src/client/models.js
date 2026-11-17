@@ -955,3 +955,4 @@ export function animate(root, time, speed, flags, dt) {
 
 // de bouwstenen van de modellen, ook voor de attracties in rides.js
 export { mat as skinMat, glowMat, part as boxPart, faceMats };
+export { setArmor, buildArms } from './rig.js';

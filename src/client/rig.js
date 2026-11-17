@@ -246,6 +246,48 @@ export function animateRig(a, time, speed, dt) {
   }
 }
 
+// ---------- harnas ----------
+// Draag je een harnas (het beste uit je rugzak telt), dan zie je dat op het poppetje: een
+// borstplaat, schouderstukken en een helm in de kleur van het harnas. kleur = null haalt het weg.
+export function setArmor(root, kleur, leer) {
+  const a = root.userData.a;
+  if (a.harnasKleur === kleur) return;
+  a.harnasKleur = kleur;
+  if (a.harnas) { for (const m of a.harnas) m.parent.remove(m); a.harnas = null; }
+  if (kleur === null || kleur === undefined || !a.spine || !a.S.chestW) return;
+  const S = a.S, m = mat(kleur, leer ? 'glad' : 'metaal'), rand = glowMat(0xffd23a), list = [];
+  list.push(part(a.spine, m, S.chestW + 0.07, S.chestH * 0.72, S.chestD + 0.08, 0, S.chestH * 0.62, 0));
+  list.push(part(a.spine, m, S.chestW * 0.7, S.chestH * 0.3, S.chestD + 0.06, 0, S.chestH * 0.16, 0));
+  if (!leer) list.push(part(a.spine, rand, 0.1, 0.1, 0.03, 0, S.chestH * 0.66, S.chestD / 2 + 0.05));
+  for (const R of a.arms) list.push(part(R.sh, m, S.armW + 0.1, 0.16, S.armW + 0.1, R.s * 0.02, -0.02, 0));
+  if (!a.muts && !a.antenne) {                                        // (de elf houdt zijn muts op, de robot zijn antenne)
+    const h = S.head;
+    list.push(part(a.head, m, h + 0.06, h * 0.42, h + 0.06, 0, h * 0.34, 0));
+    list.push(part(a.head, m, h + 0.06, h * 0.5, 0.06, 0, h * 0.02, -h / 2 - 0.01));
+  }
+  a.harnas = list;
+}
+
+// ---------- je eigen armen als je door de ogen van je poppetje kijkt ----------
+// Twee onderarmen die aan de camera hangen: de arm met je voorwerp erin, en de andere hand
+// onder in beeld. Ze worden altijd over de wereld heen getekend, zodat ze nooit in een muur steken.
+export function buildArms(look) {
+  const type = look && STYLE[look.type] ? look.type : 'mens';
+  const robot = type === 'robot', elf = type === 'elf';
+  const mk = (c) => new THREE.MeshLambertMaterial({ color: c, depthTest: false, depthWrite: false, fog: false, transparent: true });      // (doorzichtig-lijst: dan komen ze ook over water heen)
+  const mouw = mk(robot ? 0xbcc6d0 : elf ? 0xcfe8b0 : (look && look.shirt) || 0x2f7fd0), hand = mk(robot ? 0x3a424c : elf ? 0xcfe8b0 : 0xe8b890);
+  const kraag = elf || robot ? mk(robot ? 0x3a424c : (look && look.shirt) || 0x3fa34a) : null;
+  const box = new THREE.BoxGeometry(1, 1, 1);
+  const arm = () => {
+    const g = new THREE.Group();
+    const a1 = new THREE.Mesh(box, mouw); a1.scale.set(0.1, 0.5, 0.1); a1.position.y = -0.31; a1.renderOrder = 28; g.add(a1);
+    if (kraag) { const k = new THREE.Mesh(box, kraag); k.scale.set(0.115, 0.06, 0.115); k.position.y = -0.09; k.renderOrder = 29; g.add(k); }
+    const h = new THREE.Mesh(box, hand); h.scale.set(0.095, 0.1, 0.095); h.renderOrder = 29; g.add(h);
+    return g;
+  };
+  return [arm(), arm()];
+}
+
 // ---------- dorpelingen en monsters ----------
 // De andere modellen zijn gebouwd met armen en benen uit één stuk. Hier krijgen ze achteraf
 // hetzelfde skelet: elk been en elke arm wordt in tweeën gedeeld (knie, elleboog), en de romp

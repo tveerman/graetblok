@@ -62,6 +62,7 @@ class Game {
       onUse: (ndc) => { this.sound.unlock(); if (!this.ui.modalOpen()) this.player.use(ndc); },
       onKey: (code) => this.onKey(code),
       canPlay: () => this.state === 'play' && !this.ui.modalOpen(),
+      inGame: () => this.state === 'play',
     });
     this.player = new Player(this);
     this.ui.setTouch(touch);
@@ -435,7 +436,12 @@ class Game {
     this.sound.play('click', 0.6);
   }
 
-  toggleCam() { this.player.cam = this.player.cam ? 0 : 1; }
+  // drie standen: door je eigen ogen (met je armen in beeld), van achteren, en van voren
+  toggleCam() {
+    const p = this.player;
+    p.cam = (p.cam + 1) % 3;
+    this.ui.toast(['📷 Door je eigen ogen', '📷 Van achteren', '📷 Van voren: zo zie je er nu uit'][p.cam]);
+  }
 
   // Volledig scherm aan of uit (op de iPad werkt dat met de oudere "webkit"-namen).
   toggleFullscreen() {
@@ -567,7 +573,7 @@ class Game {
     if (code.startsWith('Digit')) { const n = parseInt(code.slice(5), 10); if (n >= 1 && n <= 9) this.select(n - 1); return; }
     if (code === 'WheelDown') { this.select((this.sel + 1) % HOTBAR); return; }
     if (code === 'WheelUp') { this.select((this.sel + HOTBAR - 1) % HOTBAR); return; }
-    if (code === 'KeyV') this.toggleCam();
+    if (code === 'KeyV' || code === 'F5') this.toggleCam();
     else if (code === 'KeyF') this.player.use(null);
     else if (code === 'KeyR') this.rideNearest();
     else if (code === 'KeyG') this.dragonMenu();

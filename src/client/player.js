@@ -7,7 +7,7 @@ import { B, BLOCKS, B_SHAPE, B_ROAD, SHAPE_LIQUID, PORTAL_TO, TILE_CRACK } from 
 import { ITEMS, I } from '../shared/items.js';
 import { BREATH } from '../shared/mobs.js';
 import { RAIL_DX, RAIL_DZ, railLinks, railExit, railRamp, railPos, railAt, railDirOf } from '../shared/rails.js';
-import { playerModel, animate } from './models.js';
+import { playerModel, animate, setArmor, buildArms } from './models.js';
 import { iconCanvas } from './textures.js';
 
 const HW = 0.3, HH = 1.8;
@@ -77,6 +77,11 @@ export class Player {
     this.model = playerModel(look);
     this.model.visible = false;
     this.g.R.scene.add(this.model);
+    // je eigen armen voor als je door je eigen ogen kijkt
+    const cam = this.g.R.camera;
+    if (this.fpArms) for (const a of this.fpArms) cam.remove(a);
+    this.fpArms = buildArms(look);
+    for (const a of this.fpArms) { a.visible = false; cam.add(a); }
   }
 
   teleport(x, y, z, yaw) {
@@ -609,7 +614,8 @@ export class Player {
 
   updateCamera(dt) {
     const g = this.g, cam = g.R.camera, w = g.world;
-    const third = this.cam === 1 || this.mount || this.dead;
+    const third = this.cam > 0 || this.mount || this.dead;
+    const front = this.cam === 2;                 // van voren: de camera staat vóór je en kijkt naar je terug
     const eyeY = this.pos.y + (this.mount ? 1.25 : EYE) + (this.mountKind === 'dier' || this.mountKind === 'auto' ? this.seatH : 0);
     const hx = Math.floor(this.pos.x), hz = Math.floor(this.pos.z);
     if (!third) {
@@ -618,7 +624,8 @@ export class Player {
     } else {
       const dist = this.mount ? 4.5 + 3.4 * this.mountScale : 4.2;
       const cp = Math.cos(this.pitch);
-      const bx = Math.sin(this.yaw) * cp, by = -Math.sin(this.pitch), bz = Math.cos(this.yaw) * cp;
+      const fs = front ? -1 : 1;
+      const bx = fs * Math.sin(this.yaw) * cp, by = -Math.sin(this.pitch) * (front ? -0.35 : 1), bz = fs * Math.cos(this.yaw) * cp;
       let d = 0.2;
       const oy = eyeY + 0.25;
       for (; d < dist; d += 0.25) {
@@ -637,7 +644,7 @@ export class Player {
     if (this.zoom && !(held && held.zoom)) this.zoom = false;
     const fov = this.zoom ? 16 : 72;
     if (Math.abs(cam.fov - fov) > 0.05) { cam.fov += (fov - cam.fov) * Math.min(1, dt * 10); cam.updateProjectionMatrix(); }
-    cam.rotation.set(this.pitch, this.yaw, 0);
+    if (third && front) cam.rotation.set(-this.pitch * 0.35, this.yaw + Math.PI, 0); else cam.rotation.set(this.pitch, this.yaw, 0);
     cam.updateMatrixWorld();
     const eb = w.getBlock(Math.floor(cam.position.x), Math.floor(cam.position.y), Math.floor(cam.position.z));
     this.headIn = eb === B.water ? 1 : (eb === B.lava ? 2 : 0);
@@ -652,6 +659,10 @@ export class Player {
       else if (this.mountKind === 'vlieg' || this.mountKind === 'heli' || this.mountKind === 'rit') m.position.y -= 0.62;
       m.rotation.y = this.yaw + Math.PI;
       const a = m.userData.a;
+      // het beste harnas uit je rugzak zie je op je poppetje
+      let best = null;
+      for (const s of g.inv) { const it = s && ITEMS[s[0]]; if (it && it.armor && (!best || it.armor > best.armor)) best = it; }
+      setArmor(m, best ? parseInt(best.icon[1].slice(1), 16) : null, !!best && best.key === 'harnas_leer');
       a.pose = this.mount ? 'ride' : '';
       a.airborne = !this.onGround && !this.mount && !this.inWater; a.vy = this.vel.y; a.swim = this.inWater && !this.mount;
       if (this.swing > 0 && !(a.swing > 0)) a.swing = this.swing;
@@ -670,6 +681,19 @@ export class Player {
       this.held.position.set((g.touch ? -0.37 : 0.37) * Math.min(1.6, cam.aspect) - s * 0.12, -0.27 + Math.sin(this.bobPh) * 0.012 + s * 0.06, -0.62 - s * 0.08);
       this.held.rotation.z = -s * 0.9 + 0.1;
     }
+    // je armen: de ene houdt vast wat je in je hand hebt, de andere hangt onder in beeld
+    const arms = this.fpArms, show = !third && !this.zoom;
+    if (arms) {
+      arms[0].visible = arms[1].visible = show;
+      if (show) {
+        const s = this.swing > 0 ? Math.sin((this.swing / 0.3) * Math.PI) : 0;
+        const side = g.touch ? -1 : 1, ax = 0.37 * Math.min(1.6, cam.aspect), bob = Math.sin(this.bobPh) * 0.012;
+        arms[0].position.set(side * (ax + 0.01) - side * s * 0.12, -0.325 + bob + s * 0.07, -0.61 - s * 0.1);
+        arms[0].rotation.set(-0.95 - s * 0.55, 0, side * (0.3 + s * 0.25));
+        arms[1].position.set(-side * (ax + 0.02), -0.44 - bob, -0.62);
+        arms[1].rotation.set(-1.05, 0, -side * 0.3);
+      }
+    }
   }
 
   // Waar wijst de speler naar? ndc = plek op het scherm (aanraken) of null (midden)
@@ -679,7 +703,17 @@ export class Player {
     if (ndc) dir.set(ndc.x, ndc.y, 0.5).unproject(cam).sub(cam.position).normalize();
     else cam.getWorldDirection(dir);
     const o = cam.position;
-    const extra = (this.cam === 1 || this.mount) ? _v.set(this.pos.x, this.pos.y + EYE, this.pos.z).distanceTo(o) : 0;
+    // van voren gezien wijs je (zonder tik op het scherm) gewoon recht vooruit, vanuit je ogen
+    if (this.cam === 2 && !ndc && !this.mount) {
+      const cp = Math.cos(this.pitch);
+      dir.set(-Math.sin(this.yaw) * cp, Math.sin(this.pitch), -Math.cos(this.yaw) * cp);
+      const ex = this.pos.x, ey = this.pos.y + EYE, ez = this.pos.z;
+      const blk = g.world.raycast(ex, ey, ez, dir.x, dir.y, dir.z, REACH);
+      const ent = g.ents.pick(ex, ey, ez, dir.x, dir.y, dir.z, REACH + 1);
+      if (ent && (!blk || ent.t < blk.t)) return { ent: ent.e, blk: null, dir };
+      return { ent: null, blk, dir };
+    }
+    const extra = (this.cam > 0 || this.mount) ? _v.set(this.pos.x, this.pos.y + EYE, this.pos.z).distanceTo(o) : 0;
     const maxD = REACH + extra;
     const blk = g.world.raycast(o.x, o.y, o.z, dir.x, dir.y, dir.z, maxD);
     const ent = g.ents.pick(o.x, o.y, o.z, dir.x, dir.y, dir.z, maxD + 1);
