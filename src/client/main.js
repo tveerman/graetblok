@@ -32,6 +32,8 @@ class Game {
     this.touch = touch;
     let saved = {};
     try { saved = JSON.parse(localStorage.getItem('graetblok.settings') || '{}'); } catch (e) { /* geen opslag */ }
+    // wat de speler van het kompas heeft gehaald (in te stellen in het kaartvenster)
+    try { this.kompasUit = JSON.parse(localStorage.getItem('graetblok.kompas') || '{}') || {}; } catch (e) { this.kompasUit = {}; }
     this.settings = Object.assign({}, DEFAULTS, touch ? { view: 4 } : {}, saved);
     try { this.look = JSON.parse(localStorage.getItem('graetblok.look') || 'null') || { type: 'mens', shirt: 0x2f7fd0 }; } catch (e) { this.look = { type: 'mens', shirt: 0x2f7fd0 }; }
     this.debug = /[?&]debug/.test(location.search);

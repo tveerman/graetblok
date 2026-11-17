@@ -430,7 +430,9 @@ From Jorian's design document (`spel.txt`), following development phases 1–4, 
   the other places, your own position and direction, the tree of life and the spaceship. A
   tap on the map sets a marker; it is saved with the player, shown on the map, and always on
   the compass (📍 with the distance, and an arrow when it lies behind you). The map and
-  work buttons are created by the script when an old cached page lacks them.
+  work buttons are created by the script when an old cached page lacks them. Under the map
+  twelve switches choose what the compass shows (marker, quest, spaceship and each kind of
+  place), with "all on" and "all off"; the choice is kept in the browser.
 - **Player character with a skeleton** (`src/client/rig.js`) – the human, elf and robot you
   can play are built on one rig with joints (hips, knees, ankles, spine, neck, shoulders,
   elbows). The animation computes joint angles: knees bend while the leg swings forward, the

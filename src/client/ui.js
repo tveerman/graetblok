@@ -13,6 +13,9 @@ import { ANIMALS, ANIMAL_LIST, EGG_KINDS, EGG_ORDER, RARITY, RARITIES, SHINIES, 
 const EGG_PATS = ['vlek', 'blad', 'golf', 'ster', 'barst', 'streep'];
 const hexCol = (n) => '#' + (n | 0).toString(16).padStart(6, '0');
 // het ei van één dier: de kleuren van het dier zelf, met een patroon dat bij zijn nummer hoort
+// wat je in het kaartvenster van het kompas kunt halen: [sleutel, tekst op de knop]
+const KOMPAS_KEUZES = [['pin', '📍 Markering'], ['opdracht', '◆ Opdracht'], ['schip', '🚀 Ruimteschip'], ['k0', '🏠 Dorp'], ['k1', '🏰 Kasteel'], ['k6', '🏙️ Stad'], ['k7', '✈️ Vliegveld'],
+  ['k5', '🎡 Kermis'], ['k4', '🏁 Racebaan'], ['k8', '🗼 Wachttoren'], ['k9', '🌿 Doolhof'], ['k10', '🏛️ Tempel']];
 // de kleuren van de kaart, per kleurnummer van de server (zie server/map.js)
 const MAP_COLORS = [[150, 200, 240], [70, 140, 220], [36, 84, 170], [240, 110, 30], [226, 208, 150], [104, 168, 78], [52, 118, 56], [240, 244, 250], [134, 134, 138],
   [180, 220, 240], [110, 84, 60], [62, 60, 66], [230, 90, 40], [60, 170, 160], [170, 100, 220], [96, 70, 130], [70, 56, 90], [120, 112, 108], [190, 226, 150]];
@@ -203,7 +206,8 @@ export class UI {
     let extra = '';
     // het ruimteschip (alleen in de groene wereld): het raketje wijst altijd de weg terug.
     // Ligt het schip achter je, dan staat het raketje aan de rand van het kompas.
-    const ship = worldId === 'groen';
+    const uit = this.g.kompasUit || {};          // wat de speler van het kompas heeft gehaald (in het kaartvenster)
+    const ship = worldId === 'groen' && !uit.schip;
     this.cmpShip.style.display = ship ? '' : 'none';
     if (ship) {
       const dx = CRASH.x + 0.5 - pos.x, dz = CRASH.z + 0.5 - pos.z;
@@ -216,7 +220,7 @@ export class UI {
     // het dichtstbijzijnde dorp (huisje) en kasteel (torentje)
     for (const [node, kinds, icon] of [[this.cmpDorp, [0], '🏠'], [this.cmpBurcht, [1, 2], '🏰'], [this.cmpBaan, [4], '🏁'], [this.cmpPark, [5], '🎡'], [this.cmpStad, [6], '🏙️'], [this.cmpVeld, [7], '✈️'], [this.cmpToren, [8], '🗼'], [this.cmpDool, [9], '🌿'], [this.cmpTempel, [10], '🏛️']]) {
       let best = null, bd = 1e9;
-      if (sites) for (const st of sites) { if (!kinds.includes(st[0])) continue; const d = Math.hypot(st[1] - pos.x, st[2] - pos.z); if (d < bd) { bd = d; best = st; } }
+      if (sites && !uit['k' + kinds[0]]) for (const st of sites) { if (!kinds.includes(st[0])) continue; const d = Math.hypot(st[1] - pos.x, st[2] - pos.z); if (d < bd) { bd = d; best = st; } }
       node.style.display = best && bd > 30 ? '' : 'none';
       if (best && bd > 30) {
         let rel = Math.atan2(best[1] - pos.x, -(best[2] - pos.z)) - heading;
@@ -227,7 +231,7 @@ export class UI {
     }
     let mk = this.quest && this.quest.marker && this.quest.marker.w === worldId ? this.quest.marker : null;
     if (mk && ship && mk.x === CRASH.x && mk.z === CRASH.z) mk = null;      // de opdracht wijst al naar het schip
-    if (mk) {
+    if (mk && !uit.opdracht) {
       const dx = mk.x - pos.x, dz = mk.z - pos.z;
       let rel = Math.atan2(dx, -dz) - heading;
       while (rel > Math.PI) rel -= 2 * Math.PI; while (rel < -Math.PI) rel += 2 * Math.PI;
@@ -238,7 +242,7 @@ export class UI {
     } else this.cmpMark.style.display = 'none';
     // de markering die je zelf op de kaart hebt gezet: altijd op het kompas, met de afstand erbij
     const pin = this.g.mark;
-    if (pin && pin.w === worldId) {
+    if (pin && pin.w === worldId && !uit.pin) {
       const dx = pin.x - pos.x, dz = pin.z - pos.z;
       let rel = Math.atan2(dx, -dz) - heading;
       while (rel > Math.PI) rel -= 2 * Math.PI; while (rel < -Math.PI) rel += 2 * Math.PI;
@@ -866,6 +870,34 @@ export class UI {
     if (m.mark) { knop('📍 Naar markering', () => send({ x: m.mark.x, z: m.mark.z })); knop('❌ Markering weg', () => send({ c: 'wis' })); }
     b.appendChild(rij);
     b.appendChild(el('p', 'hint', '🔴 pijltje = jij · 📍 = je markering · noorden is boven' + (m.mark ? ' · markering op ' + m.mark.x + ', ' + m.mark.z : '')));
+    // wat er op het kompas staat: tik iets uit om het kompas rustiger te maken
+    const ks = el('div', 'qsec');
+    ks.appendChild(el('h4', '', 'Wat staat er op je kompas?'));
+    const rij2 = el('div', 'btnrow');
+    const uit = g.kompasUit || (g.kompasUit = {});
+    for (const [key, tekst] of KOMPAS_KEUZES) {
+      const k = el('button', 'btn small' + (uit[key] ? '' : ' active'), tekst);
+      tap(k, () => {
+        if (uit[key]) delete uit[key]; else uit[key] = 1;
+        k.classList.toggle('active', !uit[key]);
+        try { localStorage.setItem('graetblok.kompas', JSON.stringify(uit)); } catch (e) { /* geen opslag */ }
+      });
+      rij2.appendChild(k);
+    }
+    ks.appendChild(rij2);
+    const alles = el('div', 'btnrow');
+    for (const [tekst, aan] of [['Alles aan', true], ['Alles uit', false]]) {
+      const k = el('button', 'btn small', tekst);
+      tap(k, () => {
+        for (const [key] of KOMPAS_KEUZES) { if (aan) delete uit[key]; else uit[key] = 1; }
+        [...rij2.children].forEach((n) => n.classList.toggle('active', aan));
+        try { localStorage.setItem('graetblok.kompas', JSON.stringify(uit)); } catch (e) { /* geen opslag */ }
+      });
+      alles.appendChild(k);
+    }
+    ks.appendChild(alles);
+    ks.appendChild(el('p', 'hint', 'Groen = staat op het kompas. Op de kaart blijf je alles zien.'));
+    b.appendChild(ks);
     this.open('kaart', '🗺️ Kaart', b, true);
   }
 
