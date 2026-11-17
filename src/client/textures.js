@@ -345,6 +345,13 @@ const PX = {
     return n < 0.42 ? mix([70, 14, 4], [230, 70, 8], n / 0.42) : mix([230, 70, 8], [255, 226, 90], Math.min(1, (n - 0.42) / 0.3));
   },
   stam_eik: bark([62, 46, 28], [122, 94, 60], 80),
+  // wilg (grijsbruin, zilvergroen blad), es (lichtgrijs, frisgroen blad) en linde (donker, vol hartvormig blad)
+  stam_wilg: bark([70, 62, 48], [128, 116, 92], 1041),
+  blad_wilg: leaves([96, 140, 84], [160, 196, 130], 1042),
+  stam_es: bark([110, 108, 100], [170, 168, 158], 1043),
+  blad_es: leaves([70, 150, 50], [130, 200, 80], 1044),
+  stam_linde: bark([52, 40, 30], [100, 80, 58], 1045),
+  blad_linde: leaves([34, 110, 44], [96, 170, 70], 1046, 0.5, [236, 240, 150]),
   // de Oerwereld: bemoste reuzenstam, donker reuzenblad, modder en een fossiel in de rots
   stam_reus: (x, y, u, v) => { const c = bark([54, 40, 26], [104, 82, 52], 941)(x, y, u, v); const mos = hash2(Math.floor(u * 9), Math.floor(v * 9), 942) < 0.22 * (1.2 - v); return mos ? mix(c, [70, 130, 50], 0.7) : c; },
   blad_reus: leaves([22, 78, 30], [64, 136, 52], 943),

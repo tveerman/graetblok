@@ -13,7 +13,7 @@ const M = 4;                 // rand om de chunk heen (voor bomen die over de gr
 const W = CS + 2 * M;
 const WORLD_SALT = { groen: 0, ijs: 1000, vuur: 2000, schaduw: 3000, wolken: 4000, dino: 5000 };
 
-const T_EIK = 1, T_BERK = 2, T_DEN = 3, T_SCHADUW = 4, T_VERKOOLD = 5, T_HEMEL = 6, T_IJSPIEK = 7, T_PILAAR = 8, T_REUS = 9, T_ZWAM = 10, T_KRISTAL = 11, T_CACTUS = 12;
+const T_EIK = 1, T_BERK = 2, T_DEN = 3, T_SCHADUW = 4, T_VERKOOLD = 5, T_HEMEL = 6, T_IJSPIEK = 7, T_PILAAR = 8, T_REUS = 9, T_ZWAM = 10, T_KRISTAL = 11, T_CACTUS = 12, T_WILG = 13, T_ES = 14, T_LINDE = 15, T_JUNGLE = 16;
 const V_GROEN = 1, V_IJS = 2, V_VUUR = 3, V_SCHADUW = 4, V_HEMEL = 5, V_OER = 6;
 
 export const NEST_REGION = 144;
@@ -99,8 +99,27 @@ export class WorldGen {
       k = u < -0.42 ? 'kristal' : 'zwammen';
       w = Math.min(smoothstep(0.18, 0.25, v), smoothstep(0.46, 0.39, v), smoothstep(-0.1, -0.2, u), smoothstep(0, 0.06, Math.abs(u + 0.42)));
     }
+    // Waar geen bijzonder gebied ligt groeit bos: een oerwoud, of een bos van wilgen, essen of
+    // lindes (met gewoon eikenbos ertussen).
+    if (!k) {
+      const f = this.n6.n2(x / 900 + 5.5, z / 900 + 9.1);
+      const rand = (a, b) => Math.min(smoothstep(a, a + 0.06, f), smoothstep(b, b - 0.06, f));
+      if (f < -0.4) { k = 'oerwoud'; w = smoothstep(-0.4, -0.47, f); }
+      else if (f > -0.3 && f < -0.05) { k = 'wilgen'; w = rand(-0.3, -0.05); }
+      else if (f > 0.1 && f < 0.32) { k = 'linden'; w = rand(0.1, 0.32); }
+      else if (f > 0.42) { k = 'essen'; w = smoothstep(0.42, 0.49, f); }
+    }
     w *= far;
     return w > 0.01 ? { k, w } : null;
+  }
+  // Brede rivieren: ze slingeren door het land ver van het ruimteschip. Geeft 0 terug waar geen
+  // rivier is en loopt op tot 1 in het midden van de bedding.
+  river(x, z) {
+    if (this.world !== 'groen') return 0;
+    const far = smoothstep(this.biomeStart, this.biomeStart + 160, Math.hypot(x, z));
+    if (far <= 0) return 0;
+    const rv = Math.abs(this.n4.n2(x / 1300 + 7.7, z / 1300 - 3.1));
+    return rv < 0.11 ? far * smoothstep(0.11, 0.045, rv) : 0;
   }
   biomeName(x, z) {
     const b = this.biome(x, z);
@@ -166,7 +185,12 @@ export class WorldGen {
       } else if (bm.k === 'gebergte') h = lerp(h, SEA + 30 + r * r * 60 + hills * 6, bm.w);
       else if (bm.k === 'woestijn') h = lerp(h, SEA + 5 + hills * 4 + Math.abs(this.n2.n2(x / 34, z / 34)) * 4, bm.w);
       else if (bm.k === 'kristal') h = lerp(h, SEA + 8 + hills * 5, bm.w);
+      else if (bm.k === 'wilgen') h = lerp(h, SEA + 2.5 + hills * 2.5, bm.w);            // laag, nat land met plassen
+      else if (bm.k === 'oerwoud') h = lerp(h, SEA + 6 + hills * 9, bm.w);
     }
+    // een brede rivier snijdt door alles heen, behalve door de oceaan
+    const riv = special || (bm && bm.k === 'oceaan') ? 0 : this.river(x, z);
+    if (riv > 0) h = lerp(h, SEA - 1.2, riv);          // twee blokken diep: te ondiep voor haaien en koraal
     c.h = h;
     const fh = Math.floor(h);
     if (fh < SEA) { c.liq = B.water; c.ly = SEA; }
@@ -175,6 +199,13 @@ export class WorldGen {
       if (bm.k === 'oceaan') { c.top = krater === 2 ? B.magmasteen : krater ? B.basalt : B.zand; c.under = krater ? B.basalt : B.zand; if (krater) c.base = B.basalt; c.nc = 1; return; }
       if (bm.k === 'woestijn' && fh >= SEA) { c.top = B.zand; c.under = B.zandsteen; c.vg = V_VUUR; c.tp = hash2(x, z, this.seed + 41) < 0.006 ? 1 : 0; c.tk = T_CACTUS; return; }
       if (bm.k === 'zwammen' && fh > SEA + 1) { c.top = B.gloeimos; c.under = B.aarde; c.vg = V_SCHADUW; c.tp = 0.02; c.tk = T_ZWAM; return; }
+      // de bossen: elk met zijn eigen bomen
+      if (fh > SEA + 1 && fh < SEA + 34 && riv < 0.2) {
+        if (bm.k === 'oerwoud') { c.top = B.gras; c.under = B.aarde; c.vg = V_OER; c.tp = 0.05; c.tk = T_JUNGLE; if (hash2(x, z, this.seed + 31) < 0.004) { c.tp = 1; c.tk = T_REUS; } return; }
+        if (bm.k === 'wilgen') { c.top = B.gras; c.under = B.aarde; c.vg = V_GROEN; c.tp = 0.016; c.tk = T_WILG; return; }
+        if (bm.k === 'linden') { c.top = B.gras; c.under = B.aarde; c.vg = V_GROEN; c.tp = 0.024; c.tk = T_LINDE; return; }
+        if (bm.k === 'essen') { c.top = B.gras; c.under = B.aarde; c.vg = V_GROEN; c.tp = 0.03; c.tk = T_ES; return; }
+      }
       if (bm.k === 'kristal' && fh > SEA + 1) { c.top = hash2(x >> 1, z >> 1, this.seed + 43) < 0.3 ? B.amethistblok : B.steen; c.under = B.steen; c.tp = 0.012; c.tk = T_KRISTAL; return; }
     }
     if (fh <= SEA + 1) { c.top = B.zand; c.under = B.zand; }
@@ -674,6 +705,41 @@ export class WorldGen {
       for (let i = 0; i < th; i++) put(x, y + i, z, B.amethistblok);
       for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const hh = Math.floor(th * (0.2 + rnd() * 0.45)); for (let i = 0; i < hh; i++) put(x + dx, y + i, z + dz, B.amethistblok); }
       put(x, y + th, z, B.gloeikristal);
+      return;
+    }
+    if (kind === T_WILG) {
+      // een wilg: een korte dikke stam met een brede kruin waar slierten blad uit omlaag hangen
+      const th = 3 + Math.floor(rnd() * 2), cy = y + th + 1;
+      for (let i = 0; i <= th; i++) put(x, y + i, z, B.stam_wilg);
+      for (let dx = -4; dx <= 4; dx++) for (let dz = -4; dz <= 4; dz++) {
+        const d = Math.hypot(dx, dz);
+        if (d > 4.2) continue;
+        if (d < 3.4) { soft(x + dx, cy, z + dz, B.blad_wilg); if (d < 2.4) soft(x + dx, cy + 1, z + dz, B.blad_wilg); }
+        if (d >= 2.2 && rnd() < 0.6) { const len = 1 + Math.floor(rnd() * (th + 1)); for (let i = 0; i < len; i++) soft(x + dx, cy - i, z + dz, B.blad_wilg); }
+      }
+      return;
+    }
+    if (kind === T_ES) {
+      // een es: hoog en slank, met een smalle luchtige kruin
+      const th = 8 + Math.floor(rnd() * 4);
+      for (let i = 0; i < th; i++) put(x, y + i, z, B.stam_es);
+      for (let dy = -4; dy <= 2; dy++) { const R = dy > 0 ? 1.3 : 2.4 - Math.abs(dy + 1) * 0.25; for (let dx = -3; dx <= 3; dx++) for (let dz = -3; dz <= 3; dz++) if (dx * dx + dz * dz <= R * R - rnd() * 1.4) soft(x + dx, y + th + dy, z + dz, B.blad_es); }
+      return;
+    }
+    if (kind === T_LINDE) {
+      // een linde: een stevige stam met een grote, ronde, dichte kruin
+      const th = 5 + Math.floor(rnd() * 3), cy = y + th + 1;
+      for (let i = 0; i < th + 1; i++) put(x, y + i, z, B.stam_linde);
+      for (let dx = -4; dx <= 4; dx++) for (let dz = -4; dz <= 4; dz++) for (let dy = -2; dy <= 4; dy++) if (dx * dx + dz * dz + (dy - 1) * (dy - 1) * 1.5 <= 13.5 - rnd() * 1.2) soft(x + dx, cy + dy, z + dz, B.blad_linde);
+      return;
+    }
+    if (kind === T_JUNGLE) {
+      // een oerwoudboom: een rechte stam met een platte kruin, en vaak een struik aan de voet
+      const th = 6 + Math.floor(rnd() * 6);
+      for (let i = 0; i < th; i++) put(x, y + i, z, B.stam_reus);
+      for (let dx = -3; dx <= 3; dx++) for (let dz = -3; dz <= 3; dz++) for (let dy = 0; dy <= 1; dy++) if (dx * dx + dz * dz <= (dy ? 4 : 10) - rnd() * 1.5) soft(x + dx, y + th + dy, z + dz, B.blad_reus);
+      if (rnd() < 0.6) for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) if (dx || dz) soft(x + dx, y, z + dz, B.blad_reus);
+      for (let i = 0; i < 3; i++) if (rnd() < 0.5) soft(x + (i === 0 ? 1 : i === 1 ? -1 : 0), y + th - 1 - i, z + (i === 2 ? 1 : 0), B.blad_reus);      // lianen
       return;
     }
     if (kind === T_CACTUS) {

@@ -413,7 +413,13 @@ From Jorian's design document (`spel.txt`), following development phases 1–4, 
   sit inside a ride; the airliner has a real cabin with twelve seats, windows and lights.
   *Fix*: looking up a site while a terrain column was being computed could corrupt that one
   column (a stray one-block pillar or hole); sites are now looked up first.
-  Debug: `{c:'streek', k:'oceaan'|'woestijn'|'gebergte'|'zwammen'|'kristal'}`.
+  *Forests and rivers* (same far-away zone): where no special region lies, the land is now
+  jungle (straight trunks with flat crowns, lianas, ferns and the odd giant tree), willow
+  forest on low wet ground (short trunks, hanging curtains of leaves), linden forest (big
+  round crowns) or ash forest (tall and slender), with ordinary oak land in between. Willow,
+  ash and linden are new logs and leaves that count as wood for every recipe. Wide rivers
+  (about 30 blocks across, two deep, sandy banks) wind through everything except the ocean.
+  Debug: `{c:'streek', k:'oceaan'|'woestijn'|'gebergte'|'zwammen'|'kristal'|'oerwoud'|'wilgen'|'linden'|'essen'|'rivier'}`.
 - **Player character with a skeleton** (`src/client/rig.js`) – the human, elf and robot you
   can play are built on one rig with joints (hips, knees, ankles, spine, neck, shoulders,
   elbows). The animation computes joint angles: knees bend while the leg swings forward, the

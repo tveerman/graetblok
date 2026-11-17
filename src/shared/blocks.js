@@ -371,6 +371,13 @@ def(1043, 'tentdoek', 'Gestreept tentdoek', { hard: 0.5, snd: 'snow' });
 def(1044, 'zwamsteel', 'Paddenstoelsteel', { hard: 0.8, snd: 'leaf' });
 def(1045, 'cactus', 'Cactus', { tiles: ['cactus_top', 'cactus', 'cactus_top'], hard: 0.6, snd: 'leaf' });
 def(1046, 'zandsteen', 'Zandsteen', { hard: 2.5, tool: 'pick' });
+// nieuwe bomen voor de bossen ver weg: wilg, es en linde
+def(1047, 'stam_wilg', 'Wilgenstam', { ...LOG, tiles: ['stam_eik_top', 'stam_wilg', 'stam_eik_top'] });
+def(1048, 'blad_wilg', 'Wilgenblad', { ...LEAF });
+def(1049, 'stam_es', 'Essenstam', { ...LOG, tiles: ['stam_berk_top', 'stam_es', 'stam_berk_top'] });
+def(1050, 'blad_es', 'Essenblad', { ...LEAF });
+def(1051, 'stam_linde', 'Lindestam', { ...LOG, tiles: ['stam_eik_top', 'stam_linde', 'stam_eik_top'] });
+def(1052, 'blad_linde', 'Lindeblad', { ...LEAF });
 
 // Snelle opzoektabellen (één vakje per mogelijk blok-id)
 export const B_ROAD = new Uint8Array(NUM_BLOCKS);      // 1 = wegdek: voertuigen rijden hier harder
@@ -401,8 +408,8 @@ export const LIFE_LEAVES = { groen: B.levensblad_groot, ijs: B.levensblad_ijs, v
 export const LIFE_VINES = {}, LIFE_FRUIT = {};
 TREE_KEYS.forEach((k, i) => { LIFE_VINES[k] = rankId(k, i); LIFE_FRUIT[k] = vruchtId(k, i); });
 export const ZWAMMEN = ZWAM_KEYS.map((k, i) => 125 + i), ZWAMHOEDEN = ZWAM_KEYS.map((k, i) => 130 + i);
-export const LOGS = [B.stam_eik, B.stam_den, B.stam_berk, B.stam_schaduw, B.stam_verkoold, B.stam_hemel, B.stam_reus];
-export const LEAVES = [B.blad_eik, B.blad_den, B.blad_berk, B.blad_schaduw, B.blad_goud, B.blad_reus];
+export const LOGS = [B.stam_eik, B.stam_den, B.stam_berk, B.stam_schaduw, B.stam_verkoold, B.stam_hemel, B.stam_reus, B.stam_wilg, B.stam_es, B.stam_linde];
+export const LEAVES = [B.blad_eik, B.blad_den, B.blad_berk, B.blad_schaduw, B.blad_goud, B.blad_reus, B.blad_wilg, B.blad_es, B.blad_linde];
 export const EGGS = { vuur: B.ei_vuur, ijs: B.ei_ijs, natuur: B.ei_natuur, bliksem: B.ei_bliksem, schaduw: B.ei_schaduw, robot: B.ei_robot, goud: B.ei_goud, kristal: B.ei_kristal };
 export const EGG_TYPE = {};
 for (const k in EGGS) EGG_TYPE[EGGS[k]] = k;

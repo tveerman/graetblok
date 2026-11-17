@@ -1029,7 +1029,7 @@ export class GameServer {
     else if (m.c === 'streek') {
       // spring naar het dichtstbijzijnde stuk van een gebied: 'oceaan', 'woestijn', 'gebergte', 'zwammen' of 'kristal'
       let best = null;
-      for (let r = 100; r < 6000 && !best; r += 60) for (let a = 0; a < 6.28; a += 60 / r) { const x = Math.round(p.x + Math.cos(a) * r), z = Math.round(p.z + Math.sin(a) * r); const b = w.gen.biome(x, z); if (b && b.k === m.k && b.w > 0.95) { best = [x, z]; break; } }
+      for (let r = 100; r < 6000 && !best; r += 60) for (let a = 0; a < 6.28; a += 60 / r) { const x = Math.round(p.x + Math.cos(a) * r), z = Math.round(p.z + Math.sin(a) * r); const b = w.gen.biome(x, z); if (m.k === 'rivier' ? w.gen.river(x, z) > 0.2 && w.gen.river(x, z) < 0.5 : b && b.k === m.k && b.w > 0.95) { best = [x, z]; break; } }
       if (best) { p.x = best[0] + 0.5; p.z = best[1] + 0.5; p.y = Math.max(w.topY(best[0], best[1]), 40) + 3 + (m.dy || 0); this.send(p, { t: 'tp', x: p.x, y: p.y, z: p.z }); }
     }                    // verschuif de echte dag (om het weekend en de werkweek te testen)
     else if (m.c === 'egg') { for (const k in this.meta.eggs) this.meta.eggs[k].prog = 0.95; }

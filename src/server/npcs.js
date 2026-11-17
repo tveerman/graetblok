@@ -148,7 +148,7 @@ export const npcMethods = {
     const streek = gen.biomeName ? gen.biomeName(p.x, p.z) : '';
     if (streek !== (p.streek || '')) {
       p.streek = streek;
-      const tekst = { oceaan: '🌊 De Diepe Oceaan. Pas op voor haaien, kwallen en stromingen, en kijk uit naar onderwatervulkanen.', woestijn: '🏜️ De Woestijn. Heet zand zover je kunt kijken.', gebergte: '🏔️ Het Hooggebergte. De toppen verdwijnen in de wolken.', zwammen: '🍄 Het Paddenstoelenwoud. Alles geeft hier licht.', kristal: '💎 De Kristalvelden. Paarse spitsen steken uit de grond.' }[streek];
+      const tekst = { oceaan: '🌊 De Diepe Oceaan. Pas op voor haaien, kwallen en stromingen, en kijk uit naar onderwatervulkanen.', woestijn: '🏜️ De Woestijn. Heet zand zover je kunt kijken.', gebergte: '🏔️ Het Hooggebergte. De toppen verdwijnen in de wolken.', zwammen: '🍄 Het Paddenstoelenwoud. Alles geeft hier licht.', kristal: '💎 De Kristalvelden. Paarse spitsen steken uit de grond.', oerwoud: '🌴 Het Oerwoud. Dicht, warm en vol varens en lianen.', wilgen: '🌿 Het Wilgenbos. Nat land met treurwilgen langs het water.', linden: '🌳 Het Lindebos. Grote ronde kruinen boven je hoofd.', essen: '🌲 Het Essenbos. Hoge, slanke bomen.' }[streek];
       if (tekst) this.toast(p, tekst, 'good');
     }
     // het kompas wijst naar dorpen en kastelen in de buurt
