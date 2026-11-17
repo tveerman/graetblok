@@ -432,7 +432,10 @@ From Jorian's design document (`spel.txt`), following development phases 1–4, 
   the compass (📍 with the distance, and an arrow when it lies behind you). The map and
   work buttons are created by the script when an old cached page lacks them. Under the map
   twelve switches choose what the compass shows (marker, quest, spaceship and each kind of
-  place), with "all on" and "all off"; the choice is kept in the browser.
+  place), with "all on" and "all off"; the choice is kept in the browser. A search box
+  above the map finds places by name ("Lindeburg"), by kind ("tempel", "kasteel") or region
+  ("woestijn", "rivier") within 5000 blocks, nearest first; each hit can be viewed on the
+  map or marked for the compass.
 - **Player character with a skeleton** (`src/client/rig.js`) – the human, elf and robot you
   can play are built on one rig with joints (hips, knees, ankles, spine, neck, shoulders,
   elbows). The animation computes joint angles: knees bend while the leg swings forward, the

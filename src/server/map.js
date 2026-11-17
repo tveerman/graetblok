@@ -14,6 +14,13 @@ const TOP = {
 };
 const SITE_CODE = { dorp: 0, circuit: 4, pretpark: 5, stad: 6, vliegveld: 7, wachttoren: 8, doolhof: 9, tempel: 10, kamp: 3 };
 
+// de woorden waarop je een soort plek kunt vinden (naast zijn eigen naam)
+const ZOEK_SOORT = { 0: ['dorp'], 1: ['kasteel', 'burcht'], 2: ['spookkasteel', 'kasteel'], 3: ['trollenkamp', 'kamp', 'trol'], 4: ['racebaan', 'circuit', 'race'], 5: ['kermis', 'pretpark'],
+  6: ['stad'], 7: ['vliegveld', 'luchthaven'], 8: ['wachttoren', 'toren'], 9: ['doolhof', 'heggendoolhof'], 10: ['tempel'] };
+const ZOEK_GEBIED = [['oceaan', 'De Diepe Oceaan', ['oceaan', 'zee']], ['woestijn', 'De Woestijn', ['woestijn', 'zand', 'cactus']], ['gebergte', 'Het Hooggebergte', ['gebergte', 'bergen', 'berg']],
+  ['zwammen', 'Het Paddenstoelenwoud', ['paddenstoel', 'zwam']], ['kristal', 'De Kristalvelden', ['kristal']], ['oerwoud', 'Het Oerwoud', ['oerwoud', 'jungle']],
+  ['wilgen', 'Het Wilgenbos', ['wilg', 'bos']], ['linden', 'Het Lindebos', ['linde', 'bos']], ['essen', 'Het Essenbos', ['essen', 'bos']], ['rivier', 'Een brede rivier', ['rivier', 'water']]];
+
 export const mapMethods = {
 
   sendMap(p, x, z, stap) {
@@ -42,7 +49,42 @@ export const mapMethods = {
     this.send(p, { t: 'kaart', x, z, stap, n: N, k, h, sites, px: p.x, pz: p.z, yaw: p.yaw, mark: mk && mk.w === p.world ? mk : null, wereld: WORLDS[p.world].name });
   },
 
+  // Zoeken op de kaart: op de naam van een plek ("Lindeburg"), op een soort plek ("tempel",
+  // "kasteel") of op een gebied ("woestijn", "rivier"). Geeft de dichtstbijzijnde treffers.
+  searchMap(p, q) {
+    q = String(q || '').toLowerCase().trim().slice(0, 30);
+    const w = this.worlds[p.world], gen = w.gen, res = [];
+    if (q.length < 2) { this.send(p, { t: 'kaartZoek', q, res }); return; }
+    const d = (x, z) => Math.round(Math.hypot(x - p.x, z - p.z));
+    const past = (...woorden) => woorden.some((s) => s && s.toLowerCase().includes(q));
+    for (const s of gen.sitesNear(p.x, p.z, 5000)) {
+      const code = s.kind === 'kasteel' ? (s.evil ? 2 : 1) : SITE_CODE[s.kind];
+      if (past(s.name, ...(ZOEK_SOORT[code] || []))) res.push([code, s.name, s.x, s.z, d(s.x, s.z)]);
+    }
+    if (gen.smallNear) for (const s of gen.smallNear(p.x, p.z, 3500)) {
+      const code = SITE_CODE[s.kind];
+      if (past(s.name, ...(ZOEK_SOORT[code] || []))) res.push([code, s.name, s.x, s.z, d(s.x, s.z)]);
+    }
+    const T = WORLDS[p.world].tree;
+    if (past(T.name, 'levensboom', 'boom')) res.push([20, T.name, T.x, T.z, d(T.x, T.z)]);
+    if (p.world === 'groen' && past('het ruimteschip', 'schip', 'raket')) res.push([21, 'Het ruimteschip', CRASH.x, CRASH.z, d(CRASH.x, CRASH.z)]);
+    // gebieden: het dichtstbijzijnde stuk, in steeds grotere kringen om de speler gezocht
+    if (gen.biome) for (const [k, naam, woorden] of ZOEK_GEBIED) {
+      if (!past(naam, ...woorden)) continue;
+      let best = null;
+      for (let r = 0; r < 9000 && !best; r += 70) for (let a = 0; a < 6.28; a += r ? 70 / r : 7) {
+        const x = Math.round(p.x + Math.cos(a) * r), z = Math.round(p.z + Math.sin(a) * r);
+        if (k === 'rivier') { const v = gen.river(x, z); if (v > 0.6) { best = [x, z]; break; } }
+        else { const b = gen.biome(x, z); if (b && b.k === k && b.w > 0.9) { best = [x, z]; break; } }
+      }
+      if (best) res.push([30, naam, best[0], best[1], d(best[0], best[1])]);
+    }
+    res.sort((a, b) => a[4] - b[4]);
+    this.send(p, { t: 'kaartZoek', q, res: res.slice(0, 15), meer: Math.max(0, res.length - 15) });
+  },
+
   on_kaart(p, m) {
+    if (m.c === 'zoek') { this.searchMap(p, m.q); return; }
     if (m.c === 'mark') {
       p.flags.kaartMark = { w: p.world, x: Math.round(+m.mx || 0), z: Math.round(+m.mz || 0) };
       this.send(p, { t: 'mark', m: p.flags.kaartMark });

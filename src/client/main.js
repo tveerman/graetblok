@@ -342,6 +342,7 @@ class Game {
       case 'job': this.setJob(m.job); break;
       case 'kaart': ui.openMap(m); break;
       case 'mark': this.mark = m.m; break;
+      case 'kaartZoek': ui.mapFound(m); break;
       case 'raceMenu': ui.openRaceMenu(m); break;
       case 'kermis': ui.openKermis(m); break;
       case 'kermisGo': ui.playKermis(m.game); break;

@@ -769,6 +769,20 @@ export class UI {
     const b = el('div', 'kaart');
     const half = N / 2 * m.stap;
     b.appendChild(el('p', 'hint', m.wereld + ' · je ziet ' + (2 * half) + ' bij ' + (2 * half) + ' blokken. Sleep om te schuiven, knijp met twee vingers of draai aan het muiswiel om te zoomen, en tik om een markering te zetten: je kompas wijst er dan naartoe.'));
+    // zoeken: op de naam van een plek, een soort plek of een gebied
+    const zoek = this.mapZoek || (this.mapZoek = { q: '', res: null, meer: 0 });
+    const zrij = el('div', 'kaartzoek');
+    const veld = el('input'); veld.type = 'search'; veld.placeholder = 'Zoek: dorp, tempel, woestijn, Lindeburg...'; veld.value = zoek.q; veld.maxLength = 30; veld.autocomplete = 'off';
+    const zknop = el('button', 'btn small active', '🔍 Zoek');
+    const doeZoek = () => { zoek.q = veld.value; if (veld.value.trim().length < 2) { zoek.res = null; this.fillMapResults(); return; } g.net.send({ t: 'kaart', c: 'zoek', q: veld.value }); };
+    tap(zknop, doeZoek);
+    veld.addEventListener('keydown', (e) => { e.stopPropagation(); if (e.key === 'Enter') { e.preventDefault(); veld.blur(); doeZoek(); } });
+    veld.addEventListener('input', () => { zoek.q = veld.value; });
+    zrij.appendChild(veld); zrij.appendChild(zknop);
+    b.appendChild(zrij);
+    this.mapResults = el('div', 'kaartres');
+    this.mapView = { x: m.x, z: m.z, stap: m.stap };
+    b.appendChild(this.mapResults);
     const cv = el('canvas'); cv.width = cv.height = N * 4;
     const vak = el('div', 'kaartvak'); vak.appendChild(cv);
     b.appendChild(vak);
@@ -899,6 +913,35 @@ export class UI {
     ks.appendChild(el('p', 'hint', 'Groen = staat op het kompas. Op de kaart blijf je alles zien.'));
     b.appendChild(ks);
     this.open('kaart', '🗺️ Kaart', b, true);
+    this.fillMapResults();
+  }
+
+  // de treffers van het zoeken laten zien (onder het zoekvak); tik op een treffer om hem te bekijken
+  mapFound(m) {
+    this.mapZoek = { q: m.q, res: m.res, meer: m.meer || 0 };
+    if (this.modal === 'kaart') this.fillMapResults();
+  }
+  fillMapResults() {
+    const box = this.mapResults, z = this.mapZoek, g = this.g;
+    if (!box) return;
+    box.innerHTML = '';
+    if (!z || !z.res) return;
+    if (!z.res.length) { box.appendChild(el('p', 'hint', 'Niets gevonden voor "' + z.q + '". Probeer een soort plek (dorp, kasteel, tempel) of een gebied (woestijn, rivier).')); return; }
+    const ICON = { 0: '🏠', 1: '🏰', 2: '🏰', 3: '⛺', 4: '🏁', 5: '🎡', 6: '🏙️', 7: '✈️', 8: '🗼', 9: '🌿', 10: '🏛️', 20: '🌳', 21: '🚀', 30: '🧭' };
+    for (const [code, naam, x, zz, d] of z.res) {
+      const r = el('div', 'drow');
+      r.appendChild(el('span', '', (ICON[code] || '•') + ' <b>' + naam + '</b> <small>' + d + ' blokken</small>'));
+      const btns = el('span', 'drowbtns');
+      const kijk = el('button', 'btn small active', 'Bekijk');
+      tap(kijk, () => g.net.send({ t: 'kaart', x, z: zz, stap: Math.min(this.mapView.stap, 12) }));
+      const pin = el('button', 'btn small active', '📍 Markeer');
+      tap(pin, () => g.net.send({ t: 'kaart', c: 'mark', mx: x, mz: zz, x, z: zz, stap: Math.min(this.mapView.stap, 12) }));
+      btns.appendChild(kijk); btns.appendChild(pin); r.appendChild(btns); box.appendChild(r);
+    }
+    if (z.meer) box.appendChild(el('p', 'hint', 'En nog ' + z.meer + ' verder weg. Typ meer letters om preciezer te zoeken.'));
+    const weg = el('button', 'btn small', '✖ Treffers sluiten');
+    tap(weg, () => { this.mapZoek = { q: '', res: null, meer: 0 }; this.fillMapResults(); });
+    box.appendChild(weg);
   }
 
   // ---------- de fabrieksmachine ----------
