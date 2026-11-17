@@ -251,6 +251,11 @@ img.mini { width: 22px; height: 22px; vertical-align: middle; image-rendering: p
 #loadFill { height: 100%; width: 4%; background: linear-gradient(#ffe27a, #e0a020); border-radius: 8px; transition: width .2s; }
 #loadText { font-size: 15px; margin: 8px 0 0; text-shadow: 0 1px 3px #000; }
 
+/* de puzzels van de tempel */
+.pveld { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; max-width: 320px; margin: 10px auto; }
+.pveld.drie { grid-template-columns: repeat(3, 1fr); max-width: 300px; }
+.pknop { aspect-ratio: 1; border-radius: 14px; border: 3px solid rgba(255,255,255,.35); font-size: 34px; font-weight: 700; color: #2a2014; cursor: pointer; padding: 0; transition: opacity .08s; }
+.puzzel { text-align: center; }
 /* kermisspelletjes */
 .kbar { position: relative; height: 34px; margin: 14px 0; border-radius: 10px; border: 2px solid rgba(255,255,255,.35); background: rgba(0,0,0,.45); overflow: hidden; }
 .kzone { position: absolute; top: 0; bottom: 0; background: #f5c93a; opacity: .85; }

@@ -6,6 +6,7 @@ import { B, LIFE_LEAVES, LIFE_VINES, LIFE_FRUIT, ZWAMMEN, ZWAMHOEDEN } from '../
 import { WORLDS, CRASH, NEST_PEAK } from '../shared/worlds.js';
 import { siteMethods, SITE_ODDS } from './sites.js';
 import { cityGen } from './city.js';
+import { secretGen } from './secrets.js';
 
 const M = 4;                 // rand om de chunk heen (voor bomen die over de grens hangen)
 const W = CS + 2 * M;
@@ -25,6 +26,7 @@ export class WorldGen {
     this.siteCache = new Map();
     this.noSites = new Set(opts.noSites || []);
     this.noParks = new Set(opts.noParks || []);          // vakken waar geen pretpark mag komen (daar had de speler al gebouwd)
+    this.noSmall = new Set(opts.noSmall || []);          // kleine vakken (112) waar geen toren, doolhof of tempel mag komen
     this.noCity = new Set(opts.noCity || []);            // vakken waar geen stad of vliegveld mag komen (daar had de speler al gebouwd)
     this.noCircuits = !!(opts && opts.noCircuits);      // een wereld van vóór de racebanen: daar komen er geen bij
     this.oldChunks = new Set(opts.oldChunks || []);
@@ -950,6 +952,6 @@ export class WorldGen {
   }
 }
 
-Object.assign(WorldGen.prototype, siteMethods, cityGen);
+Object.assign(WorldGen.prototype, siteMethods, cityGen, secretGen);
 
 export const VAULT_Y = 3;

@@ -24,6 +24,7 @@ import { kermisMethods } from './kermis.js';
 import { cityMethods } from './city.js';
 import { farmMethods } from './farm.js';
 import { jobMethods } from './jobs.js';
+import { secretMethods } from './secrets.js';
 import { CROP_OF_SEED } from '../shared/farm.js';
 import { WorldGen } from './worldgen.js';
 
@@ -43,7 +44,7 @@ export class GameServer {
 
   newMeta() {
     return { v: 1, seed: (Math.random() * 2147483647) | 0, time: DAY_LENGTH * 0.05, trees: {}, bossDead: {}, portals: [], eggs: {}, nextId: 1,
-      gen2: 1, gen3: 1, gen4: 1, gen5: 1, noCity: {}, noParks: {}, noSites: {}, oldChunks: {}, trains: [], weather: {}, cleared: {} };
+      gen2: 1, gen3: 1, gen4: 1, gen5: 1, gen6: 1, noSmall: {}, noCity: {}, noParks: {}, noSites: {}, oldChunks: {}, trains: [], weather: {}, cleared: {} };
   }
 
   async init() {
@@ -59,7 +60,8 @@ export class GameServer {
     if (!meta.gen3) this.upgradeCircuits(meta, per);
     if (!meta.gen4) this.upgradeParks(meta, per);
     if (!meta.gen5) this.upgradeCity(meta, per);
-    for (const w of WORLD_ORDER) this.worlds[w] = new ServerWorld(w, meta.seed, per[w], { noSites: meta.noSites[w], oldChunks: meta.oldChunks[w], noParks: (meta.noParks || {})[w], noCity: (meta.noCity || {})[w] });
+    if (!meta.gen6) this.upgradeSmall(meta, per);
+    for (const w of WORLD_ORDER) this.worlds[w] = new ServerWorld(w, meta.seed, per[w], { noSites: meta.noSites[w], oldChunks: meta.oldChunks[w], noParks: (meta.noParks || {})[w], noCity: (meta.noCity || {})[w], noSmall: (meta.noSmall || {})[w] });
     for (const rec of meta.trains || []) this.spawnTrain(rec);
     for (const rec of meta.vehicles || []) this.spawnVehicle(rec);
     this.ready = true;
@@ -118,6 +120,20 @@ export class GameServer {
         for (const st of gen.sitesNear(x, z, 110)) if (st.kind === 'pretpark' && Math.hypot(x - st.x, z - st.z) < st.r1 + 14) blocked.add(st.key);
       }
       meta.noParks[wid] = Array.from(blocked);
+    }
+  }
+
+  // Een wereld van vóór de wachttorens, doolhoven en tempels: in een klein vak (112 blokken)
+  // waar de speler al iets had gebouwd of gegraven komt er geen.
+  upgradeSmall(meta, per) {
+    meta.gen6 = 1; meta.noSmall = {};
+    for (const wid of WORLD_ORDER) {
+      const blocked = new Set();
+      for (const key of per[wid] ? per[wid].keys() : []) {
+        const cx = Math.floor(key / 65536) - 32768, cz = (key % 65536) - 32768;
+        for (const ax of [cx * 16 - 26, cx * 16 + 41]) for (const az of [cz * 16 - 26, cz * 16 + 41]) blocked.add(Math.floor(ax / 112) + ',' + Math.floor(az / 112));
+      }
+      meta.noSmall[wid] = Array.from(blocked);
     }
   }
 
@@ -560,6 +576,18 @@ export class GameServer {
       this.useHeart(p, w);
     } else if (id === B.broedmachine) {
       this.useIncubator(p, w, x, y, z);
+    } else if (id === B.schakelaar_uit || id === B.schakelaar_aan) {
+      this.useSwitch(p, w, x, y, z, id);
+    } else if (id === B.knop_rood || id === B.knop_blauw || id === B.knop_geel) {
+      this.useKnop(p, w, x, y, z, id);
+    } else if (id === B.raadselbord) {
+      this.useRiddle(p, w, x, y, z);
+    } else if (id === B.puzzelsteen) {
+      this.usePuzzle(p, w, x, y, z);
+    } else if (id === B.tempeldeur) {
+      this.useTempleDoor(p, w, x, y, z);
+    } else if (id === B.kijker) {
+      this.useLookout(p, w, x, z);
     } else if (id === B.brand) {
       this.setBlock(w, x, y, z, 0);
       this.fx(w.id, 'wool', x + 0.5, y + 0.5, z + 0.5);
@@ -807,6 +835,7 @@ export class GameServer {
     const reis = p.mount ? Math.hypot(m.x - p.x, m.z - p.z) : 0;
     p.x = m.x; p.y = m.y; p.z = m.z; p.yaw = m.yaw; p.pitch = m.pitch;
     if (reis > 0) { const e = this.worlds[p.world].ents.get(p.mount); if (e && !e.def.ride) this.jobTravel(p, e.veh ? e.veh.kind : e.train ? 'trein' : e.dragon ? 'draak' : 'dier', reis); }
+    this.footCheck(p);                                             // drukplaten en valvloeren
     const cx = Math.floor(p.x / 16), cz = Math.floor(p.z / 16);
     if (cx !== p.ccx || cz !== p.ccz) { p.ccx = cx; p.ccz = cz; this.updateWanted(p); }
     if (p.mount) {
@@ -896,6 +925,7 @@ export class GameServer {
       this.updateLineTrains(dt);
       this.updateRace(dt);
       this.updateTraffic(dt);
+      this.updateSecrets();
 
       this.updateFuses();
       this.acc.snap += dt;
@@ -983,7 +1013,7 @@ export class GameServer {
     else if (m.c === 'site') {
       // spring naar het dichtstbijzijnde dorp ('dorp'), kasteel of kamp
       let best = null;
-      for (const st of w.gen.sitesNear(p.x, p.z, 1400)) if (st.kind === m.kind && (m.evil === undefined || st.evil === !!m.evil) && (!best || Math.hypot(st.x - p.x, st.z - p.z) < Math.hypot(best.x - p.x, best.z - p.z))) best = st;
+      for (const st of w.gen.sitesNear(p.x, p.z, 1400).concat(w.gen.smallNear(p.x, p.z, 1400))) if (st.kind === m.kind && (m.evil === undefined || st.evil === !!m.evil) && (!best || Math.hypot(st.x - p.x, st.z - p.z) < Math.hypot(best.x - p.x, best.z - p.z))) best = st;
       if (best) { p.x = best.x + 0.5 + (m.dx || 0); p.y = best.y + 2 + (m.dy || 0); p.z = best.z + 3.5 + (m.dz || 0); this.send(p, { t: 'tp', x: p.x, y: p.y, z: p.z }); }
       this.send(p, { t: 'debugSite', s: best ? { kind: best.kind, x: best.x, y: best.y, z: best.z, name: best.name, evil: best.evil } : null });
     }
@@ -1010,5 +1040,5 @@ export class GameServer {
   }
 }
 
-Object.assign(GameServer.prototype, entityMethods, npcMethods, zooMethods, vehicleMethods, kermisMethods, cityMethods, farmMethods, jobMethods);
+Object.assign(GameServer.prototype, entityMethods, npcMethods, zooMethods, vehicleMethods, kermisMethods, cityMethods, farmMethods, jobMethods, secretMethods);
 export { itemName, isNight };

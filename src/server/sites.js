@@ -369,6 +369,7 @@ export const siteMethods = {
   // De grond rond een bouwwerk vlak maken. Wordt voor elke kolom aangeroepen (zie col()).
   applySite(x, z, c) {
     if (this.raw) return;
+    this.applySmall(x, z, c);                     // wachttorens, doolhoven en tempels (zie secrets.js)
     const s = this.siteAt(Math.floor(x / SITE_CELL), Math.floor(z / SITE_CELL));
     if (!s) return;
     // (de stad en het vliegveld zijn vierkant, de rest is rond)
@@ -1018,8 +1019,9 @@ export const siteMethods = {
         else this.drawCamp(S, s);
       }
     }
+    if (!old) this.drawSmallSites(S);
     if (!old) this.drawRails(S, cx, cz);
   },
 };
 
-export { SITE_ODDS, J_OFF };
+export { SITE_ODDS, J_OFF, PAL };

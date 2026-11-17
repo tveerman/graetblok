@@ -329,6 +329,23 @@ From Jorian's design document (`spel.txt`), following development phases 1–4, 
   out), the doctor bandages villagers (bandage: one wool gives two). Your job's work clothes
   (colour and cap) show on your character. Debug: `{c:'dag', v:n}` shifts the real day by n.
   Not in yet: three kinds of coins, the bank, your own shop with staff, achievements.
+- **Secrets and puzzles (geheimen, puzzels en uitdagingen)** – from Jorian's plan
+  (`src/server/secrets.js`). New craftable blocks: a lever and a pressure plate that open
+  every secret door within six blocks (doors disguised as a bookcase, a stone wall or a
+  painting; a pressure plate keeps them open for eight seconds), a trap floor that drops away
+  when you stand on it and comes back, three coloured buttons with a code door that opens
+  when they are pressed in the right order, and a riddle sign that tells the order for the
+  nearest code door. Three new small places in the green world, on a finer grid between the
+  big sites and never on a railway (🗼 🌿 🏛️ on the compass): watchtowers with a spiral
+  stair and a lookout that puts everything within 1400 blocks on your compass; hedge mazes
+  (generated per maze, always solvable) with a treasure chest in the middle; and the
+  Forgotten Temple with four puzzle rooms (colour memory, lights, melody, sliding puzzle;
+  three of them behind a trap floor, a pressure-plate door and a code door). Each solved
+  puzzle gives one digit; the four digits open the golden door of the treasure room, which
+  is built of unbreakable temple stone. In an older world these places never appear where
+  the player had built or dug. Debug: `{c:'site', kind:'tempel'|'doolhof'|'wachttoren'}`.
+  Not in yet: secret doors inside castles, parkour, ruins to restore, collecting and the
+  museum, fishing.
 - **Player character with a skeleton** (`src/client/rig.js`) – the human, elf and robot you
   can play are built on one rig with joints (hips, knees, ankles, spine, neck, shoulders,
   elbows). The animation computes joint angles: knees bend while the leg swings forward, the

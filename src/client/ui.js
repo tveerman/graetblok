@@ -183,6 +183,9 @@ export class UI {
       this.cmpBaan = el('span', 'cship', '🏁'); strip.appendChild(this.cmpBaan);
       this.cmpPark = el('span', 'cship', '🎡'); strip.appendChild(this.cmpPark);
       this.cmpStad = el('span', 'cship', '🏙️'); strip.appendChild(this.cmpStad);
+      this.cmpToren = el('span', 'cship', '🗼'); strip.appendChild(this.cmpToren);
+      this.cmpDool = el('span', 'cship', '🌿'); strip.appendChild(this.cmpDool);
+      this.cmpTempel = el('span', 'cship', '🏛️'); strip.appendChild(this.cmpTempel);
       this.cmpVeld = el('span', 'cship', '✈️'); strip.appendChild(this.cmpVeld);
     }
     for (let i = 0; i < 4; i++) place(this.cmp[i], i * Math.PI / 2);
@@ -200,7 +203,7 @@ export class UI {
       extra += '  🚀 ' + Math.round(Math.hypot(dx, dz)) + ' m';
     }
     // het dichtstbijzijnde dorp (huisje) en kasteel (torentje)
-    for (const [node, kinds, icon] of [[this.cmpDorp, [0], '🏠'], [this.cmpBurcht, [1, 2], '🏰'], [this.cmpBaan, [4], '🏁'], [this.cmpPark, [5], '🎡'], [this.cmpStad, [6], '🏙️'], [this.cmpVeld, [7], '✈️']]) {
+    for (const [node, kinds, icon] of [[this.cmpDorp, [0], '🏠'], [this.cmpBurcht, [1, 2], '🏰'], [this.cmpBaan, [4], '🏁'], [this.cmpPark, [5], '🎡'], [this.cmpStad, [6], '🏙️'], [this.cmpVeld, [7], '✈️'], [this.cmpToren, [8], '🗼'], [this.cmpDool, [9], '🌿'], [this.cmpTempel, [10], '🏛️']]) {
       let best = null, bd = 1e9;
       if (sites) for (const st of sites) { if (!kinds.includes(st[0])) continue; const d = Math.hypot(st[1] - pos.x, st[2] - pos.z); if (d < bd) { bd = d; best = st; } }
       node.style.display = best && bd > 30 ? '' : 'none';
@@ -660,6 +663,75 @@ export class UI {
     b.appendChild(us);
     b.appendChild(el('p', 'hint', 'Nitro gebruik je met de sprintknop (stick helemaal naar voren, of shift). De springknop is de handrem: daarmee kun je driften.'));
     this.open('garage', 'Garage', b, true);
+  }
+
+  // ---------- de puzzels van de Vergeten Tempel ----------
+
+  // Vier puzzels: kleuren onthouden, alle lampjes aan, een melodietje naspelen en een
+  // schuifpuzzel. Los je hem op, dan vertelt de server welk cijfer bij deze kamer hoort.
+  openPuzzle(m) {
+    const g = this.g, b = el('div', 'puzzel');
+    const info = el('p', 'hint', '');
+    b.appendChild(info);
+    const veld = el('div', 'pveld'); b.appendChild(veld);
+    const win = () => { info.textContent = 'Opgelost!'; g.sound.play('levelup'); setTimeout(() => { if (this.modal === 'puzzel') this.close(); g.net.send({ t: 'puzzel', ok: 1 }); }, 500); };
+    const rnd = (n) => Math.floor(Math.random() * n);
+    const wacht = (ms) => new Promise((r) => setTimeout(r, ms));
+    if (m.soort === 'kleur' || m.soort === 'muziek') {
+      // onthouden en nadoen: bij 'kleur' lichten de vlakken op, bij 'muziek' hoor je de tonen (en zie je een zwak flitsje)
+      const muziek = m.soort === 'muziek';
+      const kleuren = ['#e0342c', '#f4ce32', '#3fae4a', '#346ee2'], tonen = [262, 330, 392, 523];
+      const reeks = Array.from({ length: muziek ? 4 : 5 }, () => rnd(4));
+      let stap = 0, bezig = true;
+      const knop = kleuren.map((c, i) => {
+        const k = el('button', 'pknop', muziek ? ['🎵', '🎶', '🎵', '🎶'][i] : '');
+        k.style.background = c; k.style.opacity = '0.45';
+        tap(k, () => {
+          if (bezig) return;
+          flits(i, 180);
+          if (reeks[stap] !== i) { stap = 0; info.textContent = 'Net niet! Kijk en luister nog een keer.'; speel(700); return; }
+          stap++;
+          if (stap === reeks.length) { bezig = true; win(); }
+        });
+        veld.appendChild(k);
+        return k;
+      });
+      const flits = (i, ms) => { knop[i].style.opacity = '1'; g.sound.tone(tonen[i], 0.22, 'triangle', 0.25); setTimeout(() => { knop[i].style.opacity = '0.45'; }, ms); };
+      const speel = async (eerst) => {
+        bezig = true;
+        await wacht(eerst);
+        for (const i of reeks) { if (this.modal !== 'puzzel') return; flits(i, 320); await wacht(520); }
+        bezig = false;
+        info.textContent = muziek ? 'Speel het melodietje na: tik de ' + reeks.length + ' tonen in dezelfde volgorde.' : 'Tik de ' + reeks.length + ' kleuren in dezelfde volgorde aan.';
+      };
+      info.textContent = muziek ? 'Luister goed naar het melodietje...' : 'Kijk goed welke kleuren oplichten...';
+      const weer = el('button', 'btn small', '🔁 Nog een keer laten zien');
+      tap(weer, () => { if (!bezig) { stap = 0; speel(200); } });
+      b.appendChild(weer);
+      speel(600);
+    } else if (m.soort === 'licht') {
+      // alle lampjes aan: een tik zet het lampje zelf en zijn buren om
+      const aan = new Array(9).fill(true), knop = [];
+      const tik = (i) => { const x = i % 3, y = (i / 3) | 0; for (const [dx, dy] of [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]]) { const nx = x + dx, ny = y + dy; if (nx >= 0 && nx < 3 && ny >= 0 && ny < 3) aan[nx + ny * 3] = !aan[nx + ny * 3]; } };
+      const teken = () => knop.forEach((k, i) => { k.style.background = aan[i] ? '#ffe680' : '#3a3f52'; k.textContent = aan[i] ? '💡' : ''; });
+      veld.classList.add('drie');
+      for (let i = 0; i < 9; i++) { const k = el('button', 'pknop'); tap(k, () => { tik(i); teken(); g.sound.tone(aan[i] ? 660 : 330, 0.08, 'square', 0.12); if (aan.every(Boolean)) win(); }); veld.appendChild(k); knop.push(k); }
+      do { for (let n = 0; n < 4; n++) tik(rnd(9)); } while (aan.every(Boolean));
+      teken();
+      info.textContent = 'Zet alle negen lampjes aan. Een tik zet een lampje om, en ook de lampjes ernaast.';
+    } else {
+      // schuifpuzzel: zet de cijfers 1 tot en met 8 op volgorde
+      const vak = [1, 2, 3, 4, 5, 6, 7, 8, 0], knop = [];
+      const schuif = (i) => { const leeg = vak.indexOf(0), x = i % 3, y = (i / 3) | 0, lx = leeg % 3, ly = (leeg / 3) | 0; if (Math.abs(x - lx) + Math.abs(y - ly) !== 1) return false; vak[leeg] = vak[i]; vak[i] = 0; return true; };
+      const teken = () => knop.forEach((k, i) => { k.textContent = vak[i] || ''; k.style.background = vak[i] ? '#c8a060' : 'transparent'; k.style.borderColor = vak[i] ? '' : 'transparent'; });
+      veld.classList.add('drie');
+      for (let i = 0; i < 9; i++) { const k = el('button', 'pknop'); tap(k, () => { if (schuif(i)) { teken(); g.sound.play('place', 0.6, 'wood'); if (vak.join('') === '123456780') win(); } }); veld.appendChild(k); knop.push(k); }
+      // goed door elkaar: veertig keer een blokje naast het lege vak verschuiven (zo is hij altijd op te lossen)
+      do { for (let n = 0; n < 40; n++) { const leeg = vak.indexOf(0), buren = [leeg - 3, leeg + 3, leeg % 3 ? leeg - 1 : -1, leeg % 3 < 2 ? leeg + 1 : -1].filter((i) => i >= 0 && i < 9); schuif(buren[rnd(buren.length)]); } } while (vak.join('') === '123456780');
+      teken();
+      info.textContent = 'Schuif de blokjes tot ze op volgorde staan: 1, 2, 3 bovenaan en het lege vakje rechtsonder.';
+    }
+    this.open('puzzel', '🧩 Puzzel van kamer ' + m.kamer, b);
   }
 
   // ---------- mijn werk ----------

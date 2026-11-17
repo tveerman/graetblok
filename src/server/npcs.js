@@ -123,6 +123,17 @@ export const npcMethods = {
       if (d < s.r0 + 60 && s.kind === 'pretpark') this.ensureBots(w, s);
       if (d < s.r0 - 6 && s.name) inside = s;
     }
+    // een wachttoren, doolhof of tempel
+    if (!inside) for (const s of gen.smallNear(p.x, p.z, 30)) if (Math.hypot(s.x - p.x, s.z - p.z) < s.r0 + 2) {
+      if (p.inSite !== s.key) {
+        p.inSite = s.key;
+        this.toast(p, s.kind === 'wachttoren' ? 'Een wachttoren! Klim naar boven en tik op de uitkijkpost.' : s.kind === 'doolhof' ? 'Het Heggendoolhof. In het midden ligt een schat...' : 'De Vergeten Tempel. Vier kamers, vier puzzels, vier cijfers voor de gouden deur.', 'good');
+        this.jobVisit(p, s.key);
+      }
+      inside = s;
+      break;
+    }
+    if (inside && inside.small) { /* al gemeld */ } else
     if (inside) {
       if (p.inSite !== inside.key) {
         p.inSite = inside.key;
@@ -141,6 +152,15 @@ export const npcMethods = {
     const code = (s) => s.kind === 'dorp' ? 0 : s.kind === 'kasteel' ? (s.evil ? 2 : 1) : s.kind === 'circuit' ? 4 : s.kind === 'pretpark' ? 5 : s.kind === 'stad' ? 6 : s.kind === 'vliegveld' ? 7 : 3;
     const seen = new Set();
     for (const s of w.gen.sitesNear(p.x, p.z, 560)) { seen.add(s); l.push([code(s), s.x, s.z, s.name]); }
+    // wachttorens, doolhoven en tempels
+    const klein = { wachttoren: 8, doolhof: 9, tempel: 10 };
+    for (const s of w.gen.smallNear(p.x, p.z, 560)) { seen.add(s); l.push([klein[s.kind], s.x, s.z, s.name]); }
+    // vanaf een wachttoren heb je ver gekeken: alles in de wijde omtrek van die toren telt ook mee
+    const tor = p.flags.toren;
+    if (tor && tor.w === p.world) {
+      for (const s of w.gen.sitesNear(tor.x, tor.z, 1400)) if (!seen.has(s)) { seen.add(s); l.push([code(s), s.x, s.z, s.name]); }
+      for (const s of w.gen.smallNear(tor.x, tor.z, 1400)) if (!seen.has(s)) { seen.add(s); l.push([klein[s.kind], s.x, s.z, s.name]); }
+    }
     // de stad en het vliegveld bij het ruimteschip staan altijd op het kompas
     if (p.world === 'groen') { const near = w.gen.cityCells(); for (const k in near) if (!seen.has(near[k])) l.push([code(near[k]), near[k].x, near[k].z, near[k].name]); }
     this.send(p, { t: 'sites', l });

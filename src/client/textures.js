@@ -1021,6 +1021,32 @@ function zwamDraw(dark, light) {
     een(20, 64, 26, 11); een(42, 64, 40, 14); een(53, 64, 16, 7);
   };
 }
+// ---------- geheimen en puzzels ----------
+// De blokken met een schakelaar of knop zijn steenblokken met iets erop; de valvloer lijkt
+// op steenblokken, maar wie goed kijkt ziet de barstjes.
+{
+  const steen = (x, y, u, v) => PX.steenblok(x, y, u, v);
+  const rond = (u, v, cx, cy, r) => Math.hypot(u - cx, v - cy) < r;
+  PX.schakelaar_uit = (x, y, u, v) => { if (Math.abs(u - 0.5) < 0.16 && Math.abs(v - 0.5) < 0.3) { if (Math.abs(u - 0.5) < 0.05 && v > 0.5 && v < 0.74) return [120, 84, 44]; if (rond(u, v, 0.5, 0.74, 0.07)) return [216, 54, 44]; return [58, 60, 66]; } return steen(x, y, u, v); };
+  PX.schakelaar_aan = (x, y, u, v) => { if (Math.abs(u - 0.5) < 0.16 && Math.abs(v - 0.5) < 0.3) { if (Math.abs(u - 0.5) < 0.05 && v > 0.26 && v < 0.5) return [120, 84, 44]; if (rond(u, v, 0.5, 0.26, 0.07)) return [70, 220, 90]; return [58, 60, 66]; } return steen(x, y, u, v); };
+  PX.drukplaat = (x, y, u, v) => { const rand = Math.min(u, v, 1 - u, 1 - v) < 0.08; return mul(rand ? [96, 98, 104] : [150, 152, 158], 0.92 + hash2(x, y, 931) * 0.14); };
+  PX.valvloer = (x, y, u, v) => { const c = steen(x, y, u, v); const barst = Math.abs(v - (0.3 + 0.4 * u + Math.sin(u * 20) * 0.03)) < 0.012 || Math.abs(u - (0.62 - 0.3 * v)) < 0.01; return barst ? mul(c, 0.6) : c; };
+  const knop = (kleur) => (x, y, u, v) => { const d = Math.hypot(u - 0.5, v - 0.5); return d < 0.2 ? mul(kleur, 1.05 - d * 1.2) : d < 0.25 ? [40, 42, 48] : steen(x, y, u, v); };
+  PX.knop_rood = knop([226, 52, 44]); PX.knop_blauw = knop([52, 110, 226]); PX.knop_geel = knop([244, 206, 50]);
+  PX.codedeur = (x, y, u, v) => {
+    for (const [cx, k] of [[0.26, [226, 52, 44]], [0.5, [244, 206, 50]], [0.74, [52, 110, 226]]]) if (rond(u, v, cx, 0.3, 0.07)) return k;
+    const rand = Math.min(u, v, 1 - u, 1 - v) < 0.06, naad = Math.abs(u - 0.5) < 0.012;
+    return mul(rand || naad ? [70, 74, 82] : [128, 134, 146], 0.9 + hash2(x, y, 932) * 0.16);
+  };
+  PX.raadselbord = (x, y, u, v) => { if (Math.min(u, v, 1 - u, 1 - v) < 0.1) return mul([120, 84, 44], 0.9 + hash2(x, y, 933) * 0.2); const regel = (Math.floor(v * 10) % 2 === 1) && u > 0.2 && u < 0.8 && hash2(Math.floor(u * 14), Math.floor(v * 10), 934) > 0.25; return regel ? [60, 44, 28] : [236, 220, 176]; };
+  PX.schilderij = (x, y, u, v) => { if (Math.min(u, v, 1 - u, 1 - v) < 0.1) return mul([200, 160, 50], 0.85 + hash2(x, y, 935) * 0.25); if (rond(u, v, 0.68, 0.32, 0.09)) return [250, 226, 110]; if (v > 0.62 + Math.sin(u * 9) * 0.06) return mul([70, 150, 70], 0.9 + hash2(x, y, 936) * 0.2); if (v > 0.45 + Math.abs(u - 0.4) * 0.6) return [120, 126, 140]; return mix([150, 200, 240], [220, 236, 250], v); };
+  PX.puzzelsteen = (x, y, u, v) => { const d = Math.hypot(u - 0.5, v - 0.5); const ring = Math.abs(d - 0.3) < 0.035 || (Math.abs(u - 0.5) < 0.03 && d < 0.3) || (Math.abs(v - 0.5) < 0.03 && d < 0.3); return ring ? [120, 240, 255] : mul([52, 60, 92], 0.9 + hash2(x, y, 937) * 0.2); };
+  PX.tempelsteen = (x, y, u, v) => { const voeg = (x % 32 < 2) || (y % 16 < 2); return mul(voeg ? [150, 126, 70] : [222, 196, 120], 0.9 + hash2(x, y, 938) * 0.16); };
+  PX.tempeldeur = (x, y, u, v) => { if (Math.min(u, 1 - u) < 0.07 || Math.min(v, 1 - v) < 0.07) return [150, 110, 30]; if (Math.abs(u - 0.5) < 0.3 && Math.abs(v - 0.45) < 0.22) { const cu = Math.floor((u - 0.2) / 0.15), cv = Math.floor((v - 0.23) / 0.15); const inKnop = ((u - 0.2) % 0.15) > 0.03 && ((v - 0.23) % 0.15) > 0.03; return inKnop ? [240, 240, 230] : [40, 40, 50 + ((cu + cv) & 1) * 10]; } return mul([232, 190, 60], 0.9 + hash2(x, y, 939) * 0.16); };
+  PX.kijker = (x, y, u, v) => { if (rond(u, v, 0.5, 0.42, 0.2)) return rond(u, v, 0.5, 0.42, 0.13) ? [150, 210, 250] : [200, 160, 50]; if (Math.abs(u - 0.5) < 0.06 && v > 0.6) return [120, 84, 44]; return steen(x, y, u, v); };
+  PX.kijker_top = (x, y, u, v) => rond(u, v, 0.5, 0.5, 0.2) ? [200, 160, 50] : steen(x, y, u, v);
+}
+
 // de borden met de nummers van de gates op het vliegveld
 for (let n = 1; n <= 10; n++) DRAW['bord_' + n] = (g) => {
   g.fillStyle = '#1c2028'; g.fillRect(0, 0, 64, 64);

@@ -112,6 +112,32 @@ def(208, 'marktkraam', 'Marktkraam', { tiles: ['luifel', 'marktkraam', 'planken'
 // een brandje dat de brandweer moet blussen (zie jobs.js)
 def(209, 'brand', 'Brand', { ...CROSS, tiles: 'kampvuur', light: 13, hard: 0.3, drop: null, interact: true });
 
+// geheimen en puzzels (zie server/secrets.js)
+// Een schakelaar of drukplaat opent alle geheime deuren binnen zes blokken. Een open deur is
+// een onzichtbaar blok waar je doorheen loopt; gaat hij dicht, dan staat de deur er weer.
+const OPEN = { ...CROSS, drop: null, hard: Infinity, replace: false, support: false };
+def(210, 'schakelaar_uit', 'Schakelaar', { tiles: ['steenblok', 'schakelaar_uit', 'steenblok'], hard: 2, tool: 'pick', interact: true });
+def(211, 'schakelaar_aan', 'Schakelaar (aan)', { tiles: ['steenblok', 'schakelaar_aan', 'steenblok'], hard: 2, tool: 'pick', interact: true, drop: [210, 1, 1] });
+def(212, 'drukplaat', 'Drukplaat', { shape: SHAPE_LOW, solid: true, opaque: false, height: 0.0625, tiles: 'drukplaat', hard: 1, tool: 'pick' });
+def(213, 'deur_boekenkast', 'Geheime boekenkastdeur', { tiles: ['planken', 'boekenkast', 'planken'], hard: 1.6, tool: 'axe', snd: 'wood' });
+def(214, 'deur_steen', 'Geheime stenen deur', { tiles: 'steenblok', hard: 4, tool: 'pick' });
+def(215, 'deur_schilderij', 'Geheime schilderijdeur', { tiles: ['planken', 'schilderij', 'planken'], hard: 1.6, tool: 'axe', snd: 'wood' });
+def(216, 'deur_boekenkast_open', 'Open geheime deur', OPEN);
+def(217, 'deur_steen_open', 'Open geheime deur', OPEN);
+def(218, 'deur_schilderij_open', 'Open geheime deur', OPEN);
+def(219, 'valvloer', 'Valvloer', { tiles: 'valvloer', hard: 2, tool: 'pick' });
+def(220, 'knop_rood', 'Rode knop', { tiles: ['steenblok', 'knop_rood', 'steenblok'], hard: 2, tool: 'pick', interact: true });
+def(221, 'knop_blauw', 'Blauwe knop', { tiles: ['steenblok', 'knop_blauw', 'steenblok'], hard: 2, tool: 'pick', interact: true });
+def(222, 'knop_geel', 'Gele knop', { tiles: ['steenblok', 'knop_geel', 'steenblok'], hard: 2, tool: 'pick', interact: true });
+def(223, 'codedeur', 'Codedeur', { tiles: 'codedeur', hard: 6, tool: 'pick', tier: 1, snd: 'metal' });
+def(224, 'codedeur_open', 'Open codedeur', OPEN);
+def(225, 'raadselbord', 'Raadselbord', { tiles: ['planken', 'raadselbord', 'planken'], hard: 1.5, tool: 'axe', snd: 'wood', interact: true });
+def(226, 'puzzelsteen', 'Puzzelsteen', { tiles: 'puzzelsteen', hard: Infinity, interact: true, light: 10 });
+def(227, 'tempeldeur', 'Tempeldeur', { tiles: 'tempeldeur', hard: Infinity, interact: true, snd: 'metal' });
+def(228, 'tempeldeur_open', 'Open tempeldeur', OPEN);
+def(229, 'kijker', 'Uitkijkpost', { tiles: ['kijker_top', 'kijker', 'steenblok'], hard: Infinity, interact: true });
+def(230, 'tempelsteen', 'Tempelsteen', { tiles: 'tempelsteen', hard: Infinity });
+
 // de stad en het vliegveld
 def(172, 'beton', 'Beton', { hard: 3, tool: 'pick' });
 def(173, 'beton_donker', 'Donker beton', { hard: 3, tool: 'pick' });
