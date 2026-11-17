@@ -681,12 +681,12 @@ export class UI {
     row.appendChild(toggle('Scherpte aanpassen', 'dynRes'));
     row.appendChild(toggle('Mooie graphics (proef)', 'hq'));
     b.appendChild(row);
-    // twee proefknoppen voor als het geluid hapert; ze werken pas na opnieuw laden
-    const rowS = el('div', 'btnrow');
-    rowS.appendChild(toggle('Grote geluidsbuffer', 'bigBuf'));
-    rowS.appendChild(toggle('Geluid in stille stand', 'silentFix'));
-    b.appendChild(rowS);
-    b.appendChild(el('p', 'hint', 'Hapert het geluid? Probeer deze twee knoppen één voor één. Ze werken pas als je het spel opnieuw laadt.'));
+    // op iPad en iPhone speelt de muziek via de mediaspeler van het apparaat (dat hapert niet)
+    if (g.sound.tag) {
+      const rowS = el('div', 'btnrow');
+      rowS.appendChild(toggle('Muziek via de speler', 'musicTag'));
+      b.appendChild(rowS);
+    }
     const row2 = el('div', 'btnrow');
     const save = el('button', 'btn small', '💾 Nu opslaan');
     tap(save, () => { g.net.send({ t: 'save' }); this.toast('Opgeslagen!', 'good'); });

@@ -19,7 +19,7 @@ import { setupOffline } from './offline.js';
 import { Weather } from './weather.js';
 
 const $ = (id) => document.getElementById(id);
-const DEFAULTS = { view: 5, volume: 0.8, amb: 1, bigBuf: true, silentFix: true, sens: 1, music: true, sfx: true, autoJump: true, dynRes: true, hq: false };
+const DEFAULTS = { view: 5, volume: 0.8, amb: 1, musicTag: true, sens: 1, music: true, sfx: true, autoJump: true, dynRes: true, hq: false };
 
 class Game {
   constructor() {
@@ -137,7 +137,7 @@ class Game {
     const d = this.sound.diag();
     if (!d) return 'Geluid: nog niet gestart (tik ergens op het scherm)';
     const run = (d.state === 'running' ? 'aan' : 'staat stil (' + d.state + ')') + ' op ' + Math.round(d.rate / 100) / 10 + ' kHz, vertraging ' + d.lat + ' ms';
-    const mus = !this.settings.music ? 'uit' : d.notes + ' noten, sterkte ' + Math.round(d.level * 100) + '%, ' + (d.loop ? 'als lusje' : 'noot voor noot');
+    const mus = !this.settings.music ? 'uit' : d.notes + ' noten, ' + (d.via >= 0 ? 'via de speler (' + d.via + ' tellen)' : 'sterkte ' + Math.round(d.level * 100) + '%, ' + (d.loop ? 'als lusje' : 'noot voor noot'));
     return 'Geluid: ' + run + ' · muziek: ' + mus + ' · effecten: ' + (this.settings.sfx ? 'aan' : 'uit') + (d.ios ? ' · stille stand omzeild: ' + (d.channel ? 'ja' : 'nee') : '');
   }
 
@@ -191,7 +191,9 @@ class Game {
     this.R.setView(S.view);
     this.sound.setVolume(S.volume);
     this.sound.musicOn = S.music;
-    this.sound.bigBuf = S.bigBuf !== false; this.sound.useTag = S.silentFix !== false;      // gelden vanaf de volgende keer dat het spel start
+    this.sound.bigBuf = false;                               // (een grote buffer vragen deed niets op de iPad en maakte geluidjes elders trager)
+    this.sound.musicViaTag = S.musicTag !== false;
+    this.sound.forceTag = /[?&]speler/.test(location.search);      // om de muziek via de speler op een gewone computer te testen
     this.sound.setAmb(S.amb === undefined ? 1 : S.amb);
     this.sound.setSfx(S.sfx);
     this.input.sens = S.sens;

@@ -53,6 +53,9 @@ export class Sound {
     this.ambT = 0;
     this.kicked = false;
     this.sfxOn = true;
+    this.musicViaTag = true; // de muziek via de mediaspeler van het apparaat afspelen (zie musicTag)
+    this.forceTag = false;   // de stille speler ook buiten iPad en iPhone gebruiken (om te testen)
+    this.silentSrc = '';
     this.bigBuf = true;      // grote geluidsbuffer (zie unlock); wordt gezet vanuit de instellingen
     this.useTag = true;      // de stille speler voor de stille stand van iPad en iPhone gebruiken
     this.ambVol = 1;         // hoe hard regen, wind en andere geluiden van de omgeving klinken (0..1)
@@ -74,14 +77,14 @@ export class Sound {
       const as = navigator.audioSession;
       if (as) { if (as.type !== 'playback') as.type = 'playback'; this.channelMode = 'sessie'; }
     } catch (e) { /* bestaat hier niet */ }
-    if (!IS_IOS || !this.useTag) return;
+    if (!(IS_IOS || this.forceTag) || !this.useTag) return;
     try {
       if (!this.tag) {
         const a = this.tag = document.createElement('audio');
         a.setAttribute('x-webkit-airplay', 'deny');
         a.setAttribute('playsinline', '');
         a.controls = false; a.disableRemotePlayback = true; a.preload = 'auto'; a.loop = true;
-        a.src = silentWav(this.ctx ? this.ctx.sampleRate : 44100, 4);
+        a.src = this.silentSrc = silentWav(this.ctx ? this.ctx.sampleRate : 44100, 4);
         a.load();
       }
       if (this.tag.paused && !document.hidden) {
@@ -203,7 +206,7 @@ export class Sound {
   diag() {
     if (!this.ctx) return null;
     this.measure();
-    return { state: this.ctx.state, lat: Math.round(((this.ctx.baseLatency || 0) + (this.ctx.outputLatency || 0)) * 1000), rate: this.ctx.sampleRate, notes: this.notes, level: this.level || 0, ios: IS_IOS, channel: this.channelMode, loop: this.canRender };
+    return { state: this.ctx.state, lat: Math.round(((this.ctx.baseLatency || 0) + (this.ctx.outputLatency || 0)) * 1000), via: this.mus.tagOn ? Math.round(this.tag.currentTime) : -1, rate: this.ctx.sampleRate, notes: this.notes, level: this.level || 0, ios: IS_IOS, channel: this.channelMode, loop: this.canRender };
   }
 
   // hoe sterk is het muzieksignaal op dit moment? (de hoogste waarde van de laatste paar seconden)
@@ -468,6 +471,8 @@ export class Sound {
     if (m.on !== this.musicOn) { m.on = this.musicOn; this.musicGain.gain.setTargetAtTime(m.on ? MUSIC_VOL : 0, now, 0.15); }
     if (!this.musicOn) { m.next = 0; this.stopMusic(); return; }
     if (!this.canRender) { this.musicLive(env); return; }
+    if (this.tag && this.musicViaTag) { this.musicTag(env); return; }
+    if (m.tagOn || m.tagNext) this.tagStop();
     if (m.world !== env.world) { this.stopMusic(); m.world = env.world; }
     if (m.ready && m.ready.world !== m.world) m.ready = null;
     if (m.ready) {
@@ -499,9 +504,99 @@ export class Sound {
     }
   }
 
+  // ---------- muziek via de mediaspeler (iPad en iPhone) ----------
+  // Op een oude iPad haperde het geluid, wat we ook deden: de browser rekent al het geluid van
+  // het spel uit in piepkleine stukjes (3 milliseconden) en als de tablet het druk heeft komt
+  // zo'n stukje te laat. De gewone mediaspeler van het apparaat (dezelfde die een liedje of
+  // filmpje afspeelt) heeft daar geen last van: die krijgt een kant-en-klaar bestandje en
+  // buffert zelf ruim vooruit. Daarom maken we van elk muziekstukje een WAV-bestandje (twee
+  // keer het melodietje en de naklank) en laten we dat door die speler afspelen. Het is
+  // dezelfde speler die er ook voor zorgt dat je geluid hoort in de stille stand.
+  // De speler kan zijn eigen volume niet veranderen (dat mag niet op een iPad), dus het
+  // volume zit in het bestandje zelf: verander je het, dan maken we een nieuw stukje.
+  musicTag(env) {
+    const m = this.mus, tag = this.tag;
+    if (m.src || m.prev) { const j = m.job; this.stopMusic(); m.job = j; }      // de andere manier liep nog
+    if (m.world !== env.world) { this.tagStop(); m.world = env.world; }
+    const v = (0.75 + 0.25 * (env.day === undefined ? 1 : env.day)) * (env.under ? 0.6 : 1) * this.vol * MUSIC_VOL;
+    const sig = Math.round(this.vol * 20) + (env.under ? 'u' : 'b');             // verandert dit, dan moet er meteen een nieuw stukje komen
+    const fresh = () => this.renderSong(m.world, { gain: v, mel: env.under ? 0 : 1, sig, world: m.world });
+    if (m.tagNext && m.tagNext.world !== m.world) { URL.revokeObjectURL(m.tagNext.url); m.tagNext = null; }
+    if (!m.tagOn) {
+      if (m.tagNext) this.tagPlay();
+      else if (!m.job) fresh();
+      return;
+    }
+    if (m.tagSig !== sig) {
+      if (m.tagNext && m.tagNext.sig === sig) this.tagPlay();                    // het nieuwe volume is klaar: meteen wisselen
+      else if (!m.job) { if (m.tagNext) { URL.revokeObjectURL(m.tagNext.url); m.tagNext = null; } fresh(); }
+      return;
+    }
+    // onderweg alvast het volgende melodietje klaarzetten
+    if (!m.tagNext && !m.job && tag.currentTime > 4) fresh();
+  }
+
+  // het klaargezette stukje afspelen
+  tagPlay() {
+    const m = this.mus, tag = this.tag, r = m.tagNext;
+    m.tagNext = null;
+    const old = m.tagUrl;
+    m.tagUrl = r.url; m.tagSig = r.sig; m.tagOn = true;
+    tag.onended = () => {
+      // afgelopen: het volgende stukje, of (als dat er nog niet is) hetzelfde nog een keer
+      if (!m.tagOn) return;
+      if (m.tagNext && m.tagNext.sig === m.tagSig && m.tagNext.world === m.world) this.tagPlay();
+      else { try { tag.currentTime = 0; const pr = tag.play(); if (pr && pr.catch) pr.catch(() => {}); } catch (e) { /* geeft niet */ } }
+    };
+    try {
+      tag.loop = false; tag.src = r.url;
+      const pr = tag.play();
+      if (pr && pr.catch) pr.catch(() => {});
+    } catch (e) { /* de volgende tik proberen we het opnieuw */ }
+    if (old) URL.revokeObjectURL(old);
+  }
+
+  // terug naar de stille lus (muziek uit, een andere wereld, het hoofdmenu)
+  tagStop() {
+    const m = this.mus, tag = this.tag;
+    if (m.tagNext) { URL.revokeObjectURL(m.tagNext.url); m.tagNext = null; }
+    if (!m.tagOn || !tag) { m.tagOn = false; return; }
+    m.tagOn = false; m.tagSig = ''; m.job = null;
+    try {
+      tag.onended = null; tag.loop = true; tag.src = this.silentSrc;
+      if (!document.hidden) { const pr = tag.play(); if (pr && pr.catch) pr.catch(() => {}); }
+    } catch (e) { /* geeft niet */ }
+    if (m.tagUrl) { URL.revokeObjectURL(m.tagUrl); m.tagUrl = ''; }
+  }
+
+  // Van een uitgerekend muziekstukje een WAV-bestandje maken: twee keer het melodietje, met
+  // de naklank van de eerste keer door de tweede heen en de laatste naklank aan het eind.
+  songWav(buf, loopN, o) {
+    const a = buf.getChannelData(0), b = buf.numberOfChannels > 1 ? buf.getChannelData(1) : null;
+    const tail = a.length - loopN, n = loopN * 2 + tail, rate = buf.sampleRate;
+    const bytes = new ArrayBuffer(44 + n * 2), v = new DataView(bytes);
+    const str = (p, t) => { for (let i = 0; i < t.length; i++) v.setUint8(p + i, t.charCodeAt(i)); };
+    str(0, 'RIFF'); v.setUint32(4, 36 + n * 2, true); str(8, 'WAVEfmt ');
+    v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+    v.setUint32(24, rate, true); v.setUint32(28, rate * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true);
+    str(36, 'data'); v.setUint32(40, n * 2, true);
+    const out = new Int16Array(bytes, 44, n), g = o.gain * 32767, mel = o.mel;
+    const at = (i) => a[i] + (b ? b[i] * mel : 0);
+    for (let i = 0; i < n; i++) {
+      let s = 0;
+      if (i < loopN) s = at(i);
+      else if (i < 2 * loopN) { const k = i - loopN; s = at(k) + (k < tail ? at(loopN + k) : 0); }
+      else s = at(i - loopN);
+      s *= g;
+      out[i] = s > 32767 ? 32767 : s < -32768 ? -32768 : s;
+    }
+    return { url: URL.createObjectURL(new Blob([bytes], { type: 'audio/wav' })), sig: o.sig, world: o.world };
+  }
+
   // de muziek stilzetten (muziek uit, een andere wereld, het hoofdmenu, de tablet weggelegd)
   stopMusic() {
     const m = this.mus;
+    if (m.tagOn || m.tagNext) this.tagStop();
     m.job = null; m.ready = null;
     if (!this.ctx || (!m.src && !m.prev)) return;
     const now = this.ctx.currentTime;
@@ -512,7 +607,7 @@ export class Sound {
   }
 
   // Reken vier maten muziek vooruit uit: links de begeleiding, rechts de melodie met echo.
-  renderSong(world) {
+  renderSong(world, wav) {
     const m = this.mus, song = SONGS[world] || SONGS.groen;
     const OAC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
     const stepDur = 60 / song.bpm / 2;
@@ -542,6 +637,7 @@ export class Sound {
       oc.oncomplete = (ev) => {
         if (m.job !== job) return;              // intussen is de muziek gestopt of van wereld gewisseld
         m.job = null;
+        if (wav) { try { m.tagNext = this.songWav(ev.renderedBuffer, loopN, wav); } catch (e) { this.musicViaTag = false; } return; }
         try {
           // Wat na de laatste maat nog naklinkt tellen we bij het begin op: zo sluit het lusje
           // naadloos op zichzelf aan.
