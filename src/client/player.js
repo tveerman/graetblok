@@ -538,6 +538,8 @@ export class Player {
   fly(dt) {
     const g = this.g, inp = g.input;
     const sinY = Math.sin(this.yaw), cosY = Math.cos(this.yaw), cp = Math.cos(this.pitch), sp = Math.sin(this.pitch);
+    const duik = !!this.veh && this.veh.soort === 'duik';          // een onderzeeër: die 'vliegt' onder water
+    const vx0 = this.pos.x, vy0 = this.pos.y, vz0 = this.pos.z;
     // een dier of draak vliegt 14 (20 met sprinten); een vliegtuig of helikopter zo hard als zijn motor kan
     const vmax = this.mountKind === 'heli' && this.veh ? vehStats(this.veh, this.vehUp).max * (1 - 0.5 * Math.min(1, this.vehDmg / 100)) : 14;
     const speed = inp.sprint && !inp.down ? vmax * (vmax > 20 ? 1.25 : 1.42) : vmax;
@@ -566,7 +568,11 @@ export class Player {
     if (this.pos.y > top) { this.pos.y = top; this.vel.y = Math.min(0, this.vel.y); }
     // Een draak, vliegend dier, helikopter of vliegtuig kan niet door water of lava vliegen:
     // je blijft er vlak boven hangen.
-    {
+    if (duik) {
+      // de onderzeeër blijft in het water: zijn buik moet nat blijven (bovenaan steekt hij er half uit)
+      const id = g.world.getBlock(Math.floor(this.pos.x), Math.floor(this.pos.y - below - 0.1), Math.floor(this.pos.z));
+      if (!(id > 0 && B_SHAPE[id] === SHAPE_LIQUID)) { this.pos.set(vx0, vy0, vz0); this.vel.set(0, 0, 0); }
+    } else {
       const wx = Math.floor(this.pos.x), wz = Math.floor(this.pos.z);
       let wy = Math.floor(this.pos.y - below - 0.05);
       const nat = (y) => { const id = g.world.getBlock(wx, y, wz); return id > 0 && B_SHAPE[id] === SHAPE_LIQUID; };
@@ -785,7 +791,7 @@ export class Player {
 
     if (!inp.breakHeld || g.ui.modalOpen()) { this.dig = null; this.crack.visible = false; return; }
 
-    if (this.mount) { if (this.mountKind === '') this.shoot(tgt.dir); return; }      // alleen een draak kan spuwen
+    if (this.mount) { if (this.mountKind === '' || (this.veh && this.veh.kanon)) this.shoot(tgt.dir); return; }      // een draak spuwt, een tank of legerhelikopter schiet
     if (tgt.ent) {
       this.dig = null; this.crack.visible = false;
       if (this.atkCd <= 0 && !tgt.ent.owner) {
@@ -829,7 +835,7 @@ export class Player {
     if (this.shootCd > 0) return;
     const it = ITEMS[this.heldItem()];
     const ride = this.mount ? this.g.ents.map.get(this.mount) : null;
-    this.shootCd = this.mount ? (BREATH[ride && ride.dtype] || BREATH.vuur).cd : (it && it.ranged ? it.ranged.cd + 0.02 : 0.5);
+    this.shootCd = this.veh && this.veh.kanon ? 0.9 : this.mount ? (BREATH[ride && ride.dtype] || BREATH.vuur).cd : (it && it.ranged ? it.ranged.cd + 0.02 : 0.5);
     this.swing = 0.25;
     this.g.net.send({ t: 'shoot', dx: dir.x, dy: dir.y, dz: dir.z });
   }
@@ -840,7 +846,7 @@ export class Player {
     if (this.frozen || this.dead || this.useCd > 0) return;
     this.useCd = 0.16;
     const tgt = this.aim(ndc);
-    if (this.mount) { if (this.mountKind === '') this.shoot(tgt.dir); return; }      // alleen een draak kan spuwen
+    if (this.mount) { if (this.mountKind === '' || (this.veh && this.veh.kanon)) this.shoot(tgt.dir); return; }      // een draak spuwt, een tank of legerhelikopter schiet
     const id = this.heldItem();
     const it = ITEMS[id];
     if (tgt.ent) {
@@ -881,7 +887,7 @@ export class Player {
     if (it && it.thuis) { g.net.send({ t: 'thuis' }); g.sound.play('levelup'); this.swing = 0.25; return; }      // vlindervleugels: terug naar huis
     if (it && it.food && !seed) { g.net.send({ t: 'eat' }); return; }
     if (!b || !id) return;
-    if (!isBlock(id) && !(it && it.portal) && !seed) return;
+    if (!isBlock(id) && !(it && (it.portal || it.kasteel)) && !seed) return;
     let x = b.x, y = b.y, z = b.z;
     if (!BLOCKS[b.id].replace) { x += b.nx; y += b.ny; z += b.nz; }
     const cur = g.world.getBlock(x, y, z);

@@ -1,4 +1,4 @@
-// Graet Blok - het begin van alles aan de kant van het spel (de "client").
+// Big Block - het begin van alles aan de kant van het spel (de "client").
 import * as THREE from '../../vendor/three.module.min.js';
 import { HOTBAR, INV_SIZE, clamp } from '../shared/constants.js';
 import { B, BLOCKS } from '../shared/blocks.js';
@@ -343,6 +343,7 @@ class Game {
       case 'kaart': ui.openMap(m); break;
       case 'mark': this.mark = m.m; break;
       case 'kaartZoek': ui.mapFound(m); break;
+      case 'kasteel': if (m.weg) { if (ui.modal === 'kasteel') ui.close(); } else ui.openCastle(m); break;
       case 'raceMenu': ui.openRaceMenu(m); break;
       case 'kermis': ui.openKermis(m); break;
       case 'kermisGo': ui.playKermis(m.game); break;

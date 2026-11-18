@@ -14,6 +14,7 @@ import { CH, SEA, idx, lerp, smoothstep } from '../shared/constants.js';
 import { hash2, hash3, mulberry32 } from '../shared/noise.js';
 import { B, bedFoot, bedHead } from '../shared/blocks.js';
 import { CRASH, NEST_PEAK } from '../shared/worlds.js';
+import { kingdomAt, VLAG_KLEUREN } from '../shared/kingdoms.js';
 
 export const SITE_CELL = 224;
 
@@ -623,6 +624,8 @@ export const siteMethods = {
       at('dorpeling', -19, 9, 1.5, { job: 'kok' });
       at('dorpeling', 12, 20, 0.8, { job: 'drakenhandelaar' });
       at('dorpeling', -6, 12, 9, { job: 'dorpeling' });
+      // het toernooiveld en de kwartiermeester op de binnenplaats
+      at('dorpeling', -12, 22, 0.8, { job: 'spel_steek' }); at('dorpeling', -8, 22, 0.8, { job: 'spel_boog' }); at('dorpeling', 8, 14, 0.8, { job: 'kwartiermeester' });
     }
     return { npcs };
   },
@@ -630,6 +633,18 @@ export const siteMethods = {
   drawCastle(S, s) {
     const C = CASTLE[s.evil ? (this.world === 'ijs' ? 'ijs' : 'spook') : 'goed'];
     const x = s.x, y = s.y, z = s.z, evil = s.evil, P = PAL[this.world];
+    this.drawCastleBody(S, s, C, x, y, z, evil, P);
+    // de vlag van het koninkrijk op een hoge mast op de binnenplaats, met een schietschijf en een steekspelbaan
+    if (!evil && this.world === 'groen' && S.hit(x - 16, z + 14, x - 2, z + 26)) {
+      const K = kingdomAt(x, z, this.seed), a = VLAG_KLEUREN[K.vlag[0]][0], b = VLAG_KLEUREN[K.vlag[1]][0];
+      S.fill(x - 15, y + 1, z + 18, x - 15, y + 9, z + 18, P.log);
+      for (let k = 1; k <= 4; k++) { S.set(x - 15 + k, y + 9, z + 18, a); S.set(x - 15 + k, y + 8, z + 18, a); S.set(x - 15 + k, y + 7, z + 18, b); S.set(x - 15 + k, y + 6, z + 18, b); }
+      S.set(x - 6, y + 1, z + 24, B.hooi); S.set(x - 6, y + 2, z + 24, B.wol_rood);                      // de schietschijf
+      for (let k = -13; k <= -9; k++) S.set(x + k, y + 1, z + 25, B.wol);                                  // het hek van de steekspelbaan
+    }
+  },
+
+  drawCastleBody(S, s, C, x, y, z, evil, P) {
     if (!S.hit(x - 40, z - 40, x + 40, z + 42)) return;
     const R = 30;
     const rnd = (a, b, salt) => hash3(a, b, salt, s.seed);

@@ -173,6 +173,11 @@ item(389, 'kern_dino', 'Oerportaalkern', { icon: ['core', '#b6ff4a'], portal: 'd
 item(390, 'oerhart', 'Oerhart', { icon: ['heart', '#b6ff4a'], stack: 1 });
 // vlindervleugels: gebruik ze en je vliegt in één keer terug naar je bed (of naar het ruimteschip)
 item(391, 'vlindervleugels', 'Vlindervleugels', { icon: ['vlinder'], thuis: 1, stack: 16 });
+// landen en koninkrijken
+item(392, 'v_tank', 'Tank', { icon: ['car', '#55683a', 'truck'], veh: 'tank', stack: 1 });
+item(393, 'v_legerheli', 'Legerhelikopter', { icon: ['car', '#55683a', 'heli'], veh: 'legerheli', stack: 1 });
+item(394, 'v_onderzeeer', 'Onderzeeër', { icon: ['car', '#f0c020', 'boot'], veh: 'onderzeeer', stack: 1 });
+item(395, 'kasteelbrief', 'Kasteelbrief', { icon: ['brief'], kasteel: 1, stack: 1 });
 
 export { isBlock };
 export function itemName(id) {
@@ -302,6 +307,10 @@ recipe(B.hooi, 1, [[I.tarwe, 4]]);
 recipe(I.pizza, 1, [[I.tomaat, 2], [I.tarwe, 2]], 'oven');
 recipe(I.friet, 1, [[I.aardappel, 2]], 'oven');
 recipe(I.popcorn, 2, [[I.mais, 1]], 'oven');
+recipe(B.wol_geel, 1, [[B.wol, 1], [B.bloem_geel, 1]]);
+recipe(B.wol_groen, 1, [[B.wol, 1], ['blad', 1]]);
+recipe(B.wol_paars, 1, [[B.wol, 1], [B.bloem_blauw, 1], [B.bloem_rood, 1]]);
+recipe(B.wol_zwart, 1, [[B.wol, 1], [I.steenkool, 1]]);
 recipe(B.zonnepaneel, 1, [[B.glas, 2], [I.ijzerstaaf, 2], [I.kristal, 1]], 'werkbank');
 recipe(B.windmolen, 1, [[I.ijzerstaaf, 4], [B.planken, 2]], 'werkbank');
 recipe(B.batterij, 1, [[I.ijzerstaaf, 3], [I.kristal, 2]], 'werkbank');

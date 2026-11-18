@@ -1,4 +1,4 @@
-// Graet Blok - service worker: zorgt dat het spel ook start als de server uit staat.
+// Big Block - service worker: zorgt dat het spel ook start als de server uit staat.
 //
 // Hoe het werkt:
 // - Bij het eerste bezoek worden alle bestanden van het spel opgeslagen ("een generatie").

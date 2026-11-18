@@ -1,6 +1,7 @@
 // Wezens op de server: dieren, monsters, bazen, draken en projectielen.
 // Deze functies worden aan GameServer geplakt (zie onderaan server.js).
 import { CH, clamp, isNight } from '../shared/constants.js';
+import { VEHICLES } from '../shared/vehicles.js';
 import { B, BLOCKS, B_SHAPE, SHAPE_LIQUID, EGG_TYPE } from '../shared/blocks.js';
 import { I, ITEMS } from '../shared/items.js';
 import { WORLDS } from '../shared/worlds.js';
@@ -544,7 +545,8 @@ export const entityMethods = {
       if (this.rnd() <= ch) this.giveLoot(p, id, a + Math.floor(this.rnd() * (b - a + 1)));
     }
     p.kills++;
-    if (e.def.ai === 'melee' || e.def.ai === 'ranged' || e.def.boss) this.jobEvent(p, 'versla');
+    if (e.def.ai === 'melee' || e.def.ai === 'ranged' || e.def.boss) { this.jobEvent(p, 'versla'); this.royalEvent(p, 'versla'); }
+    if (e.kind === 'skeletkoning') this.royalEvent(p, 'spook');
     this.addXp(p, e.def.xp);
     if (duid) {
       const d = p.dragons.find((q) => q.uid === duid);
@@ -609,6 +611,15 @@ export const entityMethods = {
     dx /= l; dy /= l; dz /= l;
     if (p.mount) {
       const e = w.ents.get(p.mount);
+      if (e && e.veh && VEHICLES[e.veh.kind] && VEHICLES[e.veh.kind].kanon) {
+        // het kanon van een tank of legerhelikopter (alleen monsters hebben er last van)
+        if (t - p.shootCd < 0.85) return;
+        p.shootCd = t;
+        this.spawnProj(w, 'kanonskogel', p.x + dx * 2.4, p.y + 1.2 + dy * 2.4, p.z + dz * 2.4, dx * 34, dy * 34, dz * 34, 5, 14 + Math.floor(p.level / 5), 'p', p.id);
+        this.fx(w.id, 'poof', p.x + dx * 2.4, p.y + 1.2, p.z + dz * 2.4, 1);
+        this.send(p, { t: 'shot', k: 'kanonskogel' });
+        return;
+      }
       if (!e || !e.dragon) return;                       // op een trein kun je niet schieten
       const d = e.dragon, b = BREATH[d.type] || BREATH.vuur;
       if (t - p.shootCd < b.cd - 0.05) return;

@@ -31,7 +31,7 @@ export const vehicleMethods = {
     const V = VEHICLES[kind];
     if (!V || Math.hypot(x + 0.5 - p.x, y - p.y, z + 0.5 - p.z) > 10) return;
     // (op gras of een bloem mag het wel: daar rijd je zo overheen)
-    if (w.solid(x, y + 1, z) && V.soort !== 'boot') { this.toast(p, 'Hier is geen plek. Zet hem op een vrij stuk grond.', 'warn'); return; }
+    if (w.solid(x, y + 1, z) && V.soort !== 'boot' && V.soort !== 'duik') { this.toast(p, 'Hier is geen plek. Zet hem op een vrij stuk grond.', 'warn'); return; }
     for (const r of this.vehList()) if (r.w === w.id && Math.hypot(r.x - x - 0.5, r.z - z - 0.5) < 2.5 && Math.abs(r.y - y) < 3) { this.toast(p, 'Hier staat al een voertuig.', 'warn'); return; }
     // jouw auto blijft jouw auto: brandstof, schade, kleur, naam en upgrades van toen je hem oppakte
     const old = (p.flags.veh && p.flags.veh[kind]) || {};
@@ -74,7 +74,7 @@ export const vehicleMethods = {
     if (e.rider || p.mount || p.dead) return;
     p.mount = e.id; e.rider = p.id;
     if (rec.leen) this.toast(p, 'Je leent de ' + (rec.name || V.name).toLowerCase() + ' van de stad. Laat je hem staan, dan rijdt hij vanzelf weer verder.', 'good');
-    this.send(p, { t: 'mount', id: e.id, s: 1, k: V.soort === 'lucht' ? 'heli' : 'auto', veh: rec.kind, seat: V.seat, yaw: e.yaw - Math.PI, fuel: rec.fuel, tank: V.tank, dmg: rec.dmg, up: rec.up || {} });
+    this.send(p, { t: 'mount', id: e.id, s: 1, k: V.soort === 'lucht' || V.soort === 'duik' ? 'heli' : 'auto', veh: rec.kind, seat: V.seat, yaw: e.yaw - Math.PI, fuel: rec.fuel, tank: V.tank, dmg: rec.dmg, up: rec.up || {} });
   },
 
   // De speler meldt een paar keer per tel hoe ver hij gereden heeft en of hij ergens tegenaan botste.
@@ -86,7 +86,7 @@ export const vehicleMethods = {
     const d = Math.max(0, Math.min(60, +m.d || 0));
     rec.fuel = Math.max(0, rec.fuel - d / V.zuinig);
     const bump = Math.max(0, Math.min(40, +m.bump || 0));
-    if (bump && !p.god && !V.kermis) rec.dmg = Math.min(100, rec.dmg + bump);
+    if (bump && !p.god && !V.kermis && !V.pantser) rec.dmg = Math.min(100, rec.dmg + bump);
     this.vehStatus(p, rec);
   },
 

@@ -1,4 +1,4 @@
-// Alle blokken van Graet Blok.
+// Alle blokken van Big Block.
 // shape: 0 = lucht, 1 = kubus, 2 = klein ding (plantje, fakkel, vuur: een 3D-model), 3 = vloeistof
 //        4 = laag blok (lager dan een heel blok, zoals een bed)
 //        5 = ei (een rond 3D-ei; in de rugzak is het een plaatje)
@@ -371,6 +371,12 @@ def(1043, 'tentdoek', 'Gestreept tentdoek', { hard: 0.5, snd: 'snow' });
 def(1044, 'zwamsteel', 'Paddenstoelsteel', { hard: 0.8, snd: 'leaf' });
 def(1045, 'cactus', 'Cactus', { tiles: ['cactus_top', 'cactus', 'cactus_top'], hard: 0.6, snd: 'leaf' });
 def(1046, 'zandsteen', 'Zandsteen', { hard: 2.5, tool: 'pick' });
+// landen en koninkrijken: meer kleuren wol voor de vlaggen, en de steen van je eigen kasteel
+def(1053, 'wol_geel', 'Gele wol', { hard: 0.5, snd: 'snow' });
+def(1054, 'wol_groen', 'Groene wol', { hard: 0.5, snd: 'snow' });
+def(1055, 'wol_paars', 'Paarse wol', { hard: 0.5, snd: 'snow' });
+def(1056, 'wol_zwart', 'Zwarte wol', { hard: 0.5, snd: 'snow' });
+def(1057, 'kasteelsteen', 'Kasteelsteen', { tiles: ['kasteelsteen_top', 'kasteelsteen', 'kasteelmuur'], hard: Infinity, interact: true, light: 6 });
 // nieuwe bomen voor de bossen ver weg: wilg, es en linde
 def(1047, 'stam_wilg', 'Wilgenstam', { ...LOG, tiles: ['stam_eik_top', 'stam_wilg', 'stam_eik_top'] });
 def(1048, 'blad_wilg', 'Wilgenblad', { ...LEAF });

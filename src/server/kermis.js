@@ -57,6 +57,7 @@ export const kermisMethods = {
     }
     if (m.c !== 'score' || p.kermis !== m.game) return;
     p.kermis = '';
+    if (m.game === 'steekspel' || m.game === 'boog') { this.tournamentResult(p, m.game, Math.max(0, Math.min(1, +m.score || 0))); return; }
     const s = Math.max(0, Math.min(1, +m.score || 0)), r = this.rnd();
     let id = 0, n = 1, tekst = '';
     if (s >= 0.9) {

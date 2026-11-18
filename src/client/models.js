@@ -765,7 +765,7 @@ export function dier(S, shiny) {
 // Elk voertuig is opgebouwd uit doosjes en wielen, met de neus naar +z. De wielen draaien mee
 // als je rijdt (net als bij de trein); de helikopter heeft draaiende wieken.
 function voertuig(kind, kleur) {
-  const V = VEHICLES[kind], heli = V.soort === 'lucht';
+  const V = VEHICLES[kind], heli = V.soort === 'lucht' || V.soort === 'duik';
   const root = base(heli ? 'heli' : 'trein'), a = root.userData.a, g = a.inner;
   a.wheels = [];
   const [w, h, l] = V.size;
@@ -846,6 +846,25 @@ function voertuig(kind, kleur) {
     if (kind === 'tractor') { part(g, staal, w * 1.5, 0.08, 0.1, 0, 0.3, -l * 0.56); for (let i = -2; i <= 2; i++) part(g, staal, 0.08, 0.4, 0.3, i * w * 0.34, 0.2, -l * 0.6); }      // de ploeg
     else if (kind === 'zaaimachine') { part(g, mat(0xf4f4f0, 'glad'), w * 1.5, 0.5, 0.6, 0, 0.75, -l * 0.6); for (let i = -2; i <= 2; i++) part(g, staal, 0.08, 0.5, 0.08, i * w * 0.34, 0.25, -l * 0.6); }
     else { part(g, mat(0xd8362c, 'glad'), w * 1.55, 0.5, 0.7, 0, 0.42, l * 0.62); part(g, staal, w * 1.5, 0.3, 0.3, 0, 0.5, l * 0.74); part(g, lak, 0.3, 0.3, 1.6, w * 0.5, h + 0.1, -l * 0.1); }      // de maaibalk en de pijp
+  } else if (kind === 'tank') {
+    // een tank: rupsbanden, een brede romp en een koepel met een loop
+    for (const s of [-1, 1]) { part(g, donker, 0.4, 0.5, l * 0.98, s * (w / 2 - 0.2), 0.3, 0); for (const z of [-0.36, -0.12, 0.12, 0.36]) wiel(s * (w / 2 - 0.2), z * l, 0.26, 0.42); }
+    part(g, lak, w * 0.86, 0.5, l * 0.9, 0, 0.75, 0);
+    part(g, lak, w * 0.6, 0.42, l * 0.42, 0, 1.2, -l * 0.04);                                       // de koepel
+    part(g, donker, 0.18, 0.18, l * 0.6, 0, 1.22, l * 0.4);                                         // de loop
+    part(g, donker, 0.3, 0.1, 0.3, w * 0.12, 1.46, -l * 0.08);                                      // het luik
+    part(g, licht, 0.16, 0.1, 0.05, w * 0.3, 0.8, l * 0.455); part(g, licht, 0.16, 0.1, 0.05, -w * 0.3, 0.8, l * 0.455);
+  } else if (kind === 'onderzeeer') {
+    // een gele onderzeeër: een lange romp, een toren met een periscoop, ramen en een schroef
+    part(g, lak, w * 0.8, 1.1, l * 0.8, 0, 0.8, 0);
+    part(g, lak, w * 0.6, 0.8, l * 0.14, 0, 0.8, l * 0.46); part(g, lak, w * 0.5, 0.7, l * 0.12, 0, 0.8, -l * 0.45);
+    part(g, lak, w * 0.4, 0.5, l * 0.2, 0, 1.55, l * 0.02);                                         // de toren
+    part(g, staal, 0.06, 0.5, 0.06, 0, 2.0, l * 0.04); part(g, staal, 0.06, 0.06, 0.2, 0, 2.22, l * 0.09);      // de periscoop
+    for (const s of [-1, 1]) for (const z of [-0.2, 0.05, 0.3]) part(g, glas, 0.04, 0.3, 0.3, s * w * 0.405, 0.95, z * l);
+    part(g, glas, w * 0.4, 0.4, 0.05, 0, 0.9, l * 0.535);
+    for (const s of [-1, 1]) part(g, donker, 0.5, 0.06, 0.4, s * w * 0.55, 0.8, -l * 0.36);          // de roeren
+    const prop = new THREE.Group(); prop.position.set(0, 0.8, -l * 0.53); g.add(prop); a.prop = prop;
+    part(prop, donker, 0.9, 0.12, 0.05, 0, 0, 0); part(prop, donker, 0.12, 0.9, 0.05, 0, 0, 0);
   } else if (kind === 'vliegtuig') {
     // een klein propellervliegtuig
     part(g, lak, w * 0.5, 0.9, l * 0.8, 0, 1.0, 0);

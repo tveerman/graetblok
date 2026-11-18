@@ -1,4 +1,4 @@
-// De werelden van Graet Blok en hun levensbomen.
+// De werelden van Big Block en hun levensbomen.
 // Noord = -z, oost = +x.
 import { SEA } from './constants.js';
 

@@ -29,6 +29,9 @@ export const KERMIS_GAMES = {
   ring: { name: 'Ringwerpen', soort: 'mik', beurten: 3, uitleg: 'Drie ringen. Tik als het streepje precies op de paal staat.' },
   eend: { name: 'Eendjes vissen', soort: 'kies', beurten: 1, uitleg: 'Vis één eendje uit het water. Onder elk eendje staat een getal: hoe hoger, hoe beter je prijs.' },
   ballon: { name: 'Ballonnen prikken', soort: 'kies', beurten: 3, uitleg: 'Prik drie ballonnen. In sommige zit een prijs!' },
+  // het toernooi op de binnenplaats van een kasteel (zie kingdoms.js)
+  steekspel: { name: 'Steekspel', soort: 'mik', beurten: 3, uitleg: 'Drie ritten met de lans. Tik als het streepje precies op het midden van het schild staat.' },
+  boog: { name: 'Boogschieten', soort: 'mik', beurten: 3, uitleg: 'Drie pijlen. Tik als het streepje op de roos van de schietschijf staat.' },
   grijp: { name: 'Grijpmachine', soort: 'mik', beurten: 1, uitleg: 'Tik als de grijper precies boven de knuffel hangt.' },
 };
 export const KERMIS_PRICE = 2;        // zoveel munten kost één spelletje

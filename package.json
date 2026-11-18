@@ -1,7 +1,7 @@
 {
   "name": "graet-blok",
   "version": "0.1.0",
-  "description": "Graet Blok - een blokkenwereld met draken, monsters en levensbomen. Ontworpen door Jorian.",
+  "description": "Big Block - een blokkenwereld met draken, monsters en levensbomen. Ontworpen door Jorian.",
   "private": true,
   "type": "module",
   "scripts": {

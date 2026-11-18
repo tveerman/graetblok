@@ -54,6 +54,10 @@ export const JOBS = {
   spel_blik: { title: 'Kermisbaas', hi: '', game: 'blik', trades: [] },
   spel_ring: { title: 'Kermisbaas', hi: '', game: 'ring', trades: [] },
   spel_grijp: { title: 'Kermisbaas', hi: '', game: 'grijp', trades: [] },
+  spel_steek: { title: 'Toernooimeester', hi: '', game: 'steekspel', trades: [] },
+  spel_boog: { title: 'Schietmeester', hi: '', game: 'boog', trades: [] },
+  kwartiermeester: { title: 'Kwartiermeester', hi: 'Legervoertuigen voor ridders van het rijk. Ze zijn om monsters te verjagen!',
+    trades: [[M, 200, I.v_tank, 1], [M, 260, I.v_legerheli, 1], [M, 220, I.v_onderzeeer, 1], [M, 3, I.jerrycan, 1], [M, 4, I.moersleutel, 1]] },
   uitvinder: { title: 'Uitvinder', hi: 'Welkom in mijn werkplaats! Met stroom kun je van alles laten werken.',
     trades: [[M, 12, B.zonnepaneel, 1], [M, 10, B.windmolen, 1], [M, 15, B.batterij, 1], [M, 40, B.fabriek, 1], [M, 60, B.teleportpoort, 1], [M, 80, B.klimaatmachine, 1], [I.machineonderdeel, 1, M, 3]] },
   hotelier: { title: 'Hotelbaas', hi: 'Welkom in hotel De Zilveren Toren! Slaap gerust in een van de bedden achterin.',
@@ -141,6 +145,7 @@ export const npcMethods = {
       if (p.inSite !== inside.key) {
         p.inSite = inside.key;
         if (!inside.evil) this.jobVisit(p, inside.key);
+        if (inside.kind === 'dorp') this.royalEvent(p, 'dorp', inside.key);
         this.toast(p, (inside.kind === 'vliegveld' ? 'Welkom op ' : inside.kind === 'dorp' || inside.kind === 'stad' ? 'Welkom in ' : inside.kind === 'kamp' ? 'Pas op: je bent bij ' : 'Je bent bij ') + inside.name + (inside.evil && inside.kind === 'kasteel' ? '. Het spookt hier...' : inside.kind === 'vliegveld' ? '! Het lijnvliegtuig wacht aan het begin van de startbaan: stap in om mee te vliegen.' : '!'), inside.evil ? 'boss' : 'good');
       }
     } else p.inSite = null;
@@ -444,6 +449,7 @@ export const npcMethods = {
     if (e.veh) { this.useVehicle(p, w, e, hid); return true; }
     if (e.race) return true;
     if (e.def.ride) { this.useRide(p, w, e); return true; }
+    if (e.job === 'kwartiermeester' && this.royalRank(p) < 2) { this.toast(p, (e.name || 'De kwartiermeester') + ': "Legervoertuigen zijn alleen voor ridders. Praat met de vorst in de troonzaal: hij heeft opdrachten voor je."', 'warn'); return true; }
     if (hid === I.verband && e.kind === 'dorpeling') { this.jobHeal(p, w, e); return true; }      // de dokter verbindt een dorpeling
     if (e.job && JOBS[e.job] && JOBS[e.job].game) { this.kermisMenu(p, JOBS[e.job].game); return true; }                                              // de auto van een andere coureur
     if (e.job === 'racemeester') { this.raceMenu(p, w, e); return true; }
@@ -452,6 +458,7 @@ export const npcMethods = {
       e.talk = 25;
       let say = J.hi || TIPS[(e.id + Math.floor(this.meta.time / 40)) % TIPS.length];
       if (e.job === 'uitvinder') say = this.inventorSays(p);
+      if (e.job === 'koning') say = this.royalSays(p) || say;
       if (!p.flags.welkom) {
         p.flags.welkom = 1;
         this.giveLoot(p, M, 5); this.sendInv(p);

@@ -1,4 +1,4 @@
-// De spelserver van Graet Blok.
+// De spelserver van Big Block.
 //
 // De server is de baas over de wereld: blokken, rugzak, monsters, draken en opslaan.
 // Hij praat ALLEEN via berichten met het spel (de client). Nu draait hij in een
@@ -27,6 +27,7 @@ import { jobMethods } from './jobs.js';
 import { secretMethods } from './secrets.js';
 import { techMethods } from './tech.js';
 import { mapMethods } from './map.js';
+import { kingdomMethods } from './kingdoms.js';
 import { CROP_OF_SEED } from '../shared/farm.js';
 import { WorldGen } from './worldgen.js';
 
@@ -493,6 +494,13 @@ export class GameServer {
       this.sendInv(p);
       return;
     }
+    if (!isBlock(s.id) && ITEMS[s.id] && ITEMS[s.id].kasteel) {
+      // de kasteelbrief: hier verrijst je eigen kasteel
+      if (!this.placeCastle(p, w, x, y, z)) return reject();
+      s.n--; if (s.n <= 0) p.inv[p.sel] = null;
+      this.sendInv(p);
+      return;
+    }
     if (!isBlock(s.id)) {
       const it = ITEMS[s.id];
       if (it && it.portal) {
@@ -598,6 +606,8 @@ export class GameServer {
       this.useIncubator(p, w, x, y, z);
     } else if (id === B.zonnepaneel || id === B.windmolen || id === B.batterij || id === B.fabriek || id === B.teleportpoort || id === B.klimaatmachine) {
       this.useTech(p, w, x, y, z, id);
+    } else if (id === B.kasteelsteen) {
+      this.useCastleStone(p, w, x, y, z);
     } else if (id === B.schakelaar_uit || id === B.schakelaar_aan) {
       this.useSwitch(p, w, x, y, z, id);
     } else if (id === B.knop_rood || id === B.knop_blauw || id === B.knop_geel) {
@@ -1009,7 +1019,7 @@ export class GameServer {
     this.updateIncubators();
     this.updateCrops();
     this.updateTech();
-    for (const q of this.players.values()) this.updateFires(q);
+    for (const q of this.players.values()) { this.updateFires(q); this.updateKingdom(q); }
     for (const wid of active) this.cleanup(this.worlds[wid]);
     // chunks vergeten waar niemand meer is
     if (Math.floor(this.meta.time) % 5 === 0) {
@@ -1092,5 +1102,5 @@ export class GameServer {
   }
 }
 
-Object.assign(GameServer.prototype, entityMethods, npcMethods, zooMethods, vehicleMethods, kermisMethods, cityMethods, farmMethods, jobMethods, secretMethods, techMethods, mapMethods);
+Object.assign(GameServer.prototype, entityMethods, npcMethods, zooMethods, vehicleMethods, kermisMethods, cityMethods, farmMethods, jobMethods, secretMethods, techMethods, mapMethods, kingdomMethods);
 export { itemName, isNight };

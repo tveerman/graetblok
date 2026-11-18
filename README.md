@@ -1,4 +1,7 @@
-# Graet Blok
+# Big Block
+
+(The game was called *Graet Blok* until 2026-11; storage keys, the dev-server name and the
+story's world name "Graet" still use the old name on purpose, so existing saves keep working.)
 
 Een blokkenwereld met draken, monsters, portalen en levensbomen — bedacht door Jorian (9),
 gebouwd met [three.js](https://threejs.org). Het spel draait volledig in de browser; alle
@@ -441,6 +444,22 @@ From Jorian's design document (`spel.txt`), following development phases 1–4, 
   drops butterfly wings: a consumable that, used from your hand, carries you (with dragons
   and animals that follow you) back to your bed, from any world, or to the spaceship when
   you have no bed. Each use costs one pair.
+- **Countries and kingdoms (landen en koninkrijken)** – from Jorian's plan
+  (`src/shared/kingdoms.js`, `src/server/kingdoms.js`). The green world is divided into
+  kingdoms of 1344 blocks (Westoria around the spaceship, then Drakonia, Frostheim, Ironhold,
+  Eldoria and more), each with a king or queen and a two-colour flag that flies on a mast in
+  every good castle of that kingdom; a message tells you when you cross a border. The ruler
+  in the throne room gives five tasks, counted only inside his kingdom (defeat monsters, win
+  the joust, visit villages, win the archery contest, defeat a Skeleton King) and makes you
+  Schildknaap, Ridder, Baron, Graaf and Hertog. The castle courtyard has a tournament master
+  (joust) and an archery master, two timing games. From Ridder on the quartermaster sells
+  army vehicles: a tank and an army helicopter with a cannon that only hurts monsters (the
+  tank takes no crash damage) and a yellow submarine that sails under water. A Hertog gets a
+  castle deed: use it on dry land and your own castle rises as a small keep with a magic
+  castle stone inside; for coins it grows through ten levels (higher keep, ring wall with
+  gate, corner towers, lanterns and banners, battlements, gatehouse, spire, pointed roofs,
+  gold trim), with a family name and a flag in two colours you choose. Four new wool colours.
+  Not in yet: parades, a family vault and allies, the vehicle museum.
 - **Player character with a skeleton** (`src/client/rig.js`) – the human, elf and robot you
   can play are built on one rig with joints (hips, knees, ankles, spine, neck, shoulders,
   elbows). The animation computes joint angles: knees bend while the leg swings forward, the

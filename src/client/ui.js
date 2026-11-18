@@ -6,6 +6,7 @@ import { WORLDS, WORLD_ORDER, CRASH } from '../shared/worlds.js';
 import { DRAGONS, dragonStage, STAGE_NAMES } from '../shared/mobs.js';
 import { iconURL, eggURL } from './textures.js';
 import { KERMIS_GAMES } from '../shared/rides.js';
+import { VLAG_KLEUREN } from '../shared/kingdoms.js';
 import { JOBS as WORK, JOB_RANKS, jobLevel, jobMedal, jobSalary } from '../shared/jobs.js';
 import { VEHICLES, VEH_COLORS, UPGRADES, UPGRADE_ORDER, vehStats } from '../shared/vehicles.js';
 import { ANIMALS, ANIMAL_LIST, EGG_KINDS, EGG_ORDER, RARITY, RARITIES, SHINIES, SHINY, ZOO_REWARDS, MAX_OUT } from '../shared/animals.js';
@@ -757,6 +758,45 @@ export class UI {
       info.textContent = 'Schuif de blokjes tot ze op volgorde staan: 1, 2, 3 bovenaan en het lege vakje rechtsonder.';
     }
     this.open('puzzel', '🧩 Puzzel van kamer ' + m.kamer, b);
+  }
+
+  // ---------- je eigen kasteel ----------
+
+  openCastle(m) {
+    const g = this.g, send = (o) => g.net.send(Object.assign({ t: 'kasteel' }, o));
+    const b = el('div', 'garage');
+    b.appendChild(el('div', 'qsec', '<h4>🏰 ' + (m.naam ? 'Kasteel van de familie ' + m.naam : 'Jouw kasteel') + ' · level ' + m.level + ' van de 10</h4>' +
+      '<p class="hint">Jouw titel: ' + m.titel + ' · je hebt ' + m.munten + ' munten</p>'));
+    const us = el('div', 'qsec');
+    us.appendChild(el('h4', '', 'Laten groeien'));
+    if (m.prijs) {
+      us.appendChild(el('p', '', 'Level ' + (m.level + 1) + ' brengt: <b>' + m.komt + '</b>.'));
+      const up = el('button', 'btn small' + (m.munten >= m.prijs ? ' active' : ''), '🔨 Bouwen voor ' + m.prijs + ' munten');
+      tap(up, () => send({ c: 'up' }));
+      us.appendChild(up);
+    } else us.appendChild(el('p', '', 'Je kasteel is een paleis: groter kan niet!'));
+    b.appendChild(us);
+    const fs = el('div', 'qsec');
+    fs.appendChild(el('h4', '', 'Je familie en je vlag'));
+    const naam = el('button', 'btn small active', '✏️ ' + (m.naam ? 'Familienaam: ' + m.naam : 'Geef je familie een naam'));
+    tap(naam, () => { const n = window.prompt('Hoe heet je familie?', m.naam || ''); if (n !== null) send({ c: 'naam', naam: n }); });
+    fs.appendChild(naam);
+    VLAG_KLEUREN.forEach(() => 0);
+    for (const [welke, tekst] of [[0, 'Bovenste baan'], [1, 'Onderste baan']]) {
+      const rij = el('div', 'btnrow');
+      rij.appendChild(el('span', 'hint', tekst + ': '));
+      VLAG_KLEUREN.forEach(([, kleur], i) => {
+        const k = el('button', 'btn small' + (m.vlag[welke] === i ? ' active' : ''), kleur);
+        tap(k, () => send({ c: 'vlag', a: welke === 0 ? i : m.vlag[0], b: welke === 1 ? i : m.vlag[1] }));
+        rij.appendChild(k);
+      });
+      fs.appendChild(rij);
+    }
+    b.appendChild(fs);
+    const weg = el('button', 'btn small', '📜 Verhuizen (je krijgt je kasteelbrief terug)');
+    tap(weg, () => { if (window.confirm('Weet je het zeker? De muren blijven staan, maar een nieuw kasteel begint weer op level 1.')) send({ c: 'weg' }); });
+    b.appendChild(weg);
+    this.open('kasteel', 'Mijn kasteel', b, true);
   }
 
   // ---------- de wereldkaart ----------

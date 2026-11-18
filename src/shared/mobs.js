@@ -125,6 +125,7 @@ export const PROJ = {
   laser: { color: 0x4ae0ff, size: 0.35, trail: true, glow: true },
   oer: { color: 0xffffff, size: 0.8, trail: true, glow: true },
   vuurbal: { color: 0xff7a1a, size: 0.7, trail: true, glow: true },
+  kanonskogel: { color: 0x2a2a2e, size: 0.55, trail: true },
   ijspegel: { color: 0xbfefff, size: 0.5, trail: true, glow: true },
   schaduwbol: { color: 0x7a3aff, size: 0.6, trail: true, glow: true },
   bliksem: { color: 0xfff6a0, size: 0.6, trail: true, glow: true },

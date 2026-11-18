@@ -1105,6 +1105,8 @@ function zwamDraw(dark, light) {
   PX.cactus = (x, y, u, v) => { const rib = ((x % 16) < 2); const stekel = hash2(x >> 2, y >> 2, 1032) < 0.05; return stekel ? [240, 240, 210] : mul([60, 150, 70], (rib ? 0.7 : 0.92) + hash2(x, y, 1033) * 0.14); };
   PX.cactus_top = (x, y, u, v) => (Math.hypot(u - 0.5, v - 0.5) < 0.12 ? [250, 120, 170] : mul([70, 160, 80], 0.9 + hash2(x, y, 1034) * 0.16));
   PX.zandsteen = (x, y, u, v) => mul(mix([214, 190, 130], [190, 160, 100], ((y >> 3) & 1)), 0.92 + hash2(x >> 1, y >> 1, 1035) * 0.12);
+  PX.kasteelsteen = (x, y, u, v) => { const d = Math.max(Math.abs(u - 0.5), Math.abs(v - 0.5)); if (d < 0.2 && Math.abs(u - 0.5) + Math.abs(v - 0.42) < 0.2) return [250, 210, 60]; return d < 0.3 ? [150, 40, 44] : d < 0.36 ? [240, 200, 60] : steen(x, y, u, v); };
+  PX.kasteelsteen_top = (x, y, u, v) => (Math.hypot(u - 0.5, v - 0.5) < 0.24 ? [250, 210, 60] : steen(x, y, u, v));
   PX.kijker_top = (x, y, u, v) => rond(u, v, 0.5, 0.5, 0.2) ? [200, 160, 50] : steen(x, y, u, v);
 }
 
@@ -1239,6 +1241,10 @@ Object.assign(PX, {
   },
   wol: wolTex([238, 236, 228], 509),
   wol_rood: wolTex([198, 44, 40], 510),
+  wol_geel: wolTex([240, 200, 50], 1051),
+  wol_groen: wolTex([60, 150, 70], 1052),
+  wol_paars: wolTex([130, 70, 190], 1053),
+  wol_zwart: wolTex([40, 40, 46], 1054),
   wol_blauw: wolTex([54, 94, 200], 511),
   hooi: (x, y, u, v) => {
     const halm = vn(u * 3, v * 46, 3, 46, 512) * 0.6 + vn(u * 6, v * 90, 6, 90, 513) * 0.4;
@@ -2038,6 +2044,14 @@ const ICONS = {
       g.fillStyle = '#c0203a'; g.strokeStyle = 'rgba(0,0,0,0.5)'; g.lineWidth = 1.5; g.beginPath(); g.arc(x, y, r, 0, 6.3); g.fill(); g.stroke();
       g.fillStyle = 'rgba(255,255,255,0.5)'; g.beginPath(); g.arc(x - 4, y - 4, 3, 0, 6.3); g.fill();
     }
+  },
+  // een opgerolde brief met een rood lakzegel (de kasteelbrief)
+  brief: (g) => {
+    g.strokeStyle = 'rgba(0,0,0,0.6)'; g.lineWidth = 2; g.fillStyle = '#f0e2b0';
+    g.fillRect(14, 12, 36, 42); g.strokeRect(14, 12, 36, 42);
+    g.fillStyle = '#d8c488'; g.fillRect(10, 8, 44, 8); g.strokeRect(10, 8, 44, 8); g.fillRect(10, 50, 44, 8); g.strokeRect(10, 50, 44, 8);
+    g.strokeStyle = '#7a6a48'; g.lineWidth = 1.5; for (let y = 24; y <= 38; y += 7) { g.beginPath(); g.moveTo(20, y); g.lineTo(44, y); g.stroke(); }
+    g.fillStyle = '#c02a2a'; g.strokeStyle = 'rgba(0,0,0,0.6)'; g.lineWidth = 2; g.beginPath(); g.arc(40, 46, 7, 0, 6.3); g.fill(); g.stroke();
   },
   vlinder: (g) => {
     g.strokeStyle = 'rgba(0,0,0,0.6)'; g.lineWidth = 2;
